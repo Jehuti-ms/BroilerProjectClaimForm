@@ -1,23 +1,3 @@
-// Initialize with sample data from the PDF
-const sampleData = [
-    { date: '2025-10-04', amPm: 'AM', inTime: '07:00', outTime: '10:00', hours: '3:00' },
-    { date: '2025-10-04', amPm: 'PM', inTime: '15:00', outTime: '17:00', hours: '2:00' },
-    { date: '2025-10-05', amPm: 'AM', inTime: '08:00', outTime: '10:00', hours: '2:00' },
-    { date: '2025-10-05', amPm: 'PM', inTime: '15:00', outTime: '17:00', hours: '2:00' },
-    { date: '2025-10-11', amPm: 'AM', inTime: '08:00', outTime: '12:00', hours: '4:00' },
-    { date: '2025-10-11', amPm: 'PM', inTime: '', outTime: '', hours: '0:00' },
-    { date: '2025-10-12', amPm: 'AM', inTime: '09:00', outTime: '13:00', hours: '4:00' },
-    { date: '2025-10-12', amPm: 'PM', inTime: '16:00', outTime: '18:00', hours: '2:00' },
-    { date: '2025-10-18', amPm: 'AM', inTime: '08:00', outTime: '12:00', hours: '4:00' },
-    { date: '2025-10-18', amPm: 'PM', inTime: '16:00', outTime: '18:00', hours: '2:00' },
-    { date: '2025-10-19', amPm: 'AM', inTime: '07:30', outTime: '10:30', hours: '3:00' },
-    { date: '2025-10-19', amPm: 'PM', inTime: '', outTime: '', hours: '0:00' },
-    { date: '2025-10-25', amPm: 'AM', inTime: '07:00', outTime: '09:00', hours: '2:00' },
-    { date: '2025-10-25', amPm: 'PM', inTime: '15:00', outTime: '17:00', hours: '2:00' },
-    { date: '2025-10-26', amPm: 'AM', inTime: '08:00', outTime: '10:00', hours: '2:00' },
-    { date: '2025-10-26', amPm: 'PM', inTime: '15:30', outTime: '17:30', hours: '2:00' }
-];
-
 let currentEditingRow = null;
 let currentFormData = [];
 const monthNames = ["January", "February", "March", "April", "May", "June",
@@ -48,13 +28,11 @@ function checkAuthentication() {
 
 // Initialize the application
 function initializeApp() {
-    const tableBody = document.querySelector('#time-table tbody');
-    
     // Load last viewed month from localStorage
     const lastMonth = localStorage.getItem('lastViewedMonth');
     const lastYear = localStorage.getItem('lastViewedYear');
     
-    if (lastMonth && lastYear) {
+    if (lastMonth !== null && lastYear !== null) {
         document.getElementById('month-select').value = lastMonth;
         document.getElementById('year-input').value = lastYear;
     }
@@ -73,6 +51,7 @@ function initializeApp() {
     });
     
     updateFormDate();
+    loadCurrentMonthData(); // Load data for current month
 }
 
 // Save current month/year to localStorage
@@ -87,11 +66,14 @@ function saveCurrentMonth() {
 // Load user data for current month
 function loadUserData(username) {
     const userData = localStorage.getItem(`userData_${username}`);
+    console.log('Loading user data for:', username, userData);
+    
     if (userData) {
         const allData = JSON.parse(userData);
         loadCurrentMonthData(allData);
     } else {
-        // Initialize with sample data for new users
+        // Initialize with empty data for new users
+        console.log('No saved data found, starting with empty form');
         loadCurrentMonthData();
     }
 }
@@ -102,24 +84,22 @@ function loadCurrentMonthData(allData = null) {
     const year = document.getElementById('year-input').value;
     const monthYear = `${month}-${year}`;
     
+    console.log('Loading data for month:', monthYear, 'Available data:', allData);
+    
     const tableBody = document.querySelector('#time-table tbody');
     tableBody.innerHTML = '';
     currentFormData = [];
     
     if (allData && allData[monthYear]) {
         // Load saved data for this month
+        console.log('Found saved data for this month:', allData[monthYear]);
         allData[monthYear].forEach(entry => {
             addRowToTable(entry);
             currentFormData.push(entry);
         });
     } else {
-        // Load sample data only for October 2025
-        if (month == 9 && year == 2025) {
-            sampleData.forEach(entry => {
-                addRowToTable(entry);
-                currentFormData.push(entry);
-            });
-        }
+        // No data for this month, start with empty form
+        console.log('No data found for this month, starting with empty form');
     }
     
     calculateTotal();
@@ -128,12 +108,17 @@ function loadCurrentMonthData(allData = null) {
 // Save user data
 function saveUserData() {
     const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) return;
+    if (!currentUser) {
+        console.log('No user logged in, cannot save data');
+        return;
+    }
     
     const user = JSON.parse(currentUser);
     const month = document.getElementById('month-select').value;
     const year = document.getElementById('year-input').value;
     const monthYear = `${month}-${year}`;
+    
+    console.log('Saving data for user:', user.username, 'Month:', monthYear, 'Data:', currentFormData);
     
     // Get existing user data
     const existingData = localStorage.getItem(`userData_${user.username}`);
@@ -144,6 +129,7 @@ function saveUserData() {
     
     // Save back to localStorage
     localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
+    console.log('Data saved successfully');
     
     // Show save confirmation
     showNotification('Form data saved successfully!');
@@ -151,6 +137,10 @@ function saveUserData() {
 
 // Show notification
 function showNotification(message) {
+    // Remove any existing notifications
+    const existingNotifications = document.querySelectorAll('.notification');
+    existingNotifications.forEach(notification => notification.remove());
+    
     // Create notification element
     const notification = document.createElement('div');
     notification.className = 'notification';
@@ -171,7 +161,9 @@ function showNotification(message) {
     
     // Remove after 3 seconds
     setTimeout(() => {
-        notification.remove();
+        if (notification.parentNode) {
+            notification.remove();
+        }
     }, 3000);
 }
 
@@ -278,14 +270,18 @@ function saveEntry() {
         hours: hours
     };
     
+    console.log('Saving entry:', entryData);
+    
     if (currentEditingRow !== null) {
         // Update existing row
         updateRowInTable(currentEditingRow, entryData);
         currentFormData[currentEditingRow] = entryData;
+        console.log('Updated row at index:', currentEditingRow);
     } else {
         // Add new row
         addRowToTable(entryData);
         currentFormData.push(entryData);
+        console.log('Added new row, total entries:', currentFormData.length);
     }
     
     calculateTotal();
@@ -312,18 +308,23 @@ function addRowToTable(data) {
     `;
     
     tableBody.appendChild(newRow);
+    console.log('Added row to table, index:', rowIndex);
 }
 
 // Update an existing row in the table
 function updateRowInTable(rowIndex, data) {
     const rows = document.querySelectorAll('#time-table tbody tr');
-    const row = rows[rowIndex];
-    
-    row.cells[0].textContent = formatDateForDisplay(data.date);
-    row.cells[1].textContent = data.amPm;
-    row.cells[2].textContent = formatTimeDisplay(data.inTime);
-    row.cells[3].textContent = formatTimeDisplay(data.outTime);
-    row.cells[4].textContent = data.hours;
+    if (rows[rowIndex]) {
+        const row = rows[rowIndex];
+        
+        row.cells[0].textContent = formatDateForDisplay(data.date);
+        row.cells[1].textContent = data.amPm;
+        row.cells[2].textContent = formatTimeDisplay(data.inTime);
+        row.cells[3].textContent = formatTimeDisplay(data.outTime);
+        row.cells[4].textContent = data.hours;
+        
+        console.log('Updated row in table, index:', rowIndex);
+    }
 }
 
 // Format date for display (DD/MM/YYYY format)
@@ -379,6 +380,8 @@ function deleteRow(rowIndex) {
         if (rows[rowIndex]) {
             rows[rowIndex].remove();
             currentFormData.splice(rowIndex, 1);
+            
+            console.log('Deleted row, remaining entries:', currentFormData.length);
             
             // Update row indices for remaining rows
             const remainingRows = document.querySelectorAll('#time-table tbody tr');
