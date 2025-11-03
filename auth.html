@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Broiler Production Project</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1>Grantley Adams Memorial School</h1>
+                <h2>Broiler Production Project</h2>
+                <p>Please sign in to access your claim forms</p>
+            </div>
+            
+            <form id="login-form" class="auth-form">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="employee-name">Your Full Name:</label>
+                    <input type="text" id="employee-name-auth" name="employee-name" required>
+                </div>
+                
+                <button type="submit" class="auth-btn">Sign In</button>
+            </form>
+            
+            <div class="auth-footer">
+                <p>Don't have an account? <a href="#" onclick="showRegister()">Register here</a></p>
+            </div>
+        </div>
+
+        <div class="auth-card" id="register-card" style="display: none;">
+            <div class="auth-header">
+                <h1>Create Account</h1>
+                <p>Register for Broiler Production Project</p>
+            </div>
+            
+            <form id="register-form" class="auth-form">
+                <div class="form-group">
+                    <label for="new-username">Username:</label>
+                    <input type="text" id="new-username" name="new-username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new-password">Password:</label>
+                    <input type="password" id="new-password" name="new-password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm-password">Confirm Password:</label>
+                    <input type="password" id="confirm-password" name="confirm-password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new-employee-name">Your Full Name:</label>
+                    <input type="text" id="new-employee-name" name="new-employee-name" required>
+                </div>
+                
+                <button type="submit" class="auth-btn">Register</button>
+            </form>
+            
+            <div class="auth-footer">
+                <p>Already have an account? <a href="#" onclick="showLogin()">Sign in here</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+</body>
+</html>
