@@ -34,7 +34,7 @@ body {
 }
 .user-info {
     position: absolute;
-    top: 10px; /* Lower position */
+    top: 5px; /* Lower position */
     right: 10px;
     display: flex;
     align-items: center;
