@@ -51,21 +51,28 @@
         </div>
 
         <div class="form-section">
-            <table id="time-table">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Am/Pm</th>
-                        <th>Time IN</th>
-                        <th>Time OUT</th>
-                        <th>Hours</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Rows will be added dynamically -->
-                </tbody>
-            </table>
+            <div class="table-container">
+                <table id="time-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Am/Pm</th>
+                            <th>Time IN</th>
+                            <th>Time OUT</th>
+                            <th>Hours</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rows will be added dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="total-hours">
+                Total Hours: <span id="total-hours">0:00</span>
+            </div>
+        </div>
+            
             <div class="total-hours">
                 Total Hours: <span id="total-hours">0:00</span>
             </div>
