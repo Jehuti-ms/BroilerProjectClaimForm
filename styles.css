@@ -14,19 +14,18 @@ body {
     padding: 20px;
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
-/* Updated Header Styles */
 .header {
     text-align: center;
     margin-bottom: 20px;
     border-bottom: 1px solid #ddd;
     padding-bottom: 15px;
     position: relative;
-    min-height: 80px; /* Ensure enough space for user info */
+    min-height: 100px;
 }
 .header h1 {
     margin: 0;
     font-size: 24px;
-    padding-top: 10px; /* Add some space at top */
+    padding-top: 10px;
 }
 .header h2 {
     margin: 5px 0;
@@ -36,15 +35,16 @@ body {
 }
 .user-info {
     position: absolute;
-    top: 15px; /* Moved down from top */
+    top: 20px;
     right: 10px;
     display: flex;
     align-items: center;
     gap: 10px;
-    background: rgba(255, 255, 255, 0.9); /* Semi-transparent background */
+    background: rgba(255, 255, 255, 0.95);
     padding: 8px 12px;
     border-radius: 5px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid #e0e0e0;
 }
 .logout-btn {
     background-color: #666;
@@ -54,32 +54,6 @@ body {
     border-radius: 3px;
     color: white;
     cursor: pointer;
-}
-.logout-btn:hover {
-    background-color: #555;
-}
-
-/* For mobile devices */
-@media (max-width: 768px) {
-    .header {
-        min-height: 100px; /* More space on mobile */
-    }
-    .user-info {
-        position: static;
-        justify-content: center;
-        margin-top: 10px;
-        background: none;
-        box-shadow: none;
-        padding: 5px;
-    }
-    .header h1 {
-        padding-top: 0;
-    }
-    
-.logout-btn {
-    background-color: #666;
-    padding: 5px 10px;
-    font-size: 12px;
 }
 .logout-btn:hover {
     background-color: #555;
@@ -311,6 +285,23 @@ button:hover {
     .container {
         padding: 10px;
     }
+    .header {
+        min-height: auto;
+        padding-bottom: 60px;
+    }
+    .user-info {
+        position: absolute;
+        top: auto;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        right: auto;
+        justify-content: center;
+        background: none;
+        box-shadow: none;
+        border: none;
+        padding: 5px;
+    }
     .date-controls {
         flex-direction: column;
         gap: 10px;
@@ -329,10 +320,5 @@ button:hover {
     .modal-content {
         width: 95%;
         margin: 10% auto;
-    }
-    .user-info {
-        position: static;
-        justify-content: center;
-        margin-top: 10px;
     }
 }
