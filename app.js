@@ -22,7 +22,7 @@ function checkAuthentication() {
     document.getElementById('user-display').textContent = `Welcome, ${user.employeeName}`;
     document.getElementById('employee-name').value = user.employeeName;
     
-    // Load user's saved data and last viewed month
+    // Load user's saved data
     loadUserData(user.username);
 }
 
@@ -51,7 +51,6 @@ function initializeApp() {
     });
     
     updateFormDate();
-    loadCurrentMonthData(); // Load data for current month
 }
 
 // Save current month/year to localStorage
@@ -72,7 +71,6 @@ function loadUserData(username) {
         const allData = JSON.parse(userData);
         loadCurrentMonthData(allData);
     } else {
-        // Initialize with empty data for new users
         console.log('No saved data found, starting with empty form');
         loadCurrentMonthData();
     }
@@ -97,9 +95,6 @@ function loadCurrentMonthData(allData = null) {
             addRowToTable(entry);
             currentFormData.push(entry);
         });
-    } else {
-        // No data for this month, start with empty form
-        console.log('No data found for this month, starting with empty form');
     }
     
     calculateTotal();
@@ -129,7 +124,7 @@ function saveUserData() {
     
     // Save back to localStorage
     localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
-    console.log('Data saved successfully');
+    console.log('Data saved successfully. Full data:', allData);
     
     // Show save confirmation
     showNotification('Form data saved successfully!');
@@ -230,8 +225,7 @@ function closeModal() {
     currentEditingRow = null;
 }
 
-// Save entry from modal
-// Save entry from modal - IMPROVED DATE HANDLING
+// Save entry from modal - SIMPLIFIED DATE HANDLING
 function saveEntry() {
     const date = document.getElementById('entry-date').value;
     const amPm = document.getElementById('entry-am-pm').value;
@@ -248,22 +242,6 @@ function saveEntry() {
         return;
     }
     
-    // Validate the date
-    const selectedDate = new Date(date);
-    if (isNaN(selectedDate.getTime())) {
-        alert('Please select a valid date');
-        return;
-    }
-    
-    // Format the date consistently as YYYY-MM-DD
-    const year = selectedDate.getFullYear();
-    const month = (selectedDate.getMonth() + 1).toString().padStart(2, '0');
-    const day = selectedDate.getDate().toString().padStart(2, '0');
-    const formattedDate = `${year}-${month}-${day}`;
-    
-    console.log('Original date input:', date);
-    console.log('Formatted date for storage:', formattedDate);
-    
     // Calculate hours
     const inDate = new Date(`2000-01-01T${inTime}`);
     const outDate = new Date(`2000-01-01T${outTime}`);
@@ -279,15 +257,16 @@ function saveEntry() {
     
     const hours = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
     
+    // Use the date exactly as the user entered it
     const entryData = {
-        date: formattedDate, // Use the consistently formatted date
+        date: date, // Use the raw date from input (YYYY-MM-DD)
         amPm: amPm,
         inTime: inTime,
         outTime: outTime,
         hours: hours
     };
     
-    console.log('Saving entry:', entryData);
+    console.log('Saving entry with date:', date, 'Full entry:', entryData);
     
     if (currentEditingRow !== null) {
         // Update existing row
@@ -325,7 +304,7 @@ function addRowToTable(data) {
     `;
     
     tableBody.appendChild(newRow);
-    console.log('Added row to table, index:', rowIndex);
+    console.log('Added row to table with date:', data.date);
 }
 
 // Update an existing row in the table
@@ -340,7 +319,7 @@ function updateRowInTable(rowIndex, data) {
         row.cells[3].textContent = formatTimeDisplay(data.outTime);
         row.cells[4].textContent = data.hours;
         
-        console.log('Updated row in table, index:', rowIndex);
+        console.log('Updated row in table with date:', data.date);
     }
 }
 
@@ -354,7 +333,7 @@ function formatDateForDisplay(dateString) {
     return `${day}/${month}/${year}`;
 }
 
-// Format date for input (YYYY-MM-DD format) - FIXED
+// Format date for input (YYYY-MM-DD format)
 function formatDateForInput(dateString) {
     if (!dateString) return '';
     const [day, month, year] = dateString.split('/');
