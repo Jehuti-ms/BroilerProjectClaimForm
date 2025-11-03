@@ -42,7 +42,7 @@ function checkAuthentication() {
     document.getElementById('user-display').textContent = `Welcome, ${user.employeeName}`;
     document.getElementById('employee-name').value = user.employeeName;
     
-    // Load user's saved data
+    // Load user's saved data and last viewed month
     loadUserData(user.username);
 }
 
@@ -50,18 +50,38 @@ function checkAuthentication() {
 function initializeApp() {
     const tableBody = document.querySelector('#time-table tbody');
     
+    // Load last viewed month from localStorage
+    const lastMonth = localStorage.getItem('lastViewedMonth');
+    const lastYear = localStorage.getItem('lastViewedYear');
+    
+    if (lastMonth && lastYear) {
+        document.getElementById('month-select').value = lastMonth;
+        document.getElementById('year-input').value = lastYear;
+    }
+    
     // Add event listeners for date controls
     document.getElementById('month-select').addEventListener('change', function() {
         updateFormDate();
+        saveCurrentMonth();
         loadCurrentMonthData();
     });
     
     document.getElementById('year-input').addEventListener('change', function() {
         updateFormDate();
+        saveCurrentMonth();
         loadCurrentMonthData();
     });
     
     updateFormDate();
+}
+
+// Save current month/year to localStorage
+function saveCurrentMonth() {
+    const month = document.getElementById('month-select').value;
+    const year = document.getElementById('year-input').value;
+    
+    localStorage.setItem('lastViewedMonth', month);
+    localStorage.setItem('lastViewedYear', year);
 }
 
 // Load user data for current month
@@ -93,7 +113,7 @@ function loadCurrentMonthData(allData = null) {
             currentFormData.push(entry);
         });
     } else {
-        // Load sample data for current month (October 2025)
+        // Load sample data only for October 2025
         if (month == 9 && year == 2025) {
             sampleData.forEach(entry => {
                 addRowToTable(entry);
