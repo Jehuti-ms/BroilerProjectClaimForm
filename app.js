@@ -231,6 +231,7 @@ function closeModal() {
 }
 
 // Save entry from modal
+// Save entry from modal - IMPROVED DATE HANDLING
 function saveEntry() {
     const date = document.getElementById('entry-date').value;
     const amPm = document.getElementById('entry-am-pm').value;
@@ -246,6 +247,22 @@ function saveEntry() {
         alert('Please enter both IN and OUT times');
         return;
     }
+    
+    // Validate the date
+    const selectedDate = new Date(date);
+    if (isNaN(selectedDate.getTime())) {
+        alert('Please select a valid date');
+        return;
+    }
+    
+    // Format the date consistently as YYYY-MM-DD
+    const year = selectedDate.getFullYear();
+    const month = (selectedDate.getMonth() + 1).toString().padStart(2, '0');
+    const day = selectedDate.getDate().toString().padStart(2, '0');
+    const formattedDate = `${year}-${month}-${day}`;
+    
+    console.log('Original date input:', date);
+    console.log('Formatted date for storage:', formattedDate);
     
     // Calculate hours
     const inDate = new Date(`2000-01-01T${inTime}`);
@@ -263,7 +280,7 @@ function saveEntry() {
     const hours = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
     
     const entryData = {
-        date: date,
+        date: formattedDate, // Use the consistently formatted date
         amPm: amPm,
         inTime: inTime,
         outTime: outTime,
@@ -328,20 +345,39 @@ function updateRowInTable(rowIndex, data) {
 }
 
 // Format date for display (DD/MM/YYYY format)
+// Format date for display (DD/MM/YYYY format) - IMPROVED
 function formatDateForDisplay(dateString) {
     if (!dateString) return '';
-    const date = new Date(dateString);
+    
+    // Handle both YYYY-MM-DD and other formats
+    let date;
+    if (dateString.includes('-')) {
+        // It's already in YYYY-MM-DD format
+        date = new Date(dateString);
+    } else {
+        // It's in DD/MM/YYYY format
+        const [day, month, year] = dateString.split('/');
+        date = new Date(`${year}-${month}-${day}`);
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateString);
+        return '';
+    }
+    
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
 }
 
-// Format date for input (YYYY-MM-DD format)
+// Format date for input (YYYY-MM-DD format) - FIXED
 function formatDateForInput(dateString) {
     if (!dateString) return '';
     const [day, month, year] = dateString.split('/');
-    return `${year}-${month}-${day}`;
+    // Ensure proper formatting for Date object
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
 // Format time for display (convert 24h to 12h format)
