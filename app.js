@@ -345,27 +345,9 @@ function updateRowInTable(rowIndex, data) {
 }
 
 // Format date for display (DD/MM/YYYY format)
-// Format date for display (DD/MM/YYYY format) - IMPROVED
 function formatDateForDisplay(dateString) {
     if (!dateString) return '';
-    
-    // Handle both YYYY-MM-DD and other formats
-    let date;
-    if (dateString.includes('-')) {
-        // It's already in YYYY-MM-DD format
-        date = new Date(dateString);
-    } else {
-        // It's in DD/MM/YYYY format
-        const [day, month, year] = dateString.split('/');
-        date = new Date(`${year}-${month}-${day}`);
-    }
-    
-    // Check if date is valid
-    if (isNaN(date.getTime())) {
-        console.error('Invalid date:', dateString);
-        return '';
-    }
-    
+    const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
@@ -376,8 +358,7 @@ function formatDateForDisplay(dateString) {
 function formatDateForInput(dateString) {
     if (!dateString) return '';
     const [day, month, year] = dateString.split('/');
-    // Ensure proper formatting for Date object
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    return `${year}-${month}-${day}`;
 }
 
 // Format time for display (convert 24h to 12h format)
