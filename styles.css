@@ -20,12 +20,10 @@ body {
     border-bottom: 1px solid #ddd;
     padding-bottom: 15px;
     position: relative;
-    min-height: 100px;
 }
 .header h1 {
     margin: 0;
     font-size: 24px;
-    padding-top: 10px;
 }
 .header h2 {
     margin: 5px 0;
@@ -35,7 +33,7 @@ body {
 }
 .user-info {
     position: absolute;
-    top: 20px;
+    top: 50px; /* Aligned with Claim Form title */
     right: 10px;
     display: flex;
     align-items: center;
@@ -133,37 +131,67 @@ input[type="date"], input[type="time"], input[type="text"] {
     padding: 5px;
     border: 1px solid #ddd;
 }
+
+/* Total Hours */
 .total-hours {
     text-align: right;
     font-weight: bold;
     font-size: 18px;
-    margin-bottom: 20px;
+    margin-bottom: 30px;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #ddd;
 }
+
+/* Form Footer - Signatures and Buttons */
+.form-footer {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 2px solid #ddd;
+}
+
 .signature-section {
     display: flex;
     justify-content: space-between;
-    margin-top: 30px;
+    margin-bottom: 30px;
+    gap: 20px;
 }
 .signature-box {
-    width: 30%;
+    flex: 1;
+    text-align: center;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+.signature-box div:first-child {
+    font-weight: bold;
+    margin-bottom: 10px;
 }
 .signature-line {
     border-top: 1px solid #000;
     margin-top: 40px;
     padding-top: 5px;
 }
+
 .buttons {
     display: flex;
     justify-content: space-between;
+    gap: 10px;
     margin-top: 20px;
 }
 button {
-    padding: 10px 20px;
+    padding: 12px 24px;
     background-color: #4CAF50;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: background-color 0.2s;
+    flex: 1;
 }
 button:hover {
     background-color: #45a049;
@@ -180,6 +208,7 @@ button:hover {
     padding: 5px 10px;
     font-size: 12px;
     margin-right: 5px;
+    flex: none;
 }
 .edit-btn:hover {
     background-color: #e68900;
@@ -188,6 +217,7 @@ button:hover {
     background-color: #f44336;
     padding: 5px 10px;
     font-size: 12px;
+    flex: none;
 }
 .delete-btn:hover {
     background-color: #d32f2f;
@@ -326,7 +356,6 @@ button:hover {
         padding: 10px;
     }
     .header {
-        min-height: auto;
         padding-bottom: 60px;
     }
     .user-info {
@@ -346,16 +375,16 @@ button:hover {
         flex-direction: column;
         gap: 10px;
     }
-    .buttons {
-        flex-direction: column;
-        gap: 10px;
-    }
     .signature-section {
         flex-direction: column;
-        gap: 20px;
+        gap: 15px;
     }
     .signature-box {
         width: 100%;
+    }
+    .buttons {
+        flex-direction: column;
+        gap: 10px;
     }
     .modal-content {
         width: 95%;
