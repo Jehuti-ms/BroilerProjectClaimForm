@@ -68,39 +68,36 @@
                     </tbody>
                 </table>
             </div>
+            <!-- ... header, date controls, employee info, form section ... -->
+
             <div class="total-hours">
                 Total Hours: <span id="total-hours">0:00</span>
             </div>
-        </div>
             
-            <div class="total-hours">
-                Total Hours: <span id="total-hours">0:00</span>
-            </div>
-        </div>
+            <div class="form-footer">
+                <div class="signature-section">
+                    <div class="signature-box">
+                        <div>Signature Claimant:</div>
+                        <div class="signature-line"></div>
+                    </div>
+                    <div class="signature-box">
+                        <div>Signature HOD:</div>
+                        <div class="signature-line"></div>
+                    </div>
+                    <div class="signature-box">
+                        <div>Signature Principal:</div>
+                        <div class="signature-line"></div>
+                    </div>
+                </div>
 
-        <div class="signature-section">
-            <div class="signature-box">
-                <div>Signature Claimant:</div>
-                <div class="signature-line"></div>
+                <div class="buttons">
+                    <button onclick="calculateTotal()">Calculate Total</button>
+                    <button onclick="generatePDF()">Generate PDF</button>
+                    <button onclick="clearForm()">Clear Form</button>
+                    <button onclick="saveForm()" class="save-btn">Save Form</button>
+                </div>
             </div>
-            <div class="signature-box">
-                <div>Signature HOD:</div>
-                <div class="signature-line"></div>
-            </div>
-            <div class="signature-box">
-                <div>Signature Principal:</div>
-                <div class="signature-line"></div>
-            </div>
-        </div>
-
-        <div class="buttons">
-            <button onclick="calculateTotal()">Calculate Total</button>
-            <button onclick="generatePDF()">Generate PDF</button>
-            <button onclick="clearForm()">Clear Form</button>
-            <button onclick="saveForm()" class="save-btn">Save Form</button>
-        </div>
-    </div>
-
+            
     <!-- Modal for adding/editing entries -->
     <div id="entry-modal" class="modal">
         <div class="modal-content">
