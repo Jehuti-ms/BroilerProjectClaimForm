@@ -6,7 +6,13 @@ function showRegister() {
 
 function showLogin() {
     document.getElementById('register-card').style.display = 'none';
+    document.getElementById('reset-card').style.display = 'none';
     document.getElementById('login-form').parentElement.style.display = 'block';
+}
+
+function showReset() {
+    document.getElementById('login-form').parentElement.style.display = 'none';
+    document.getElementById('reset-card').style.display = 'block';
 }
 
 // Handle login form submission
@@ -17,7 +23,7 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
     const password = document.getElementById('password').value;
     const employeeName = document.getElementById('employee-name-auth').value;
     
-    // Simple authentication (in a real app, this would be server-side)
+    // Simple authentication
     const users = JSON.parse(localStorage.getItem('users') || '{}');
     
     if (users[username] && users[username].password === password) {
@@ -85,10 +91,106 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
     window.location.href = 'index.html';
 });
 
+// Handle password reset form submission
+document.getElementById('reset-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('reset-username').value;
+    const newPassword = document.getElementById('reset-new-password').value;
+    const confirmNewPassword = document.getElementById('reset-confirm-password').value;
+    
+    // Validation
+    if (newPassword !== confirmNewPassword) {
+        alert('Passwords do not match');
+        return;
+    }
+    
+    if (newPassword.length < 4) {
+        alert('Password must be at least 4 characters long');
+        return;
+    }
+    
+    // Get existing users
+    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    
+    // Check if username exists
+    if (!users[username]) {
+        alert('Username not found');
+        return;
+    }
+    
+    // Update password
+    users[username].password = newPassword;
+    users[username].passwordResetAt = new Date().toISOString();
+    
+    // Save updated users
+    localStorage.setItem('users', JSON.stringify(users));
+    
+    alert('Password reset successful! You can now login with your new password.');
+    showLogin();
+});
+
 // Check if user is already logged in
 document.addEventListener('DOMContentLoaded', function() {
     const currentUser = localStorage.getItem('currentUser');
     if (currentUser) {
         window.location.href = 'index.html';
     }
+    
+    // Add emergency reset button for development (remove in production)
+    addEmergencyReset();
 });
+
+// Emergency reset function for development
+function addEmergencyReset() {
+    const emergencyReset = document.createElement('button');
+    emergencyReset.textContent = 'Emergency Reset (Clear All Data)';
+    emergencyReset.style.cssText = `
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        background: #ff4444;
+        color: white;
+        border: none;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        cursor: pointer;
+        z-index: 10000;
+    `;
+    emergencyReset.onclick = function() {
+        if (confirm('WARNING: This will clear ALL user data including forms and passwords. Continue?')) {
+            localStorage.clear();
+            alert('All data cleared. Page will reload.');
+            location.reload();
+        }
+    };
+    document.body.appendChild(emergencyReset);
+}
+
+// Manual password reset function (can be called from browser console)
+function manualPasswordReset(username, newPassword) {
+    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    
+    if (!users[username]) {
+        console.error('User not found:', username);
+        return false;
+    }
+    
+    users[username].password = newPassword;
+    users[username].manualResetAt = new Date().toISOString();
+    
+    localStorage.setItem('users', JSON.stringify(users));
+    console.log('Password reset for user:', username);
+    return true;
+}
+
+// List all users (for admin purposes)
+function listAllUsers() {
+    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    console.log('All registered users:');
+    Object.keys(users).forEach(username => {
+        console.log('Username:', username, 'Name:', users[username].employeeName);
+    });
+    return users;
+}
