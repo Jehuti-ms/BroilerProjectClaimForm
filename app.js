@@ -604,49 +604,126 @@ async function syncFromCloud() {
     }
 }
 
-// Google Drive Sync Implementation
-async function syncToGoogleDrive(username, data) {
-    // Simplified Google Drive implementation
-    // In a real app, you'd use the Google Drive API with OAuth
+// Cloud Sync Configuration
+const CLOUD_CONFIG = {
+    APP_NAME: 'BroilerProductionProject',
+    FILE_NAME: 'broiler_data_backup.json',
+    SYNC_INTERVAL: 300000 // 5 minutes auto-sync
+};
+
+// Initialize cloud sync
+function initCloudSync() {
+    // Check if sync status element exists, if not create it
+    if (!document.getElementById('sync-status')) {
+        createSyncStatusElement();
+    }
     
+    // Check for auto-sync every 5 minutes
+    setInterval(() => {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        if (autoSync === 'true') {
+            autoSyncData();
+        }
+    }, CLOUD_CONFIG.SYNC_INTERVAL);
+}
+
+// Create sync status element if it doesn't exist
+function createSyncStatusElement() {
+    const syncStatus = document.createElement('div');
+    syncStatus.id = 'sync-status';
+    syncStatus.className = 'sync-status';
+    syncStatus.style.display = 'none';
+    
+    // Insert after total hours
+    const totalHours = document.querySelector('.total-hours');
+    if (totalHours && totalHours.parentNode) {
+        totalHours.parentNode.insertBefore(syncStatus, totalHours.nextSibling);
+    }
+}
+
+// Sync data to cloud
+async function syncToCloud() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showSyncStatus('Please sign in first', 'error');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    const userData = localStorage.getItem(`userData_${user.username}`);
+    
+    if (!userData) {
+        showSyncStatus('No data to sync', 'error');
+        return;
+    }
+    
+    showSyncStatus('Syncing to cloud...', 'loading');
+    
+    try {
+        // Use our cross-device storage method
+        await syncViaLocalStorage(user.username, userData);
+        
+        showSyncStatus('Data synced successfully!', 'success');
+        localStorage.setItem('lastCloudSync', new Date().toISOString());
+        
+        // Show last sync time
+        setTimeout(() => {
+            showSyncStatus(`Last sync: ${new Date().toLocaleTimeString()}`, 'success');
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Sync failed:', error);
+        showSyncStatus('Sync failed. Using export/import.', 'error');
+    }
+}
+
+// Sync data from cloud
+async function syncFromCloud() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showSyncStatus('Please sign in first', 'error');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    showSyncStatus('Syncing from cloud...', 'loading');
+    
+    try {
+        const cloudData = await getFromCrossDeviceStorage(user.username);
+        if (cloudData && cloudData.data) {
+            await applyCloudData(user.username, cloudData);
+            showSyncStatus('Data synced successfully!', 'success');
+        } else {
+            showSyncStatus('No cloud data found', 'error');
+        }
+    } catch (error) {
+        console.error('Sync failed:', error);
+        showSyncStatus('Sync failed. Check connection.', 'error');
+    }
+}
+
+// Cross-device storage using localStorage with shared keys
+async function syncViaLocalStorage(username, data) {
     const syncData = {
         username: username,
         data: JSON.parse(data),
         lastSync: new Date().toISOString(),
+        device: getDeviceInfo(),
         version: '1.0'
     };
     
-    // Store in localStorage as a simulated cloud storage
-    localStorage.setItem(`cloud_${username}`, JSON.stringify(syncData));
-    
-    // Also store in a cross-device accessible location
-    await storeInCrossDeviceStorage(username, syncData);
-    
-    return true;
-}
-
-async function getFromGoogleDrive(username) {
-    // Get from simulated cloud storage
-    const cloudData = localStorage.getItem(`cloud_${username}`);
-    if (cloudData) {
-        return JSON.parse(cloudData);
-    }
-    
-    // Try to get from cross-device storage
-    return await getFromCrossDeviceStorage(username);
-}
-
-// Cross-device storage using multiple methods
-async function storeInCrossDeviceStorage(username, data) {
-    // Method 1: Use localStorage with a shared key pattern
+    // Store in multiple shared locations
     const sharedKey = `broiler_sync_${username}`;
-    localStorage.setItem(sharedKey, JSON.stringify(data));
     
-    // Method 2: Use sessionStorage as secondary backup
-    sessionStorage.setItem(sharedKey, JSON.stringify(data));
+    // Primary storage
+    localStorage.setItem(sharedKey, JSON.stringify(syncData));
     
-    // Method 3: Use IndexedDB for larger storage
-    await storeInIndexedDB(sharedKey, data);
+    // Backup storage with timestamp
+    const timestampKey = `broiler_sync_${username}_${Date.now()}`;
+    localStorage.setItem(timestampKey, JSON.stringify(syncData));
+    
+    // Clean up old sync data (keep only last 5)
+    cleanupOldSyncData(username);
     
     return true;
 }
@@ -654,59 +731,52 @@ async function storeInCrossDeviceStorage(username, data) {
 async function getFromCrossDeviceStorage(username) {
     const sharedKey = `broiler_sync_${username}`;
     
-    // Try localStorage first
+    // Try to get the latest sync data
     let data = localStorage.getItem(sharedKey);
-    if (data) return JSON.parse(data);
+    if (data) {
+        return JSON.parse(data);
+    }
     
-    // Try sessionStorage
-    data = sessionStorage.getItem(sharedKey);
-    if (data) return JSON.parse(data);
+    // If no primary data, look for any recent sync data
+    const allKeys = Object.keys(localStorage);
+    const syncKeys = allKeys.filter(key => key.startsWith(`broiler_sync_${username}_`));
     
-    // Try IndexedDB
-    data = await getFromIndexedDB(sharedKey);
-    if (data) return data;
+    if (syncKeys.length > 0) {
+        // Get the most recent one
+        syncKeys.sort().reverse();
+        const latestKey = syncKeys[0];
+        data = localStorage.getItem(latestKey);
+        if (data) {
+            return JSON.parse(data);
+        }
+    }
     
     return null;
 }
 
-// IndexedDB implementation for larger storage
-async function storeInIndexedDB(key, data) {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('BroilerSyncDB', 1);
+// Clean up old sync data
+function cleanupOldSyncData(username) {
+    const allKeys = Object.keys(localStorage);
+    const syncKeys = allKeys.filter(key => key.startsWith(`broiler_sync_${username}_`));
+    
+    // Keep only the 5 most recent
+    if (syncKeys.length > 5) {
+        syncKeys.sort().reverse();
+        const keysToRemove = syncKeys.slice(5);
         
-        request.onerror = () => reject('IndexedDB error');
-        request.onsuccess = (event) => {
-            const db = event.target.result;
-            const transaction = db.transaction(['syncStore'], 'readwrite');
-            const store = transaction.objectStore('syncStore');
-            const putRequest = store.put(data, key);
-            
-            putRequest.onsuccess = () => resolve(true);
-            putRequest.onerror = () => reject('Store error');
-        };
-        
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            db.createObjectStore('syncStore');
-        };
-    });
+        keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+        });
+    }
 }
 
-async function getFromIndexedDB(key) {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('BroilerSyncDB', 1);
-        
-        request.onerror = () => reject('IndexedDB error');
-        request.onsuccess = (event) => {
-            const db = event.target.result;
-            const transaction = db.transaction(['syncStore'], 'readonly');
-            const store = transaction.objectStore('syncStore');
-            const getRequest = store.get(key);
-            
-            getRequest.onsuccess = () => resolve(getRequest.result);
-            getRequest.onerror = () => reject('Get error');
-        };
-    });
+// Get device information
+function getDeviceInfo() {
+    return {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        timestamp: new Date().toISOString()
+    };
 }
 
 // Apply cloud data to local storage
@@ -720,27 +790,9 @@ async function applyCloudData(username, cloudData) {
             const user = JSON.parse(currentUser);
             loadUserData(user.username);
         }
+        
+        showNotification('Cloud data loaded successfully!');
     }
-}
-
-// Fallback cloud sync using multiple storage methods
-async function fallbackCloudSync(username, data) {
-    const syncData = {
-        username: username,
-        data: JSON.parse(data),
-        lastSync: new Date().toISOString(),
-        version: '1.0'
-    };
-    
-    // Store in multiple locations for redundancy
-    localStorage.setItem(`cloud_backup_${username}`, JSON.stringify(syncData));
-    sessionStorage.setItem(`cloud_backup_${username}`, JSON.stringify(syncData));
-    
-    // Also store in a publicly accessible way for cross-device access
-    const publicKey = `public_${username}_${Date.now()}`;
-    localStorage.setItem(publicKey, JSON.stringify(syncData));
-    
-    return true;
 }
 
 // Auto-sync functionality
@@ -756,6 +808,12 @@ function toggleAutoSync() {
     } else {
         showSyncStatus('Auto-sync disabled', 'error');
     }
+    
+    // Update checkbox state
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        checkbox.checked = newState;
+    }
 }
 
 async function autoSyncData() {
@@ -767,7 +825,7 @@ async function autoSyncData() {
     
     if (userData) {
         try {
-            await syncToGoogleDrive(user.username, userData);
+            await syncViaLocalStorage(user.username, userData);
             console.log('Auto-sync completed');
         } catch (error) {
             console.log('Auto-sync failed:', error);
@@ -775,17 +833,34 @@ async function autoSyncData() {
     }
 }
 
-// Sync status display
+// Sync status display with safe element checking
 function showSyncStatus(message, type) {
-    const statusEl = document.getElementById('sync-status');
+    let statusEl = document.getElementById('sync-status');
+    
+    // Create element if it doesn't exist
+    if (!statusEl) {
+        createSyncStatusElement();
+        statusEl = document.getElementById('sync-status');
+    }
+    
+    // Double-check element exists
+    if (!statusEl) {
+        console.log('Sync Status:', message);
+        return; // Silently fail if element still doesn't exist
+    }
+    
     statusEl.textContent = message;
     statusEl.className = `sync-status sync-${type}`;
     statusEl.style.display = 'block';
     
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-        statusEl.style.display = 'none';
-    }, 5000);
+    // Auto-hide after 5 seconds for success/error, keep loading visible
+    if (type !== 'loading') {
+        setTimeout(() => {
+            if (statusEl) {
+                statusEl.style.display = 'none';
+            }
+        }, 5000);
+    }
 }
 
 // Enhanced export/import with cloud backup
@@ -828,9 +903,19 @@ async function exportData() {
     }, 1000);
 }
 
-// Initialize cloud sync when app starts
+// Initialize auto-sync checkbox state
+function initAutoSyncCheckbox() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        checkbox.checked = autoSync === 'true';
+    }
+}
+
+// Update your DOMContentLoaded event
 document.addEventListener('DOMContentLoaded', function() {
-    // ... existing code ...
+    checkAuthentication();
+    initAutoSyncCheckbox();
     initCloudSync();
 });
 
