@@ -740,3 +740,94 @@ document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
     initCloudSync();
 });
+
+// Supabase Cloud Sync
+async function initSupabase() {
+    try {
+        // Check if user is already signed in
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+            console.log('User already signed in:', session.user.email);
+            return true;
+        }
+        
+        return false;
+    } catch (error) {
+        console.error('Supabase init failed:', error);
+        return false;
+    }
+}
+
+// Supabase Authentication
+async function signUpWithEmail(email, password) {
+    const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+    });
+    
+    if (error) throw error;
+    return data;
+}
+
+async function signInWithEmail(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+    });
+    
+    if (error) throw error;
+    return data;
+}
+
+async function signOut() {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+}
+
+// Supabase Data Sync
+async function syncToSupabase(data) {
+    try {
+        const { data: session } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+        
+        const userData = {
+            user_id: session.user.id,
+            data: data,
+            last_sync: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        
+        // Upsert data (insert or update)
+        const { data: result, error } = await supabase
+            .from('user_data')
+            .upsert(userData, { onConflict: 'user_id' });
+            
+        if (error) throw error;
+        
+        return true;
+    } catch (error) {
+        console.error('Supabase sync failed:', error);
+        return false;
+    }
+}
+
+async function getFromSupabase() {
+    try {
+        const { data: session } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+        
+        const { data, error } = await supabase
+            .from('user_data')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
+            
+        if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
+        
+        return data;
+    } catch (error) {
+        console.error('Supabase get failed:', error);
+        return null;
+    }
+}
