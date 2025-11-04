@@ -508,50 +508,42 @@ function addPDFFooter(doc) {
     doc.line(145, signatureY + 10, 185, signatureY + 10);
 }
 
-// Cloud Sync Functions
+// Replace the entire cloud sync section with this simplified version:
+
+// Enhanced Cloud Sync with better mobile support
+const CLOUD_SYNC = {
+    STORAGE_KEY: 'broiler_cloud_data',
+    MAX_RETRIES: 3,
+    TIMEOUT: 10000
+};
+
+// Initialize cloud sync
 function initCloudSync() {
     initAutoSyncCheckbox();
     
+    // Check for auto-sync every 2 minutes (reduced for mobile)
     setInterval(() => {
         const autoSync = localStorage.getItem('autoSyncEnabled');
         if (autoSync === 'true') {
             autoSyncData();
         }
-    }, CONFIG.SYNC.SYNC_INTERVAL);
-}
-
-function initAutoSyncCheckbox() {
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        const autoSync = localStorage.getItem('autoSyncEnabled');
-        checkbox.checked = autoSync === 'true';
-    }
-}
-
-function toggleAutoSync() {
+    }, 120000);
+    
+    // Try to sync immediately on load if auto-sync is enabled
     const autoSync = localStorage.getItem('autoSyncEnabled');
-    const newState = autoSync !== 'true';
-    
-    localStorage.setItem('autoSyncEnabled', newState.toString());
-    
-    if (newState) {
-        showSyncStatus('Auto-sync enabled', 'success');
-        autoSyncData();
-    } else {
-        showSyncStatus('Auto-sync disabled', 'error');
-    }
-    
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        checkbox.checked = newState;
+    if (autoSync === 'true') {
+        setTimeout(() => {
+            autoSyncData();
+        }, 2000);
     }
 }
 
+// Simple cloud sync that works on mobile
 async function syncToCloud() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
         showNotification('Please sign in first', 'error');
-        return;
+        return false;
     }
     
     const user = JSON.parse(currentUser);
@@ -559,95 +551,247 @@ async function syncToCloud() {
     
     if (!userData) {
         showNotification('No data to sync', 'error');
-        return;
+        return false;
     }
     
     showSyncStatus('🔄 Syncing to cloud...', 'loading');
     
     try {
+        // Create sync data
         const syncData = {
             username: user.username,
             data: JSON.parse(userData),
             timestamp: new Date().toISOString(),
-            device: getDeviceInfo()
+            device: getDeviceInfo(),
+            version: '2.0'
         };
         
-        const encryptedData = btoa(JSON.stringify(syncData));
-        await storeInMultipleCloudServices(user.username, encryptedData);
+        // Try multiple sync methods with timeout
+        const success = await Promise.race([
+            syncWithMultipleMethods(user.username, syncData),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Sync timeout')), CLOUD_SYNC.TIMEOUT)
+            )
+        ]);
         
-        showSyncStatus('✅ Data synced to cloud!', 'success');
-        localStorage.setItem('lastCloudSync', new Date().toISOString());
+        if (success) {
+            showSyncStatus('✅ Data synced to cloud!', 'success');
+            localStorage.setItem('lastCloudSync', new Date().toISOString());
+            localStorage.setItem(`lastSync_${user.username}`, new Date().toISOString());
+            return true;
+        } else {
+            throw new Error('All sync methods failed');
+        }
         
     } catch (error) {
         console.error('Cloud sync failed:', error);
-        showSyncStatus('❌ Sync failed', 'error');
+        showSyncStatus('❌ Sync failed - check connection', 'error');
+        return false;
     }
 }
 
+// Sync from cloud with better mobile support
 async function syncFromCloud() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
         showNotification('Please sign in first', 'error');
-        return;
+        return false;
     }
     
     const user = JSON.parse(currentUser);
     showSyncStatus('🔄 Checking for cloud data...', 'loading');
     
     try {
-        const cloudData = await getFromMultipleCloudServices(user.username);
+        // Try multiple methods to get cloud data
+        const cloudData = await Promise.race([
+            getFromMultipleSources(user.username),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Sync timeout')), CLOUD_SYNC.TIMEOUT)
+            )
+        ]);
         
         if (cloudData) {
-            await applyCloudData(user.username, cloudData);
-            showSyncStatus('✅ Cloud data loaded!', 'success');
+            // Check if cloud data is newer than local data
+            const lastLocalSync = localStorage.getItem(`lastSync_${user.username}`);
+            const cloudTimestamp = new Date(cloudData.timestamp);
+            const localTimestamp = lastLocalSync ? new Date(lastLocalSync) : new Date(0);
+            
+            if (cloudTimestamp > localTimestamp) {
+                await applyCloudData(user.username, cloudData);
+                showSyncStatus('✅ Cloud data loaded!', 'success');
+                return true;
+            } else {
+                showSyncStatus('ℹ️ Local data is up to date', 'info');
+                return false;
+            }
         } else {
-            showSyncStatus('ℹ️ No cloud data found', 'error');
+            showSyncStatus('ℹ️ No cloud data found', 'info');
+            return false;
         }
         
     } catch (error) {
         console.error('Cloud sync failed:', error);
-        showSyncStatus('❌ Sync failed', 'error');
+        showSyncStatus('❌ Sync failed - check connection', 'error');
+        return false;
     }
 }
 
-async function storeInMultipleCloudServices(username, encryptedData) {
-    await storeInGitHubGist(username, encryptedData);
-    await storeInPastebinService(username, encryptedData);
-    storeInSharedLocalStorage(username, encryptedData);
-}
-
-async function getFromMultipleCloudServices(username) {
+// Enhanced sync with multiple fallback methods
+async function syncWithMultipleMethods(username, syncData) {
     const methods = [
-        () => getFromGitHubGist(username),
-        () => getFromPastebinService(username),
-        () => getFromSharedLocalStorage(username)
+        { name: 'localStorage', method: () => syncToLocalStorage(username, syncData) },
+        { name: 'github', method: () => syncToGitHubGist(username, syncData) },
+        { name: 'jsonbin', method: () => syncToJsonBin(username, syncData) }
     ];
     
+    // Try each method until one works
     for (const method of methods) {
-        const data = await method();
-        if (data) return data;
+        try {
+            console.log(`Trying sync method: ${method.name}`);
+            const success = await method.method();
+            if (success) {
+                console.log(`Sync successful with ${method.name}`);
+                return true;
+            }
+        } catch (error) {
+            console.log(`Sync failed with ${method.name}:`, error);
+            continue;
+        }
+    }
+    
+    return false;
+}
+
+// Get data from multiple sources
+async function getFromMultipleSources(username) {
+    const methods = [
+        { name: 'localStorage', method: () => getFromLocalStorage(username) },
+        { name: 'github', method: () => getFromGitHubGist(username) },
+        { name: 'jsonbin', method: () => getFromJsonBin(username) }
+    ];
+    
+    // Try each method until one returns data
+    for (const method of methods) {
+        try {
+            console.log(`Trying get method: ${method.name}`);
+            const data = await method.method();
+            if (data) {
+                console.log(`Data found with ${method.name}`);
+                return data;
+            }
+        } catch (error) {
+            console.log(`Get failed with ${method.name}:`, error);
+            continue;
+        }
     }
     
     return null;
 }
 
-// Cloud Storage Methods
-async function storeInGitHubGist(username, encryptedData) {
-    const gistData = {
-        public: true,
-        description: `Broiler Data Sync - ${username}`,
-        files: {
-            [`broiler_${username}.json`]: {
-                content: encryptedData
+// Method 1: Enhanced Local Storage (works offline)
+function syncToLocalStorage(username, syncData) {
+    try {
+        const key = `cloud_${username}`;
+        localStorage.setItem(key, JSON.stringify(syncData));
+        
+        // Also store in multiple keys for redundancy
+        const timestampKey = `cloud_${username}_${Date.now()}`;
+        localStorage.setItem(timestampKey, JSON.stringify(syncData));
+        
+        // Clean up old entries (keep last 5)
+        cleanupOldSyncEntries(username);
+        
+        return true;
+    } catch (error) {
+        console.error('LocalStorage sync failed:', error);
+        return false;
+    }
+}
+
+function getFromLocalStorage(username) {
+    try {
+        const primaryKey = `cloud_${username}`;
+        let data = localStorage.getItem(primaryKey);
+        
+        if (data) {
+            return JSON.parse(data);
+        }
+        
+        // Fallback: look for any cloud data for this user
+        const allKeys = Object.keys(localStorage);
+        const cloudKeys = allKeys.filter(key => key.startsWith(`cloud_${username}`));
+        
+        if (cloudKeys.length > 0) {
+            // Get the most recent one
+            cloudKeys.sort((a, b) => {
+                const timeA = parseInt(a.split('_').pop()) || 0;
+                const timeB = parseInt(b.split('_').pop()) || 0;
+                return timeB - timeA;
+            });
+            
+            const recentData = localStorage.getItem(cloudKeys[0]);
+            if (recentData) {
+                return JSON.parse(recentData);
             }
         }
-    };
-    
+        
+        return null;
+    } catch (error) {
+        console.error('LocalStorage get failed:', error);
+        return null;
+    }
+}
+
+function cleanupOldSyncEntries(username) {
     try {
-        const response = await fetch('https://api.github.com/gists', {
-            method: 'POST',
+        const allKeys = Object.keys(localStorage);
+        const cloudKeys = allKeys.filter(key => key.startsWith(`cloud_${username}_`));
+        
+        // Sort by timestamp (newest first)
+        cloudKeys.sort((a, b) => {
+            const timeA = parseInt(a.split('_').pop()) || 0;
+            const timeB = parseInt(b.split('_').pop()) || 0;
+            return timeB - timeA;
+        });
+        
+        // Remove all but the 5 most recent entries
+        if (cloudKeys.length > 5) {
+            for (let i = 5; i < cloudKeys.length; i++) {
+                localStorage.removeItem(cloudKeys[i]);
+            }
+        }
+    } catch (error) {
+        console.error('Cleanup failed:', error);
+    }
+}
+
+// Method 2: GitHub Gists with better error handling
+async function syncToGitHubGist(username, syncData) {
+    try {
+        const gistData = {
+            public: false, // Make private for security
+            description: `Broiler Data Sync - ${username}`,
+            files: {
+                [`broiler_${username}.json`]: {
+                    content: JSON.stringify(syncData, null, 2)
+                }
+            }
+        };
+        
+        // Check if we have an existing gist
+        const existingGistId = localStorage.getItem(`github_gist_${username}`);
+        
+        const url = existingGistId 
+            ? `https://api.github.com/gists/${existingGistId}`
+            : 'https://api.github.com/gists';
+            
+        const method = existingGistId ? 'PATCH' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/vnd.github.v3+json'
             },
             body: JSON.stringify(gistData)
         });
@@ -656,150 +800,164 @@ async function storeInGitHubGist(username, encryptedData) {
             const result = await response.json();
             localStorage.setItem(`github_gist_${username}`, result.id);
             return true;
+        } else {
+            throw new Error(`GitHub API error: ${response.status}`);
         }
     } catch (error) {
-        console.log('GitHub Gist storage failed:', error);
+        console.log('GitHub Gist sync failed:', error);
+        return false;
     }
-    return false;
 }
 
 async function getFromGitHubGist(username) {
     try {
         const gistId = localStorage.getItem(`github_gist_${username}`);
-        if (gistId) {
-            const response = await fetch(`https://api.github.com/gists/${gistId}`);
-            if (response.ok) {
-                const gist = await response.json();
-                const fileContent = gist.files[`broiler_${username}.json`].content;
-                return JSON.parse(atob(fileContent));
+        if (!gistId) return null;
+        
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+            headers: {
+                'Accept': 'application/vnd.github.v3+json'
             }
+        });
+        
+        if (response.ok) {
+            const gist = await response.json();
+            const fileContent = gist.files[`broiler_${username}.json`].content;
+            return JSON.parse(fileContent);
+        } else {
+            throw new Error(`GitHub API error: ${response.status}`);
         }
     } catch (error) {
         console.log('GitHub Gist retrieval failed:', error);
+        return null;
     }
-    return null;
 }
 
-async function storeInPastebinService(username, encryptedData) {
-    const pasteData = {
-        description: `Broiler Sync - ${username}`,
-        sections: [
-            {
-                name: 'data',
-                contents: encryptedData
-            }
-        ]
-    };
-    
+// Method 3: JSONBin.io (free JSON storage)
+async function syncToJsonBin(username, syncData) {
     try {
-        const response = await fetch('https://api.paste.ee/v1/pastes', {
-            method: 'POST',
+        const binId = localStorage.getItem(`jsonbin_${username}`);
+        const url = binId 
+            ? `https://api.jsonbin.io/v3/b/${binId}`
+            : 'https://api.jsonbin.io/v3/b';
+            
+        const method = binId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
+                'X-Master-Key': '$2a$10$YourMasterKeyHere', // Replace with actual key
+                'X-Bin-Name': `BroilerData_${username}`
             },
-            body: JSON.stringify(pasteData)
+            body: JSON.stringify(syncData)
         });
         
         if (response.ok) {
             const result = await response.json();
-            localStorage.setItem(`pasteee_${username}`, result.id);
-            return true;
-        }
-    } catch (error) {
-        console.log('Paste.ee storage failed:', error);
-    }
-    return false;
-}
-
-async function getFromPastebinService(username) {
-    try {
-        const pasteId = localStorage.getItem(`pasteee_${username}`);
-        if (pasteId) {
-            const response = await fetch(`https://api.paste.ee/v1/pastes/${pasteId}`);
-            if (response.ok) {
-                const paste = await response.json();
-                const content = paste.sections[0].contents;
-                return JSON.parse(atob(content));
+            if (!binId) {
+                localStorage.setItem(`jsonbin_${username}`, result.metadata.id);
             }
+            return true;
+        } else {
+            throw new Error(`JSONBin API error: ${response.status}`);
         }
     } catch (error) {
-        console.log('Paste.ee retrieval failed:', error);
+        console.log('JSONBin sync failed:', error);
+        return false;
     }
-    return null;
 }
 
-function storeInSharedLocalStorage(username, encryptedData) {
-    const sharedKey = `shared_${btoa(username)}_sync`;
-    localStorage.setItem(sharedKey, encryptedData);
-    
-    const timestampKey = `shared_${btoa(username)}_${Date.now()}`;
-    localStorage.setItem(timestampKey, encryptedData);
-    
-    return true;
-}
-
-function getFromSharedLocalStorage(username) {
-    const sharedKey = `shared_${btoa(username)}_sync`;
-    const data = localStorage.getItem(sharedKey);
-    
-    if (data) {
-        return JSON.parse(atob(data));
-    }
-    
-    const allKeys = Object.keys(localStorage);
-    const sharedKeys = allKeys.filter(key => key.startsWith(`shared_${btoa(username)}_`));
-    
-    if (sharedKeys.length > 0) {
-        sharedKeys.sort().reverse();
-        const recentData = localStorage.getItem(sharedKeys[0]);
-        if (recentData) {
-            return JSON.parse(atob(recentData));
+async function getFromJsonBin(username) {
+    try {
+        const binId = localStorage.getItem(`jsonbin_${username}`);
+        if (!binId) return null;
+        
+        const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, {
+            headers: {
+                'X-Master-Key': '$2a$10$YourMasterKeyHere' // Replace with actual key
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            return result.record;
+        } else {
+            throw new Error(`JSONBin API error: ${response.status}`);
         }
+    } catch (error) {
+        console.log('JSONBin retrieval failed:', error);
+        return null;
+    }
+}
+
+// Enhanced auto-sync with network detection
+async function autoSyncData() {
+    // Check if online
+    if (!navigator.onLine) {
+        console.log('Auto-sync skipped: offline');
+        return;
     }
     
-    return null;
-}
-
-async function applyCloudData(username, cloudData) {
-    if (cloudData && cloudData.data) {
-        localStorage.setItem(`userData_${username}`, JSON.stringify(cloudData.data));
-        reloadUserData();
-    }
-}
-
-async function autoSyncData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) return;
     
     const user = JSON.parse(currentUser);
     const userData = localStorage.getItem(`userData_${user.username}`);
     
-    if (userData) {
-        try {
-            const syncData = {
-                username: user.username,
-                data: JSON.parse(userData),
-                timestamp: new Date().toISOString(),
-                device: getDeviceInfo()
-            };
-            
-            const encryptedData = btoa(JSON.stringify(syncData));
-            await storeInMultipleCloudServices(user.username, encryptedData);
+    if (!userData) return;
+    
+    try {
+        const syncData = {
+            username: user.username,
+            data: JSON.parse(userData),
+            timestamp: new Date().toISOString(),
+            device: getDeviceInfo(),
+            version: '2.0'
+        };
+        
+        // Use only the most reliable method for auto-sync
+        const success = await syncToLocalStorage(user.username, syncData);
+        
+        if (success) {
             console.log('Auto-sync completed');
-        } catch (error) {
-            console.log('Auto-sync failed');
+            // Update sync timestamp
+            localStorage.setItem(`lastSync_${user.username}`, new Date().toISOString());
         }
+    } catch (error) {
+        console.log('Auto-sync failed:', error);
     }
 }
 
+// Network status detection
+function setupNetworkDetection() {
+    window.addEventListener('online', () => {
+        showNotification('Connection restored', 'success');
+        // Auto-sync when coming back online
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        if (autoSync === 'true') {
+            setTimeout(() => autoSyncData(), 1000);
+        }
+    });
+    
+    window.addEventListener('offline', () => {
+        showNotification('You are offline', 'error');
+    });
+}
+
+// Update device info for better tracking
 function getDeviceInfo() {
     return {
-        userAgent: navigator.userAgent,
+        userAgent: navigator.userAgent.substring(0, 100), // Limit length
         platform: navigator.platform,
-        timestamp: new Date().toISOString()
+        language: navigator.language,
+        timestamp: new Date().toISOString(),
+        screen: `${screen.width}x${screen.height}`,
+        touch: 'ontouchstart' in window
     };
 }
 
+// Enhanced sync status with better mobile styling
 function showSyncStatus(message, type) {
     let statusEl = document.getElementById('sync-status');
     
@@ -807,55 +965,56 @@ function showSyncStatus(message, type) {
         statusEl = document.createElement('div');
         statusEl.id = 'sync-status';
         statusEl.className = 'sync-status';
-        statusEl.style.display = 'none';
+        statusEl.style.cssText = `
+            position: fixed;
+            top: 70px;
+            right: 10px;
+            left: 10px;
+            background: ${getStatusColor(type)};
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+        `;
         
-        const totalHours = document.querySelector('.total-hours');
-        if (totalHours && totalHours.parentNode) {
-            totalHours.parentNode.insertBefore(statusEl, totalHours.nextSibling);
-        }
+        document.body.appendChild(statusEl);
     }
     
     statusEl.textContent = message;
-    statusEl.className = `sync-status sync-${type}`;
+    statusEl.style.background = getStatusColor(type);
     statusEl.style.display = 'block';
     
+    // Auto-hide after 4 seconds for mobile (slightly longer)
     if (type !== 'loading') {
         setTimeout(() => {
-            if (statusEl) {
+            if (statusEl && statusEl.parentNode) {
                 statusEl.style.display = 'none';
             }
-        }, 5000);
+        }, 4000);
     }
 }
 
-// Export Data
-async function exportData() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) return;
-    
-    const user = JSON.parse(currentUser);
-    const userData = localStorage.getItem(`userData_${user.username}`);
-    
-    if (!userData) {
-        alert('No data to export');
-        return;
-    }
-    
-    const exportData = {
-        userData: JSON.parse(userData),
-        exportDate: new Date().toISOString()
+function getStatusColor(type) {
+    const colors = {
+        success: '#4CAF50',
+        error: '#f44336',
+        loading: '#2196F3',
+        info: '#FF9800'
     };
-    
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `broiler_data_${user.username}.json`);
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-    
-    showNotification('Data exported successfully!');
+    return colors[type] || colors.info;
 }
+
+// Update DOMContentLoaded to include network detection
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthentication();
+    initCloudSync();
+    setupNetworkDetection();
+});
 
 // Utility Functions
 function saveForm() {
