@@ -8,6 +8,7 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 // Check authentication on page load
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
+    initCloudSync();
 });
 
 // Check if user is authenticated
@@ -508,7 +509,7 @@ function generatePDF() {
     doc.save(`Broiler_Claim_Form_${monthNames[month]}_${year}.pdf`);
 }
 
-// Simple Cloud Sync Functions
+// Simple Cloud Sync Functions ================================================//
 function addSyncControls() {
     const syncHTML = `
         <div class="sync-controls" style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
@@ -651,6 +652,128 @@ async function exportData() {
     
     showNotification('Data exported successfully!');
 }
+/*======================================================================
+         SupaBase
+=========================================================================*/
+// Supabase Sync - FREE forever, no expiration
+const SUPABASE_CONFIG = {
+    url: 'https://wjzkiceausyejnmnlqvg.supabase.co', // Replace with your URL
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqemtpY2VhdXN5ZWpubW5scXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyMzg3ODEsImV4cCI6MjA3NzgxNDc4MX0.uqX0SA5Wa52yPvRkSxxrkDvC8YkIEpO5MNndAC_IrHQ' // Replace with your anon key
+};
+
+async function syncToCloud() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showSyncStatus('Please sign in first', 'error');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    const userData = localStorage.getItem(`userData_${user.username}`);
+    
+    if (!userData) {
+        showSyncStatus('No data to sync', 'error');
+        return;
+    }
+    
+    showSyncStatus('🔄 Syncing to cloud...', 'loading');
+    
+    try {
+        const success = await syncToSupabase(user.username, JSON.parse(userData));
+        
+        if (success) {
+            showSyncStatus('✅ Data synced to cloud!', 'success');
+            localStorage.setItem('lastCloudSync', new Date().toISOString());
+        } else {
+            throw new Error('Cloud sync failed');
+        }
+        
+    } catch (error) {
+        console.error('Cloud sync failed:', error);
+        showSyncStatus('❌ Sync failed', 'error');
+    }
+}
+
+async function syncToSupabase(username, data) {
+    try {
+        const response = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/user_data`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_CONFIG.key,
+                'Authorization': `Bearer ${SUPABASE_CONFIG.key}`,
+                'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify({
+                user_id: username,
+                data: data,
+                updated_at: new Date().toISOString()
+            })
+        });
+        
+        return response.ok;
+    } catch (error) {
+        console.error('Supabase sync failed:', error);
+        return false;
+    }
+}
+
+async function syncFromCloud() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showSyncStatus('Please sign in first', 'error');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    showSyncStatus('🔄 Loading from cloud...', 'loading');
+    
+    try {
+        const cloudData = await syncFromSupabase(user.username);
+        
+        if (cloudData) {
+            localStorage.setItem(`userData_${user.username}`, JSON.stringify(cloudData.data));
+            loadUserData(user.username);
+            showSyncStatus('✅ Cloud data loaded!', 'success');
+        } else {
+            showSyncStatus('ℹ️ No cloud data found', 'info');
+        }
+        
+    } catch (error) {
+        console.error('Cloud retrieval failed:', error);
+        showSyncStatus('❌ Sync failed', 'error');
+    }
+}
+
+async function syncFromSupabase(username) {
+    try {
+        const response = await fetch(
+            `${SUPABASE_CONFIG.url}/rest/v1/user_data?user_id=eq.${username}&select=*`, 
+            {
+                headers: {
+                    'apikey': SUPABASE_CONFIG.key,
+                    'Authorization': `Bearer ${SUPABASE_CONFIG.key}`
+                }
+            }
+        );
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data[0]; // Return first record
+        }
+        return null;
+    } catch (error) {
+        console.error('Supabase retrieval failed:', error);
+        return null;
+    }
+}
+
+// Initialize on app start
+function initCloudSync() {
+    // Supabase is always ready - no token needed
+    console.log('Supabase sync ready');
+}
+//==================================================//
 
 // Utility Functions
 function saveForm() {
