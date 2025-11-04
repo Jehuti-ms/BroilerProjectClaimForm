@@ -11,6 +11,370 @@ document.addEventListener('DOMContentLoaded', function() {
     initCloudSync();
 });
 
+// Add this at the top of app.js (after your existing variables)
+const CLOUD_CONFIG = {
+    url: SUPABASE_CONFIG.url,    // Uses your existing config
+    key: SUPABASE_CONFIG.anonKey // Uses your existing config
+};
+
+// Cloud Sync using your Supabase configuration
+const CLOUD_CONFIG = {
+    url: SUPABASE_CONFIG.url,
+    key: SUPABASE_CONFIG.anonKey
+};
+
+// Initialize cloud sync
+function initCloudSync() {
+    updateLastSyncDisplay();
+    startAutoSync();
+    console.log('Supabase cloud sync initialized');
+}
+
+// Main sync function - Push to Supabase
+async function syncToCloud() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showNotification('Please sign in first', 'error');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    const userData = localStorage.getItem(`userData_${user.username}`);
+    
+    if (!userData) {
+        showNotification('No data to sync', 'error');
+        return;
+    }
+    
+    showSyncStatus('🔄 Syncing to cloud...', 'loading');
+    
+    try {
+        const success = await syncToSupabase(user.username, JSON.parse(userData));
+        
+        if (success) {
+            showSyncStatus('✅ Data synced to cloud!', 'success');
+            localStorage.setItem('lastCloudSync', new Date().toISOString());
+            updateLastSyncDisplay();
+        } else {
+            throw new Error('Supabase sync failed');
+        }
+        
+    } catch (error) {
+        console.error('Cloud sync failed:', error);
+        showSyncStatus('❌ Sync failed: ' + error.message, 'error');
+    }
+}
+
+// Pull from Supabase
+async function syncFromCloud() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showNotification('Please sign in first', 'error');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    showSyncStatus('🔄 Loading from cloud...', 'loading');
+    
+    try {
+        const cloudData = await syncFromSupabase(user.username);
+        
+        if (cloudData) {
+            localStorage.setItem(`userData_${user.username}`, JSON.stringify(cloudData.data));
+            loadUserData(user.username);
+            showSyncStatus('✅ Cloud data loaded!', 'success');
+            updateLastSyncDisplay();
+        } else {
+            showSyncStatus('ℹ️ No cloud data found', 'info');
+        }
+        
+    } catch (error) {
+        console.error('Cloud retrieval failed:', error);
+        showSyncStatus('❌ Sync failed: ' + error.message, 'error');
+    }
+}
+
+// Sync data to Supabase
+async function syncToSupabase(username, data) {
+    try {
+        // Using the supabase client from your config
+        const { error } = await supabase
+            .from('user_data')
+            .upsert({
+                user_id: username,
+                data: data,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'user_id'
+            });
+
+        if (error) {
+            console.error('Supabase error:', error);
+            // Fallback to REST API if client fails
+            return await syncToSupabaseRest(username, data);
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Supabase client sync failed:', error);
+        // Fallback to REST API
+        return await syncToSupabaseRest(username, data);
+    }
+}
+
+// REST API fallback for Supabase
+async function syncToSupabaseRest(username, data) {
+    try {
+        const response = await fetch(`${CLOUD_CONFIG.url}/rest/v1/user_data`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': CLOUD_CONFIG.key,
+                'Authorization': `Bearer ${CLOUD_CONFIG.key}`,
+                'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify({
+                user_id: username,
+                data: data,
+                updated_at: new Date().toISOString()
+            })
+        });
+        
+        if (response.ok) {
+            return true;
+        } else {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+    } catch (error) {
+        console.error('Supabase REST sync failed:', error);
+        throw error;
+    }
+}
+
+// Get data from Supabase
+async function syncFromSupabase(username) {
+    try {
+        // Using the supabase client from your config
+        const { data, error } = await supabase
+            .from('user_data')
+            .select('*')
+            .eq('user_id', username)
+            .single();
+
+        if (error) {
+            console.error('Supabase error:', error);
+            // Fallback to REST API
+            return await syncFromSupabaseRest(username);
+        }
+        
+        return data;
+    } catch (error) {
+        console.error('Supabase client retrieval failed:', error);
+        // Fallback to REST API
+        return await syncFromSupabaseRest(username);
+    }
+}
+
+// REST API fallback for Supabase retrieval
+async function syncFromSupabaseRest(username) {
+    try {
+        const response = await fetch(
+            `${CLOUD_CONFIG.url}/rest/v1/user_data?user_id=eq.${username}&select=*`, 
+            {
+                headers: {
+                    'apikey': CLOUD_CONFIG.key,
+                    'Authorization': `Bearer ${CLOUD_CONFIG.key}`
+                }
+            }
+        );
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data[0];
+        } else {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+    } catch (error) {
+        console.error('Supabase REST retrieval failed:', error);
+        throw error;
+    }
+}
+
+// Update last sync display in your HTML
+function updateLastSyncDisplay() {
+    const lastSync = localStorage.getItem('lastCloudSync');
+    const lastSyncElement = document.getElementById('last-sync');
+    
+    if (lastSyncElement) {
+        if (lastSync) {
+            const lastSyncDate = new Date(lastSync);
+            lastSyncElement.innerHTML = `
+                <span class="sync-icon">🕒</span>
+                Last synced: ${lastSyncDate.toLocaleString()}
+            `;
+            lastSyncElement.style.display = 'block';
+            lastSyncElement.style.color = '#4CAF50';
+        } else {
+            lastSyncElement.innerHTML = `
+                <span class="sync-icon">⚠️</span>
+                Never synced - Click "Sync to Cloud" to backup your data
+            `;
+            lastSyncElement.style.display = 'block';
+            lastSyncElement.style.color = '#FF9800';
+        }
+    }
+}
+
+// Show sync status in the cloud sync section
+function showSyncStatus(message, type) {
+    // Create or update status element
+    let statusElement = document.getElementById('sync-status');
+    
+    if (!statusElement) {
+        statusElement = document.createElement('div');
+        statusElement.id = 'sync-status';
+        statusElement.className = 'sync-status';
+        
+        const cloudSection = document.querySelector('.cloud-sync-section');
+        if (cloudSection) {
+            const buttons = cloudSection.querySelector('.cloud-sync-buttons');
+            if (buttons && buttons.nextSibling) {
+                cloudSection.insertBefore(statusElement, buttons.nextSibling);
+            } else {
+                cloudSection.appendChild(statusElement);
+            }
+        }
+    }
+    
+    statusElement.textContent = message;
+    statusElement.className = `sync-status sync-${type}`;
+    statusElement.style.display = 'block';
+    statusElement.style.padding = '10px';
+    statusElement.style.margin = '10px 0';
+    statusElement.style.borderRadius = '4px';
+    statusElement.style.textAlign = 'center';
+    statusElement.style.fontSize = '14px';
+    
+    // Set colors based on type
+    if (type === 'success') {
+        statusElement.style.background = '#4CAF50';
+        statusElement.style.color = 'white';
+    } else if (type === 'error') {
+        statusElement.style.background = '#f44336';
+        statusElement.style.color = 'white';
+    } else if (type === 'loading') {
+        statusElement.style.background = '#2196F3';
+        statusElement.style.color = 'white';
+    } else if (type === 'info') {
+        statusElement.style.background = '#FF9800';
+        statusElement.style.color = 'white';
+    }
+    
+    // Auto-hide success messages after 5 seconds
+    if (type === 'success' || type === 'info') {
+        setTimeout(() => {
+            if (statusElement && statusElement.textContent === message) {
+                statusElement.style.display = 'none';
+            }
+        }, 5000);
+    }
+}
+
+// Auto-sync functionality
+function startAutoSync() {
+    // Auto-sync every 5 minutes if user is active
+    setInterval(() => {
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser && navigator.onLine && !document.hidden) {
+            const user = JSON.parse(currentUser);
+            const userData = localStorage.getItem(`userData_${user.username}`);
+            
+            if (userData) {
+                console.log('Auto-syncing data to Supabase...');
+                syncToSupabase(user.username, JSON.parse(userData))
+                    .then(success => {
+                        if (success) {
+                            localStorage.setItem('lastCloudSync', new Date().toISOString());
+                            updateLastSyncDisplay();
+                        }
+                    })
+                    .catch(error => {
+                        console.log('Auto-sync failed:', error);
+                    });
+            }
+        }
+    }, 5 * 60 * 1000); // 5 minutes
+}
+
+// Enhanced save function with auto-sync
+const originalSaveUserData = saveUserData;
+saveUserData = function() {
+    originalSaveUserData.apply(this, arguments);
+    
+    // Auto-sync after saving if online
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser && navigator.onLine) {
+        setTimeout(() => {
+            const user = JSON.parse(currentUser);
+            const userData = localStorage.getItem(`userData_${user.username}`);
+            if (userData) {
+                syncToSupabase(user.username, JSON.parse(userData))
+                    .then(success => {
+                        if (success) {
+                            console.log('Auto-saved to Supabase');
+                            localStorage.setItem('lastCloudSync', new Date().toISOString());
+                            updateLastSyncDisplay();
+                        }
+                    })
+                    .catch(error => {
+                        console.log('Auto-save failed:', error);
+                    });
+            }
+        }, 1000);
+    }
+};
+
+// Update DOMContentLoaded to initialize cloud sync
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthentication();
+    // Wait a bit for Supabase to initialize, then init cloud sync
+    setTimeout(() => initCloudSync(), 1000);
+});
+
+// Test Supabase connection
+async function testSupabaseConnection() {
+    try {
+        const { data, error } = await supabase
+            .from('user_data')
+            .select('count')
+            .limit(1);
+
+        if (error) {
+            console.error('Supabase test failed:', error);
+            return false;
+        }
+        
+        console.log('✅ Supabase connection successful!');
+        return true;
+    } catch (error) {
+        console.error('Supabase test failed:', error);
+        return false;
+    }
+}
+
+// Run connection test on load
+setTimeout(() => {
+    testSupabaseConnection().then(success => {
+        if (success) {
+            console.log('Supabase cloud sync ready!');
+        } else {
+            console.log('Supabase connection issues - sync may not work');
+        }
+    });
+}, 2000);
+
 // Check if user is authenticated
 function checkAuthentication() {
     const currentUser = localStorage.getItem('currentUser');
