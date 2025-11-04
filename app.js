@@ -91,11 +91,23 @@ function loadUserData(username) {
 
 // Load data for current month
 function loadCurrentMonthData(allData = null) {
-    const month = parseInt(document.getElementById('month-select').value); // Ensure it's a number
-    const year = document.getElementById('year-input').value;
-    const monthYear = `${month}-${year}`;
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
     
-    console.log('Loading data for month:', monthYear, 'which is:', monthNames[month], year, 'Available data:', allData);
+    const monthValue = monthSelect.value;
+    const monthValueParsed = parseInt(monthValue);
+    const yearValue = yearInput.value;
+    const monthYear = `${monthValueParsed}-${yearValue}`;
+    
+    console.log('=== LOAD DEBUG ===');
+    console.log('Raw month value:', monthValue, 'Type:', typeof monthValue);
+    console.log('Parsed month value:', monthValueParsed, 'Type:', typeof monthValueParsed);
+    console.log('Year value:', yearValue);
+    console.log('MonthYear key:', monthYear);
+    console.log('Month name:', monthNames[monthValueParsed]);
+    console.log('All data keys:', allData ? Object.keys(allData) : 'No data');
+    console.log('Looking for key:', monthYear, 'Found:', allData ? allData[monthYear] : 'N/A');
+    console.log('=== END DEBUG ===');
     
     const tableBody = document.querySelector('#time-table tbody');
     tableBody.innerHTML = '';
@@ -139,11 +151,22 @@ function saveUserData() {
     }
     
     const user = JSON.parse(currentUser);
-    const month = parseInt(document.getElementById('month-select').value); // Ensure it's a number
-    const year = document.getElementById('year-input').value;
-    const monthYear = `${month}-${year}`;
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
     
-    console.log('Saving data for user:', user.username, 'Month:', monthYear, 'which is:', monthNames[month], 'Data:', currentFormData);
+    const monthValue = monthSelect.value;
+    const monthValueParsed = parseInt(monthValue);
+    const yearValue = yearInput.value;
+    const monthYear = `${monthValueParsed}-${yearValue}`;
+    
+    console.log('=== SAVE DEBUG ===');
+    console.log('Raw month value:', monthValue, 'Type:', typeof monthValue);
+    console.log('Parsed month value:', monthValueParsed, 'Type:', typeof monthValueParsed);
+    console.log('Year value:', yearValue);
+    console.log('MonthYear key:', monthYear);
+    console.log('Month name:', monthNames[monthValueParsed]);
+    console.log('Data to save:', currentFormData);
+    console.log('=== END DEBUG ===');
     
     // Get existing user data
     const existingData = localStorage.getItem(`userData_${user.username}`);
