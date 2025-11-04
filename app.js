@@ -510,511 +510,344 @@ function addPDFFooter(doc) {
 
 // Replace the entire cloud sync section with this simplified version:
 
-// Enhanced Cloud Sync with better mobile support
-const CLOUD_SYNC = {
-    STORAGE_KEY: 'broiler_cloud_data',
-    MAX_RETRIES: 3,
-    TIMEOUT: 10000
+// Service Worker Sync Manager
+const SW_SYNC = {
+    registration: null,
+    isSupported: 'serviceWorker' in navigator && 'SyncManager' in window,
+    syncInProgress: false
 };
 
-// Initialize cloud sync
-function initCloudSync() {
-    initAutoSyncCheckbox();
-    
-    // Check for auto-sync every 2 minutes (reduced for mobile)
-    setInterval(() => {
-        const autoSync = localStorage.getItem('autoSyncEnabled');
-        if (autoSync === 'true') {
-            autoSyncData();
+// Initialize Service Worker Sync
+async function initServiceWorkerSync() {
+    if (!SW_SYNC.isSupported) {
+        console.log('Service Worker sync not supported');
+        initFallbackSync();
+        return;
+    }
+
+    try {
+        // Register Service Worker
+        SW_SYNC.registration = await navigator.serviceWorker.register('/sw.js');
+        console.log('Service Worker registered');
+
+        // Wait for Service Worker to be ready
+        await navigator.serviceWorker.ready;
+        
+        // Setup sync event listeners
+        setupSyncListeners();
+        
+        // Register background sync
+        await registerBackgroundSync();
+        
+        // Register periodic sync if supported
+        if ('periodicSync' in SW_SYNC.registration) {
+            await registerPeriodicSync();
         }
-    }, 120000);
-    
-    // Try to sync immediately on load if auto-sync is enabled
-    const autoSync = localStorage.getItem('autoSyncEnabled');
-    if (autoSync === 'true') {
-        setTimeout(() => {
-            autoSyncData();
-        }, 2000);
+        
+        // Start sync on load
+        setTimeout(() => triggerSync(), 3000);
+        
+    } catch (error) {
+        console.error('Service Worker registration failed:', error);
+        initFallbackSync();
     }
 }
 
-// Simple cloud sync that works on mobile
-async function syncToCloud() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showNotification('Please sign in first', 'error');
-        return false;
-    }
-    
-    const user = JSON.parse(currentUser);
-    const userData = localStorage.getItem(`userData_${user.username}`);
-    
-    if (!userData) {
-        showNotification('No data to sync', 'error');
-        return false;
-    }
-    
-    showSyncStatus('🔄 Syncing to cloud...', 'loading');
-    
+// Setup message listeners for Service Worker
+function setupSyncListeners() {
+    // Listen for messages from Service Worker
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        const { type, timestamp, success, error } = event.data;
+        
+        switch (type) {
+            case 'SYNC_STARTED':
+                SW_SYNC.syncInProgress = true;
+                showSyncStatus('🔄 Background sync started...', 'loading');
+                break;
+                
+            case 'SYNC_COMPLETED':
+                SW_SYNC.syncInProgress = false;
+                if (success) {
+                    showSyncStatus('✅ Sync completed!', 'success');
+                    updateLastSyncTime();
+                } else {
+                    showSyncStatus('❌ Sync failed', 'error');
+                }
+                break;
+                
+            case 'SYNC_FAILED':
+                SW_SYNC.syncInProgress = false;
+                showSyncStatus(`❌ Sync error: ${error}`, 'error');
+                break;
+        }
+    });
+
+    // Listen for controller changes
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        console.log('Service Worker controller changed');
+        triggerSync();
+    });
+}
+
+// Register background sync
+async function registerBackgroundSync() {
     try {
-        // Create sync data
+        const registration = await navigator.serviceWorker.ready;
+        
+        // Register for background sync
+        await registration.sync.register('broiler-background-sync');
+        console.log('Background sync registered');
+        
+    } catch (error) {
+        console.error('Background sync registration failed:', error);
+    }
+}
+
+// Register periodic background sync
+async function registerPeriodicSync() {
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        
+        // Check if periodic sync is supported and allowed
+        const status = await navigator.permissions.query({
+            name: 'periodic-background-sync'
+        });
+        
+        if (status.state === 'granted') {
+            await registration.periodicSync.register('broiler-periodic-sync', {
+                minInterval: 15 * 60 * 1000 // 15 minutes minimum
+            });
+            console.log('Periodic sync registered');
+        } else {
+            console.log('Periodic sync permission denied');
+        }
+        
+    } catch (error) {
+        console.error('Periodic sync not supported:', error);
+    }
+}
+
+// Trigger immediate sync
+async function triggerSync() {
+    if (!SW_SYNC.registration || SW_SYNC.syncInProgress) {
+        return;
+    }
+
+    try {
+        // Get current user data
+        const currentUser = localStorage.getItem('currentUser');
+        if (!currentUser) return;
+        
+        const user = JSON.parse(currentUser);
+        const userData = localStorage.getItem(`userData_${user.username}`);
+        
+        if (!userData) return;
+        
+        // Prepare sync data
         const syncData = {
             username: user.username,
             data: JSON.parse(userData),
             timestamp: new Date().toISOString(),
-            device: getDeviceInfo(),
-            version: '2.0'
+            device: getDeviceInfo()
         };
         
-        // Try multiple sync methods with timeout
-        const success = await Promise.race([
-            syncWithMultipleMethods(user.username, syncData),
-            new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Sync timeout')), CLOUD_SYNC.TIMEOUT)
-            )
-        ]);
-        
-        if (success) {
-            showSyncStatus('✅ Data synced to cloud!', 'success');
-            localStorage.setItem('lastCloudSync', new Date().toISOString());
-            localStorage.setItem(`lastSync_${user.username}`, new Date().toISOString());
-            return true;
-        } else {
-            throw new Error('All sync methods failed');
-        }
-        
-    } catch (error) {
-        console.error('Cloud sync failed:', error);
-        showSyncStatus('❌ Sync failed - check connection', 'error');
-        return false;
-    }
-}
-
-// Sync from cloud with better mobile support
-async function syncFromCloud() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showNotification('Please sign in first', 'error');
-        return false;
-    }
-    
-    const user = JSON.parse(currentUser);
-    showSyncStatus('🔄 Checking for cloud data...', 'loading');
-    
-    try {
-        // Try multiple methods to get cloud data
-        const cloudData = await Promise.race([
-            getFromMultipleSources(user.username),
-            new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Sync timeout')), CLOUD_SYNC.TIMEOUT)
-            )
-        ]);
-        
-        if (cloudData) {
-            // Check if cloud data is newer than local data
-            const lastLocalSync = localStorage.getItem(`lastSync_${user.username}`);
-            const cloudTimestamp = new Date(cloudData.timestamp);
-            const localTimestamp = lastLocalSync ? new Date(lastLocalSync) : new Date(0);
-            
-            if (cloudTimestamp > localTimestamp) {
-                await applyCloudData(user.username, cloudData);
-                showSyncStatus('✅ Cloud data loaded!', 'success');
-                return true;
-            } else {
-                showSyncStatus('ℹ️ Local data is up to date', 'info');
-                return false;
-            }
-        } else {
-            showSyncStatus('ℹ️ No cloud data found', 'info');
-            return false;
-        }
-        
-    } catch (error) {
-        console.error('Cloud sync failed:', error);
-        showSyncStatus('❌ Sync failed - check connection', 'error');
-        return false;
-    }
-}
-
-// Enhanced sync with multiple fallback methods
-async function syncWithMultipleMethods(username, syncData) {
-    const methods = [
-        { name: 'localStorage', method: () => syncToLocalStorage(username, syncData) },
-        { name: 'github', method: () => syncToGitHubGist(username, syncData) },
-        { name: 'jsonbin', method: () => syncToJsonBin(username, syncData) }
-    ];
-    
-    // Try each method until one works
-    for (const method of methods) {
-        try {
-            console.log(`Trying sync method: ${method.name}`);
-            const success = await method.method();
-            if (success) {
-                console.log(`Sync successful with ${method.name}`);
-                return true;
-            }
-        } catch (error) {
-            console.log(`Sync failed with ${method.name}:`, error);
-            continue;
-        }
-    }
-    
-    return false;
-}
-
-// Get data from multiple sources
-async function getFromMultipleSources(username) {
-    const methods = [
-        { name: 'localStorage', method: () => getFromLocalStorage(username) },
-        { name: 'github', method: () => getFromGitHubGist(username) },
-        { name: 'jsonbin', method: () => getFromJsonBin(username) }
-    ];
-    
-    // Try each method until one returns data
-    for (const method of methods) {
-        try {
-            console.log(`Trying get method: ${method.name}`);
-            const data = await method.method();
-            if (data) {
-                console.log(`Data found with ${method.name}`);
-                return data;
-            }
-        } catch (error) {
-            console.log(`Get failed with ${method.name}:`, error);
-            continue;
-        }
-    }
-    
-    return null;
-}
-
-// Method 1: Enhanced Local Storage (works offline)
-function syncToLocalStorage(username, syncData) {
-    try {
-        const key = `cloud_${username}`;
-        localStorage.setItem(key, JSON.stringify(syncData));
-        
-        // Also store in multiple keys for redundancy
-        const timestampKey = `cloud_${username}_${Date.now()}`;
-        localStorage.setItem(timestampKey, JSON.stringify(syncData));
-        
-        // Clean up old entries (keep last 5)
-        cleanupOldSyncEntries(username);
-        
-        return true;
-    } catch (error) {
-        console.error('LocalStorage sync failed:', error);
-        return false;
-    }
-}
-
-function getFromLocalStorage(username) {
-    try {
-        const primaryKey = `cloud_${username}`;
-        let data = localStorage.getItem(primaryKey);
-        
-        if (data) {
-            return JSON.parse(data);
-        }
-        
-        // Fallback: look for any cloud data for this user
-        const allKeys = Object.keys(localStorage);
-        const cloudKeys = allKeys.filter(key => key.startsWith(`cloud_${username}`));
-        
-        if (cloudKeys.length > 0) {
-            // Get the most recent one
-            cloudKeys.sort((a, b) => {
-                const timeA = parseInt(a.split('_').pop()) || 0;
-                const timeB = parseInt(b.split('_').pop()) || 0;
-                return timeB - timeA;
+        // Send data to Service Worker for queuing
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+                type: 'QUEUE_DATA',
+                payload: syncData
             });
-            
-            const recentData = localStorage.getItem(cloudKeys[0]);
-            if (recentData) {
-                return JSON.parse(recentData);
-            }
         }
         
-        return null;
+        // Trigger background sync
+        const registration = await navigator.serviceWorker.ready;
+        await registration.sync.register('broiler-background-sync');
+        
+        showSyncStatus('🔄 Triggering background sync...', 'loading');
+        
     } catch (error) {
-        console.error('LocalStorage get failed:', error);
-        return null;
+        console.error('Trigger sync failed:', error);
+        showSyncStatus('❌ Failed to trigger sync', 'error');
     }
 }
 
-function cleanupOldSyncEntries(username) {
-    try {
-        const allKeys = Object.keys(localStorage);
-        const cloudKeys = allKeys.filter(key => key.startsWith(`cloud_${username}_`));
-        
-        // Sort by timestamp (newest first)
-        cloudKeys.sort((a, b) => {
-            const timeA = parseInt(a.split('_').pop()) || 0;
-            const timeB = parseInt(b.split('_').pop()) || 0;
-            return timeB - timeA;
-        });
-        
-        // Remove all but the 5 most recent entries
-        if (cloudKeys.length > 5) {
-            for (let i = 5; i < cloudKeys.length; i++) {
-                localStorage.removeItem(cloudKeys[i]);
-            }
-        }
-    } catch (error) {
-        console.error('Cleanup failed:', error);
-    }
-}
-
-// Method 2: GitHub Gists with better error handling
-async function syncToGitHubGist(username, syncData) {
-    try {
-        const gistData = {
-            public: false, // Make private for security
-            description: `Broiler Data Sync - ${username}`,
-            files: {
-                [`broiler_${username}.json`]: {
-                    content: JSON.stringify(syncData, null, 2)
-                }
-            }
-        };
-        
-        // Check if we have an existing gist
-        const existingGistId = localStorage.getItem(`github_gist_${username}`);
-        
-        const url = existingGistId 
-            ? `https://api.github.com/gists/${existingGistId}`
-            : 'https://api.github.com/gists';
-            
-        const method = existingGistId ? 'PATCH' : 'POST';
-        
-        const response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/vnd.github.v3+json'
-            },
-            body: JSON.stringify(gistData)
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            localStorage.setItem(`github_gist_${username}`, result.id);
-            return true;
-        } else {
-            throw new Error(`GitHub API error: ${response.status}`);
-        }
-    } catch (error) {
-        console.log('GitHub Gist sync failed:', error);
-        return false;
-    }
-}
-
-async function getFromGitHubGist(username) {
-    try {
-        const gistId = localStorage.getItem(`github_gist_${username}`);
-        if (!gistId) return null;
-        
-        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
-            headers: {
-                'Accept': 'application/vnd.github.v3+json'
-            }
-        });
-        
-        if (response.ok) {
-            const gist = await response.json();
-            const fileContent = gist.files[`broiler_${username}.json`].content;
-            return JSON.parse(fileContent);
-        } else {
-            throw new Error(`GitHub API error: ${response.status}`);
-        }
-    } catch (error) {
-        console.log('GitHub Gist retrieval failed:', error);
-        return null;
-    }
-}
-
-// Method 3: JSONBin.io (free JSON storage)
-async function syncToJsonBin(username, syncData) {
-    try {
-        const binId = localStorage.getItem(`jsonbin_${username}`);
-        const url = binId 
-            ? `https://api.jsonbin.io/v3/b/${binId}`
-            : 'https://api.jsonbin.io/v3/b';
-            
-        const method = binId ? 'PUT' : 'POST';
-        
-        const response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Master-Key': '$2a$10$YourMasterKeyHere', // Replace with actual key
-                'X-Bin-Name': `BroilerData_${username}`
-            },
-            body: JSON.stringify(syncData)
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            if (!binId) {
-                localStorage.setItem(`jsonbin_${username}`, result.metadata.id);
-            }
-            return true;
-        } else {
-            throw new Error(`JSONBin API error: ${response.status}`);
-        }
-    } catch (error) {
-        console.log('JSONBin sync failed:', error);
-        return false;
-    }
-}
-
-async function getFromJsonBin(username) {
-    try {
-        const binId = localStorage.getItem(`jsonbin_${username}`);
-        if (!binId) return null;
-        
-        const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, {
-            headers: {
-                'X-Master-Key': '$2a$10$YourMasterKeyHere' // Replace with actual key
-            }
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            return result.record;
-        } else {
-            throw new Error(`JSONBin API error: ${response.status}`);
-        }
-    } catch (error) {
-        console.log('JSONBin retrieval failed:', error);
-        return null;
-    }
-}
-
-// Enhanced auto-sync with network detection
-async function autoSyncData() {
-    // Check if online
-    if (!navigator.onLine) {
-        console.log('Auto-sync skipped: offline');
+// Queue data changes for sync
+function queueDataForSync(data) {
+    if (!navigator.serviceWorker.controller) {
         return;
     }
     
+    navigator.serviceWorker.controller.postMessage({
+        type: 'QUEUE_DATA',
+        payload: data
+    });
+    
+    // Trigger sync after short delay
+    setTimeout(() => triggerSync(), 1000);
+}
+
+// Enhanced saveUserData that triggers sync
+function saveUserData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) return;
     
     const user = JSON.parse(currentUser);
-    const userData = localStorage.getItem(`userData_${user.username}`);
+    const month = parseInt(document.getElementById('month-select').value);
+    const year = document.getElementById('year-input').value;
+    const monthYear = `${month}-${year}`;
     
-    if (!userData) return;
+    // Get existing user data
+    const existingData = localStorage.getItem(`userData_${user.username}`);
+    let allData = existingData ? JSON.parse(existingData) : {};
     
-    try {
-        const syncData = {
-            username: user.username,
-            data: JSON.parse(userData),
-            timestamp: new Date().toISOString(),
-            device: getDeviceInfo(),
-            version: '2.0'
-        };
-        
-        // Use only the most reliable method for auto-sync
-        const success = await syncToLocalStorage(user.username, syncData);
-        
-        if (success) {
-            console.log('Auto-sync completed');
-            // Update sync timestamp
-            localStorage.setItem(`lastSync_${user.username}`, new Date().toISOString());
-        }
-    } catch (error) {
-        console.log('Auto-sync failed:', error);
-    }
-}
-
-// Network status detection
-function setupNetworkDetection() {
-    window.addEventListener('online', () => {
-        showNotification('Connection restored', 'success');
-        // Auto-sync when coming back online
-        const autoSync = localStorage.getItem('autoSyncEnabled');
-        if (autoSync === 'true') {
-            setTimeout(() => autoSyncData(), 1000);
-        }
-    });
+    // Update data for current month
+    allData[monthYear] = currentFormData;
     
-    window.addEventListener('offline', () => {
-        showNotification('You are offline', 'error');
-    });
-}
-
-// Update device info for better tracking
-function getDeviceInfo() {
-    return {
-        userAgent: navigator.userAgent.substring(0, 100), // Limit length
-        platform: navigator.platform,
-        language: navigator.language,
+    // Save back to localStorage
+    localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
+    
+    // Queue for background sync
+    queueDataForSync({
+        username: user.username,
+        data: allData,
         timestamp: new Date().toISOString(),
-        screen: `${screen.width}x${screen.height}`,
-        touch: 'ontouchstart' in window
-    };
+        type: 'full_sync'
+    });
+    
+    // Show save confirmation
+    showNotification('Form data saved and queued for sync!');
 }
 
-// Enhanced sync status with better mobile styling
-function showSyncStatus(message, type) {
-    let statusEl = document.getElementById('sync-status');
-    
-    if (!statusEl) {
-        statusEl = document.createElement('div');
-        statusEl.id = 'sync-status';
-        statusEl.className = 'sync-status';
-        statusEl.style.cssText = `
-            position: fixed;
-            top: 70px;
-            right: 10px;
-            left: 10px;
-            background: ${getStatusColor(type)};
-            color: white;
-            padding: 12px 15px;
-            border-radius: 8px;
-            z-index: 10000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            text-align: center;
-            font-size: 14px;
-            font-weight: 500;
-            display: none;
-        `;
-        
-        document.body.appendChild(statusEl);
+// Manual sync function
+async function manualSync() {
+    if (SW_SYNC.syncInProgress) {
+        showSyncStatus('🔄 Sync already in progress...', 'loading');
+        return;
     }
     
-    statusEl.textContent = message;
-    statusEl.style.background = getStatusColor(type);
-    statusEl.style.display = 'block';
+    showSyncStatus('🔄 Starting manual sync...', 'loading');
+    await triggerSync();
+}
+
+// Update last sync time
+function updateLastSyncTime() {
+    localStorage.setItem('lastSyncTime', new Date().toISOString());
+    updateSyncStatusDisplay();
+}
+
+// Update sync status display
+function updateSyncStatusDisplay() {
+    const lastSync = localStorage.getItem('lastSyncTime');
+    const statusElement = document.getElementById('sync-status-display');
     
-    // Auto-hide after 4 seconds for mobile (slightly longer)
-    if (type !== 'loading') {
-        setTimeout(() => {
-            if (statusEl && statusEl.parentNode) {
-                statusEl.style.display = 'none';
-            }
-        }, 4000);
+    if (statusElement) {
+        if (lastSync) {
+            const lastSyncDate = new Date(lastSync);
+            statusElement.textContent = `Last sync: ${lastSyncDate.toLocaleTimeString()}`;
+            statusElement.style.color = '#4CAF50';
+        } else {
+            statusElement.textContent = 'Never synced';
+            statusElement.style.color = '#f44336';
+        }
     }
 }
 
-function getStatusColor(type) {
-    const colors = {
-        success: '#4CAF50',
-        error: '#f44336',
-        loading: '#2196F3',
-        info: '#FF9800'
-    };
-    return colors[type] || colors.info;
+// Fallback sync for unsupported browsers
+function initFallbackSync() {
+    console.log('Using fallback sync');
+    
+    // Sync every 5 minutes
+    setInterval(() => {
+        if (navigator.onLine) {
+            autoSyncData();
+        }
+    }, 5 * 60 * 1000);
+    
+    // Sync when coming online
+    window.addEventListener('online', () => {
+        setTimeout(() => autoSyncData(), 2000);
+    });
 }
 
-// Update DOMContentLoaded to include network detection
+// Enhanced autoSyncData for fallback
+async function autoSyncData() {
+    // Your existing autoSyncData implementation
+    console.log('Fallback auto-sync running');
+}
+
+// Update your existing cloud sync functions to use Service Worker
+async function syncToCloud() {
+    await triggerSync();
+}
+
+async function syncFromCloud() {
+    await triggerSync();
+}
+
+// Update DOMContentLoaded
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
-    initCloudSync();
-    setupNetworkDetection();
+    initServiceWorkerSync(); // Replace initCloudSync() with this
+    
+    // Add sync status display to UI
+    addSyncStatusToUI();
 });
+
+// Add sync status to UI
+function addSyncStatusToUI() {
+    const syncControls = `
+        <div class="sync-controls" style="margin: 15px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            <h3>🔄 Automatic Sync</h3>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button onclick="manualSync()" class="sync-btn">Sync Now</button>
+                <span id="sync-status-display" style="font-size: 12px; color: #666;">
+                    Checking sync status...
+                </span>
+            </div>
+            <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                Data syncs automatically in background
+            </div>
+        </div>
+    `;
+    
+    // Insert into your UI
+    const formSection = document.querySelector('.form-container');
+    if (formSection) {
+        formSection.insertAdjacentHTML('afterend', syncControls);
+        updateSyncStatusDisplay();
+    }
+}
+
+// Add some CSS for sync controls
+const syncStyles = `
+    .sync-btn {
+        background: #2196F3;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    
+    .sync-btn:hover {
+        background: #1976D2;
+    }
+    
+    .sync-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+    
+    .sync-controls {
+        background: #f9f9f9;
+    }
+`;
+
+// Add styles to document
+const styleSheet = document.createElement('style');
+styleSheet.textContent = syncStyles;
+document.head.appendChild(styleSheet);
 
 // Utility Functions
 function saveForm() {
