@@ -604,13 +604,6 @@ async function syncFromCloud() {
     }
 }
 
-// Cloud Sync Configuration
-const CLOUD_CONFIG = {
-    APP_NAME: 'BroilerProductionProject',
-    FILE_NAME: 'broiler_data_backup.json',
-    SYNC_INTERVAL: 300000 // 5 minutes auto-sync
-};
-
 // Initialize cloud sync
 function initCloudSync() {
     // Check if sync status element exists, if not create it
