@@ -36,6 +36,7 @@
             
             <div class="auth-footer">
                 <p>Don't have an account? <a href="#" onclick="showRegister()">Register here</a></p>
+                <p>Forgot password? <a href="#" onclick="showReset()">Reset password</a></p>
             </div>
         </div>
 
@@ -71,6 +72,36 @@
             
             <div class="auth-footer">
                 <p>Already have an account? <a href="#" onclick="showLogin()">Sign in here</a></p>
+            </div>
+        </div>
+
+        <div class="auth-card" id="reset-card" style="display: none;">
+            <div class="auth-header">
+                <h1>Reset Password</h1>
+                <p>Enter your username and new password</p>
+            </div>
+            
+            <form id="reset-form" class="auth-form">
+                <div class="form-group">
+                    <label for="reset-username">Username:</label>
+                    <input type="text" id="reset-username" name="reset-username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="reset-new-password">New Password:</label>
+                    <input type="password" id="reset-new-password" name="reset-new-password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="reset-confirm-password">Confirm New Password:</label>
+                    <input type="password" id="reset-confirm-password" name="reset-confirm-password" required>
+                </div>
+                
+                <button type="submit" class="auth-btn">Reset Password</button>
+            </form>
+            
+            <div class="auth-footer">
+                <p>Remember your password? <a href="#" onclick="showLogin()">Sign in here</a></p>
             </div>
         </div>
     </div>
