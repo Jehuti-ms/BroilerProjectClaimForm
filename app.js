@@ -7,10 +7,9 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 // Check authentication on page load
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
-    initializeApp();
 });
 
-// Check if user is authenticated
+// Check if user is authenticated - FIXED INITIALIZATION ORDER
 function checkAuthentication() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -22,48 +21,45 @@ function checkAuthentication() {
     document.getElementById('user-display').textContent = `Welcome, ${user.employeeName}`;
     document.getElementById('employee-name').value = user.employeeName;
     
-    // Load user's saved data
+    // Initialize app first, THEN load user data
+    initializeApp();
     loadUserData(user.username);
 }
 
 // Initialize the application
-// Add this to your initializeApp function to debug month values
-// Check the initialization
 function initializeApp() {
     // Load last viewed month from localStorage
     const lastMonth = localStorage.getItem('lastViewedMonth');
     const lastYear = localStorage.getItem('lastViewedYear');
     
-    console.log('=== INIT DEBUG ===');
-    console.log('Last viewed month from storage:', lastMonth);
-    console.log('Last viewed year from storage:', lastYear);
-    
     if (lastMonth !== null && lastYear !== null) {
         document.getElementById('month-select').value = lastMonth;
         document.getElementById('year-input').value = lastYear;
-        console.log('Set dropdown to - Month:', lastMonth, 'Year:', lastYear);
-    } else {
-        console.log('No last viewed data, using defaults');
     }
-    
-    const currentMonth = document.getElementById('month-select').value;
-    const currentYear = document.getElementById('year-input').value;
-    console.log('Current dropdown values - Month:', currentMonth, 'Year:', currentYear);
-    console.log('=== END INIT DEBUG ===');
     
     // Add event listeners for date controls
     document.getElementById('month-select').addEventListener('change', function() {
-        console.log('Month changed to:', this.value);
         updateFormDate();
         saveCurrentMonth();
-        loadCurrentMonthData();
+        
+        // Load data for the new month
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser) {
+            const user = JSON.parse(currentUser);
+            loadUserData(user.username);
+        }
     });
     
     document.getElementById('year-input').addEventListener('change', function() {
-        console.log('Year changed to:', this.value);
         updateFormDate();
         saveCurrentMonth();
-        loadCurrentMonthData();
+        
+        // Load data for the new month/year
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser) {
+            const user = JSON.parse(currentUser);
+            loadUserData(user.username);
+        }
     });
     
     updateFormDate();
@@ -81,36 +77,20 @@ function saveCurrentMonth() {
 // Load user data for current month
 function loadUserData(username) {
     const userData = localStorage.getItem(`userData_${username}`);
-    console.log('Loading user data for:', username, userData);
     
     if (userData) {
         const allData = JSON.parse(userData);
         loadCurrentMonthData(allData);
     } else {
-        console.log('No saved data found, starting with empty form');
         loadCurrentMonthData();
     }
 }
 
 // Load data for current month
 function loadCurrentMonthData(allData = null) {
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    
-    const monthValue = monthSelect.value;
-    const monthValueParsed = parseInt(monthValue);
-    const yearValue = yearInput.value;
-    const monthYear = `${monthValueParsed}-${yearValue}`;
-    
-    console.log('=== LOAD DEBUG ===');
-    console.log('Raw month value:', monthValue, 'Type:', typeof monthValue);
-    console.log('Parsed month value:', monthValueParsed, 'Type:', typeof monthValueParsed);
-    console.log('Year value:', yearValue);
-    console.log('MonthYear key:', monthYear);
-    console.log('Month name:', monthNames[monthValueParsed]);
-    console.log('All data keys:', allData ? Object.keys(allData) : 'No data');
-    console.log('Looking for key:', monthYear, 'Found:', allData ? allData[monthYear] : 'N/A');
-    console.log('=== END DEBUG ===');
+    const month = parseInt(document.getElementById('month-select').value);
+    const year = document.getElementById('year-input').value;
+    const monthYear = `${month}-${year}`;
     
     const tableBody = document.querySelector('#time-table tbody');
     tableBody.innerHTML = '';
@@ -118,58 +98,26 @@ function loadCurrentMonthData(allData = null) {
     
     if (allData && allData[monthYear]) {
         // Load saved data for this month
-        console.log('Found saved data for this month:', allData[monthYear]);
         allData[monthYear].forEach(entry => {
             addRowToTable(entry);
             currentFormData.push(entry);
         });
-    } else {
-        console.log('No data found for month:', monthYear);
     }
     
     calculateTotal();
 }
 
-// Add this debug function
-function debugMonthSelection() {
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    console.log('=== MONTH DEBUG ===');
-    console.log('Dropdown selected index:', monthSelect.selectedIndex);
-    console.log('Dropdown value:', monthSelect.value);
-    console.log('Dropdown text:', monthSelect.options[monthSelect.selectedIndex].text);
-    console.log('Year value:', yearInput.value);
-    console.log('Month names index:', monthNames[monthSelect.value]);
-    console.log('=== END DEBUG ===');
-}
-
-// Call this in initializeApp and in the change event listeners
-
 // Save user data
 function saveUserData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
-        console.log('No user logged in, cannot save data');
         return;
     }
     
     const user = JSON.parse(currentUser);
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    
-    const monthValue = monthSelect.value;
-    const monthValueParsed = parseInt(monthValue);
-    const yearValue = yearInput.value;
-    const monthYear = `${monthValueParsed}-${yearValue}`;
-    
-    console.log('=== SAVE DEBUG ===');
-    console.log('Raw month value:', monthValue, 'Type:', typeof monthValue);
-    console.log('Parsed month value:', monthValueParsed, 'Type:', typeof monthValueParsed);
-    console.log('Year value:', yearValue);
-    console.log('MonthYear key:', monthYear);
-    console.log('Month name:', monthNames[monthValueParsed]);
-    console.log('Data to save:', currentFormData);
-    console.log('=== END DEBUG ===');
+    const month = parseInt(document.getElementById('month-select').value);
+    const year = document.getElementById('year-input').value;
+    const monthYear = `${month}-${year}`;
     
     // Get existing user data
     const existingData = localStorage.getItem(`userData_${user.username}`);
@@ -180,7 +128,6 @@ function saveUserData() {
     
     // Save back to localStorage
     localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
-    console.log('Data saved successfully. Full data:', allData);
     
     // Show save confirmation
     showNotification('Form data saved successfully!');
@@ -281,7 +228,7 @@ function closeModal() {
     currentEditingRow = null;
 }
 
-// Save entry from modal - SIMPLIFIED DATE HANDLING
+// Save entry from modal
 function saveEntry() {
     const date = document.getElementById('entry-date').value;
     const amPm = document.getElementById('entry-am-pm').value;
@@ -315,25 +262,21 @@ function saveEntry() {
     
     // Use the date exactly as the user entered it
     const entryData = {
-        date: date, // Use the raw date from input (YYYY-MM-DD)
+        date: date,
         amPm: amPm,
         inTime: inTime,
         outTime: outTime,
         hours: hours
     };
     
-    console.log('Saving entry with date:', date, 'Full entry:', entryData);
-    
     if (currentEditingRow !== null) {
         // Update existing row
         updateRowInTable(currentEditingRow, entryData);
         currentFormData[currentEditingRow] = entryData;
-        console.log('Updated row at index:', currentEditingRow);
     } else {
         // Add new row
         addRowToTable(entryData);
         currentFormData.push(entryData);
-        console.log('Added new row, total entries:', currentFormData.length);
     }
     
     calculateTotal();
@@ -360,7 +303,6 @@ function addRowToTable(data) {
     `;
     
     tableBody.appendChild(newRow);
-    console.log('Added row to table with date:', data.date);
 }
 
 // Update an existing row in the table
@@ -374,26 +316,37 @@ function updateRowInTable(rowIndex, data) {
         row.cells[2].textContent = formatTimeDisplay(data.inTime);
         row.cells[3].textContent = formatTimeDisplay(data.outTime);
         row.cells[4].textContent = data.hours;
-        
-        console.log('Updated row in table with date:', data.date);
     }
 }
 
-// Format date for display (DD/MM/YYYY format)
+// Format date for display (DD/MM/YYYY format) - FIXED TIMEZONE ISSUE
 function formatDateForDisplay(dateString) {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    
+    // Split the YYYY-MM-DD string and create date without timezone issues
+    const [year, month, day] = dateString.split('-');
+    // Create date using local timezone
+    const date = new Date(year, month - 1, day);
+    
+    const displayDay = date.getDate().toString().padStart(2, '0');
+    const displayMonth = (date.getMonth() + 1).toString().padStart(2, '0');
+    const displayYear = date.getFullYear();
+    
+    return `${displayDay}/${displayMonth}/${displayYear}`;
 }
 
-// Format date for input (YYYY-MM-DD format)
+// Format date for input (YYYY-MM-DD format) - FIXED TIMEZONE ISSUE
 function formatDateForInput(dateString) {
     if (!dateString) return '';
     const [day, month, year] = dateString.split('/');
-    return `${year}-${month}-${day}`;
+    
+    // Create date using local timezone to ensure correct conversion
+    const date = new Date(year, month - 1, day);
+    const inputYear = date.getFullYear();
+    const inputMonth = (date.getMonth() + 1).toString().padStart(2, '0');
+    const inputDay = date.getDate().toString().padStart(2, '0');
+    
+    return `${inputYear}-${inputMonth}-${inputDay}`;
 }
 
 // Format time for display (convert 24h to 12h format)
@@ -432,8 +385,6 @@ function deleteRow(rowIndex) {
         if (rows[rowIndex]) {
             rows[rowIndex].remove();
             currentFormData.splice(rowIndex, 1);
-            
-            console.log('Deleted row, remaining entries:', currentFormData.length);
             
             // Update row indices for remaining rows
             const remainingRows = document.querySelectorAll('#time-table tbody tr');
@@ -539,19 +490,19 @@ function generatePDF() {
     doc.text(`Total Hours: ${totalHours}`, 160, finalY);
     
     // Add signature areas with proper spacing
-    const signatureY = finalY + 25; // More space before signatures
+    const signatureY = finalY + 25;
     
     // Signature Claimant
     doc.text('Signature Claimant:', 25, signatureY);
-    doc.line(25, signatureY + 10, 65, signatureY + 10); // Line below text with space
+    doc.line(25, signatureY + 10, 65, signatureY + 10);
     
     // Signature HOD
     doc.text('Signature HOD:', 85, signatureY);
-    doc.line(85, signatureY + 10, 125, signatureY + 10); // Line below text with space
+    doc.line(85, signatureY + 10, 125, signatureY + 10);
     
     // Signature Principal
     doc.text('Signature Principal:', 145, signatureY);
-    doc.line(145, signatureY + 10, 185, signatureY + 10); // Line below text with space
+    doc.line(145, signatureY + 10, 185, signatureY + 10);
     
     // Save the PDF
     doc.save(`Broiler_Claim_Form_${monthNames[month]}_${year}.pdf`);
