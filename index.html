@@ -12,51 +12,64 @@
 </head>
 <body>
     <div class="container">
+        <!-- Header Section -->
         <div class="header">
             <h1>Grantley Adams Memorial School</h1>
-              <h2>Broiler Production Project</h2>
-                <h2>Claim Form - <span id="form-date">October 2025</span></h2>
-                <div class="user-info">
-              <span id="user-display">Welcome, User</span>
-            <button onclick="logout()" class="logout-btn">Logout</button>
+            <h2>Broiler Production Project</h2>
+            <h3>Claim Form - <span id="form-date">October 2025</span></h3>
+            
+            <!-- User Info and Controls -->
+            <div class="user-info">
+                <span id="user-display">Welcome, User</span>
+                <button onclick="logout()" class="logout-btn">Logout</button>
+            </div>
+            
+            <!-- Auto-Sync Controls -->
+            <div class="sync-controls">
+                <label>
+                    <input type="checkbox" id="auto-sync" onchange="toggleAutoSync()">
+                    Auto-Sync
+                </label>
+            </div>
         </div>
-    </div>
 
+        <!-- Date and Employee Controls -->
         <div class="date-controls">
-            <div>
-                <label for="month-select">Month:</label>
-                <select id="month-select">
-                    <option value="0">January</option>
-                    <option value="1">February</option>
-                    <option value="2">March</option>
-                    <option value="3">April</option>
-                    <option value="4">May</option>
-                    <option value="5">June</option>
-                    <option value="6">July</option>
-                    <option value="7">August</option>
-                    <option value="8">September</option>
-                    <option value="9" selected>October</option>
-                    <option value="10">November</option>
-                    <option value="11">December</option>
-                </select>
+            <div class="date-selectors">
+                <div class="date-group">
+                    <label for="month-select">Month:</label>
+                    <select id="month-select">
+                        <option value="0">January</option>
+                        <option value="1">February</option>
+                        <option value="2">March</option>
+                        <option value="3">April</option>
+                        <option value="4">May</option>
+                        <option value="5">June</option>
+                        <option value="6">July</option>
+                        <option value="7">August</option>
+                        <option value="8">September</option>
+                        <option value="9" selected>October</option>
+                        <option value="10">November</option>
+                        <option value="11">December</option>
+                    </select>
+                </div>
                 
-                <label for="year-input" style="margin-left: 15px;">Year:</label>
-                <input type="number" id="year-input" value="2025" min="2020" max="2030">
-                <div class="sync-controls">
-                    <label>
-                        <input type="checkbox" id="auto-sync" onchange="toggleAutoSync()">
-                        Enable Auto-Sync 
-                    </label>
+                <div class="date-group">
+                    <label for="year-input">Year:</label>
+                    <input type="number" id="year-input" value="2025" min="2020" max="2030">
                 </div>
             </div>
+            
             <button class="add-entry-btn" onclick="openModal()">Add New Entry</button>
         </div>
 
+        <!-- Employee Information -->
         <div class="employee-info">
             <label for="employee-name">Employee Name:</label>
             <input type="text" id="employee-name" value="Jeoffery Knight">
         </div>
 
+        <!-- Time Entry Table -->
         <div class="form-section">
             <div class="table-container">
                 <table id="time-table">
@@ -75,43 +88,111 @@
                     </tbody>
                 </table>
             </div>
-            <!-- ... header, date controls, employee info, form section ... -->
-
-            <!-- ... header, date controls, employee info, form section ... -->
-
+            
+            <!-- Total Hours -->
             <div class="total-hours">
                 Total Hours: <span id="total-hours">0:00</span>
             </div>
+            
+            <!-- Sync Status -->
             <div id="sync-status" class="sync-status" style="display: none;"></div>
-            
-            <!-- Reverted Signature Section -->
-            <div class="signature-section">
-                <div class="signature-box">
-                    <div>Signature Claimant:</div>
-                    <div class="signature-line"></div>
+        </div>
+
+        <!-- Cloud Sync Section -->
+        <div class="form-section">
+            <div class="cloud-sync-section">
+                <h3>📡 Cloud Sync</h3>
+                <p class="sync-description">Keep your data synchronized across all devices</p>
+                
+                <div class="cloud-sync-buttons">
+                    <button onclick="syncToCloud()" class="cloud-btn">
+                        <span class="btn-icon">📤</span>
+                        Sync to Cloud
+                    </button>
+                    <button onclick="syncFromCloud()" class="cloud-btn">
+                        <span class="btn-icon">📥</span>
+                        Sync from Cloud
+                    </button>
                 </div>
-                <div class="signature-box">
-                    <div>Signature HOD:</div>
-                    <div class="signature-line"></div>
-                </div>
-                <div class="signature-box">
-                    <div>Signature Principal:</div>
-                    <div class="signature-line"></div>
+                
+                <div id="last-sync" class="last-sync" style="display: none;"></div>
+                
+                <div class="sync-features">
+                    <div class="feature">
+                        <span class="feature-icon">🔄</span>
+                        <span>Auto-sync every 5 minutes</span>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">📱</span>
+                        <span>Works across all devices</span>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">💾</span>
+                        <span>Automatic backups</span>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Buttons placed neatly under signatures -->
-            <div class="buttons">
-                <button onclick="calculateTotal()">Calculate Total</button>
-                <button onclick="generatePDF()">Generate PDF</button>
-                <button onclick="clearForm()">Clear Form</button>
-                <button onclick="saveForm()" class="save-btn">Save Form</button>
-                <button onclick="exportData()" class="export-btn">Export Data</button>
-                <button onclick="importData()" class="import-btn">Import Data</button>
-                <button onclick="syncToCloud()" class="cloud-btn">Sync to Cloud</button>
-                <button onclick="syncFromCloud()" class="cloud-btn">Sync from Cloud</button>
+        </div>
+
+        <!-- Data Management Section -->
+        <div class="form-section">
+            <div class="data-management-section">
+                <h3>💾 Data Management</h3>
+                
+                <div class="data-buttons">
+                    <button onclick="exportData()" class="export-btn">
+                        <span class="btn-icon">📄</span>
+                        Export Data
+                    </button>
+                    <button onclick="importData()" class="import-btn">
+                        <span class="btn-icon">📂</span>
+                        Import Data
+                    </button>
+                    <button onclick="clearForm()" class="clear-btn">
+                        <span class="btn-icon">🗑️</span>
+                        Clear Form
+                    </button>
+                </div>
+                
+                <p class="data-help">
+                    Export your data for backup or transfer to another device. Import to restore from backup.
+                </p>
             </div>
-            
+        </div>
+
+        <!-- Signatures Section -->
+        <div class="signature-section">
+            <div class="signature-box">
+                <div>Signature Claimant:</div>
+                <div class="signature-line"></div>
+            </div>
+            <div class="signature-box">
+                <div>Signature HOD:</div>
+                <div class="signature-line"></div>
+            </div>
+            <div class="signature-box">
+                <div>Signature Principal:</div>
+                <div class="signature-line"></div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="buttons">
+            <button onclick="calculateTotal()" class="calc-btn">
+                <span class="btn-icon">🧮</span>
+                Calculate Total
+            </button>
+            <button onclick="generatePDF()" class="pdf-btn">
+                <span class="btn-icon">📊</span>
+                Generate PDF
+            </button>
+            <button onclick="saveForm()" class="save-btn">
+                <span class="btn-icon">💾</span>
+                Save Form
+            </button>
+        </div>
+    </div>
+
     <!-- Modal for adding/editing entries -->
     <div id="entry-modal" class="modal">
         <div class="modal-content">
@@ -119,30 +200,37 @@
                 <h2 id="modal-title">Add New Time Entry</h2>
                 <span class="close" onclick="closeModal()">&times;</span>
             </div>
-            <div class="form-group">
-                <label for="entry-date">Date:</label>
-                <input type="date" id="entry-date">
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="entry-date">Date:</label>
+                    <input type="date" id="entry-date">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="entry-am-pm">AM/PM:</label>
+                        <select id="entry-am-pm">
+                            <option value="AM">AM</option>
+                            <option value="PM">PM</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="entry-time-in">Time IN:</label>
+                        <input type="time" id="entry-time-in">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="entry-time-out">Time OUT:</label>
+                        <input type="time" id="entry-time-out">
+                    </div>
+                </div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="entry-am-pm">AM/PM:</label>
-                    <select id="entry-am-pm">
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="entry-time-in">Time IN:</label>
-                    <input type="time" id="entry-time-in">
-                </div>
-                <div class="form-group">
-                    <label for="entry-time-out">Time OUT:</label>
-                    <input type="time" id="entry-time-out">
-                </div>
-            </div>
+            
             <div class="modal-buttons">
-                <button onclick="closeModal()">Cancel</button>
-                <button onclick="saveEntry()">Save Entry</button>
+                <button onclick="closeModal()" class="cancel-btn">Cancel</button>
+                <button onclick="saveEntry()" class="confirm-btn">Save Entry</button>
             </div>
         </div>
     </div>
