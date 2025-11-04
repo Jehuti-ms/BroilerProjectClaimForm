@@ -413,3 +413,186 @@ button:hover {
     gap: 5px;
     cursor: pointer;
 }
+/* Enhanced Button Styles with Icons */
+.btn-icon {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+.calc-btn {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+}
+
+.calc-btn:hover {
+    background: linear-gradient(135deg, #F57C00, #EF6C00);
+}
+
+.pdf-btn {
+    background: linear-gradient(135deg, #F44336, #D32F2F);
+}
+
+.pdf-btn:hover {
+    background: linear-gradient(135deg, #D32F2F, #C2185B);
+}
+
+.clear-btn {
+    background: linear-gradient(135deg, #607D8B, #455A64);
+}
+
+.clear-btn:hover {
+    background: linear-gradient(135deg, #455A64, #37474F);
+}
+
+.cancel-btn {
+    background: #6c757d;
+}
+
+.cancel-btn:hover {
+    background: #5a6268;
+}
+
+.confirm-btn {
+    background: #4CAF50;
+}
+
+.confirm-btn:hover {
+    background: #45a049;
+}
+
+/* Date Selectors */
+.date-selectors {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.date-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.date-group label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0;
+}
+
+/* Cloud Sync Section */
+.cloud-sync-section {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 25px;
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
+    margin: 25px 0;
+    text-align: center;
+}
+
+.cloud-sync-section h3 {
+    margin: 0 0 10px 0;
+    color: #495057;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.sync-description {
+    color: #6c757d;
+    margin: 0 0 20px 0;
+    font-size: 14px;
+}
+
+.sync-features {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.feature {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #495057;
+}
+
+.feature-icon {
+    font-size: 16px;
+}
+
+/* Data Management Section */
+.data-management-section {
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    padding: 25px;
+    border-radius: 10px;
+    border: 1px solid #90caf9;
+    margin: 25px 0;
+    text-align: center;
+}
+
+.data-management-section h3 {
+    margin: 0 0 15px 0;
+    color: #1976D2;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.data-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.data-help {
+    color: #546e7a;
+    font-size: 13px;
+    margin: 0;
+    font-style: italic;
+}
+
+/* Modal Enhancements */
+.modal-body {
+    padding: 10px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .date-selectors {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+    
+    .date-group {
+        justify-content: space-between;
+    }
+    
+    .sync-features {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .data-buttons {
+        flex-direction: column;
+    }
+    
+    .cloud-sync-buttons {
+        flex-direction: column;
+    }
+    
+    .buttons {
+        flex-direction: column;
+    }
+    
+    .signature-section {
+        flex-direction: column;
+        gap: 25px;
+    }
+    
+    .signature-box {
+        width: 100%;
+    }
+}
