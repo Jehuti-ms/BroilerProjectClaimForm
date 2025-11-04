@@ -519,97 +519,17 @@ function logout() {
     window.location.href = 'auth.html';
 }
 
-// Cloud Sync Configuration
+// Cloud Sync Configuration (ONLY DECLARE THIS ONCE)
 const CLOUD_CONFIG = {
-    // Using Google Drive API (simplified version)
     APP_NAME: 'BroilerProductionProject',
     FILE_NAME: 'broiler_data_backup.json',
-    SYNC_INTERVAL: 300000 // 5 minutes auto-sync
+    SYNC_INTERVAL: 300000 // 5 minutes
 };
 
 // Initialize cloud sync
 function initCloudSync() {
-    // Check for auto-sync every 5 minutes
-    setInterval(() => {
-        const autoSync = localStorage.getItem('autoSyncEnabled');
-        if (autoSync === 'true') {
-            autoSyncData();
-        }
-    }, CLOUD_CONFIG.SYNC_INTERVAL);
-}
-
-// Sync data to cloud (Google Drive)
-async function syncToCloud() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showSyncStatus('Please sign in first', 'error');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    const userData = localStorage.getItem(`userData_${user.username}`);
-    
-    if (!userData) {
-        showSyncStatus('No data to sync', 'error');
-        return;
-    }
-    
-    showSyncStatus('Syncing to cloud...', 'loading');
-    
-    try {
-        // Method 1: Google Drive API (requires OAuth setup)
-        await syncToGoogleDrive(user.username, userData);
-        
-        // Method 2: Fallback to localStorage cross-device sync
-        await syncViaLocalStorage(user.username, userData);
-        
-        showSyncStatus('Data synced to cloud successfully!', 'success');
-        localStorage.setItem('lastCloudSync', new Date().toISOString());
-    } catch (error) {
-        console.error('Cloud sync failed:', error);
-        showSyncStatus('Cloud sync failed. Using fallback method.', 'error');
-        
-        // Fallback: Try simplified method
-        try {
-            await fallbackCloudSync(user.username, userData);
-            showSyncStatus('Data synced using fallback method!', 'success');
-        } catch (fallbackError) {
-            showSyncStatus('All sync methods failed. Use Export/Import.', 'error');
-        }
-    }
-}
-
-// Sync data from cloud
-async function syncFromCloud() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showSyncStatus('Please sign in first', 'error');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    showSyncStatus('Syncing from cloud...', 'loading');
-    
-    try {
-        const cloudData = await getFromGoogleDrive(user.username);
-        if (cloudData) {
-            await applyCloudData(user.username, cloudData);
-            showSyncStatus('Data synced from cloud successfully!', 'success');
-        } else {
-            showSyncStatus('No cloud data found', 'error');
-        }
-    } catch (error) {
-        console.error('Cloud sync failed:', error);
-        showSyncStatus('Cloud sync failed. Check connection.', 'error');
-    }
-}
-
-// Initialize cloud sync
-function initCloudSync() {
-    // Check if sync status element exists, if not create it
-    if (!document.getElementById('sync-status')) {
-        createSyncStatusElement();
-    }
+    // Initialize auto-sync checkbox
+    initAutoSyncCheckbox();
     
     // Check for auto-sync every 5 minutes
     setInterval(() => {
@@ -620,17 +540,33 @@ function initCloudSync() {
     }, CLOUD_CONFIG.SYNC_INTERVAL);
 }
 
-// Create sync status element if it doesn't exist
-function createSyncStatusElement() {
-    const syncStatus = document.createElement('div');
-    syncStatus.id = 'sync-status';
-    syncStatus.className = 'sync-status';
-    syncStatus.style.display = 'none';
+// Initialize auto-sync checkbox state
+function initAutoSyncCheckbox() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        checkbox.checked = autoSync === 'true';
+    }
+}
+
+// Auto-sync toggle function
+function toggleAutoSync() {
+    const autoSync = localStorage.getItem('autoSyncEnabled');
+    const newState = autoSync !== 'true';
     
-    // Insert after total hours
-    const totalHours = document.querySelector('.total-hours');
-    if (totalHours && totalHours.parentNode) {
-        totalHours.parentNode.insertBefore(syncStatus, totalHours.nextSibling);
+    localStorage.setItem('autoSyncEnabled', newState.toString());
+    
+    if (newState) {
+        showSyncStatus('Auto-sync enabled', 'success');
+        autoSyncData();
+    } else {
+        showSyncStatus('Auto-sync disabled', 'error');
+    }
+    
+    // Update checkbox state
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        checkbox.checked = newState;
     }
 }
 
@@ -653,20 +589,11 @@ async function syncToCloud() {
     showSyncStatus('Syncing to cloud...', 'loading');
     
     try {
-        // Use our cross-device storage method
         await syncViaLocalStorage(user.username, userData);
-        
         showSyncStatus('Data synced successfully!', 'success');
         localStorage.setItem('lastCloudSync', new Date().toISOString());
-        
-        // Show last sync time
-        setTimeout(() => {
-            showSyncStatus(`Last sync: ${new Date().toLocaleTimeString()}`, 'success');
-        }, 2000);
-        
     } catch (error) {
-        console.error('Sync failed:', error);
-        showSyncStatus('Sync failed. Using export/import.', 'error');
+        showSyncStatus('Sync failed', 'error');
     }
 }
 
@@ -690,86 +617,29 @@ async function syncFromCloud() {
             showSyncStatus('No cloud data found', 'error');
         }
     } catch (error) {
-        console.error('Sync failed:', error);
-        showSyncStatus('Sync failed. Check connection.', 'error');
+        showSyncStatus('Sync failed', 'error');
     }
 }
 
-// Cross-device storage using localStorage with shared keys
+// Cross-device storage using localStorage
 async function syncViaLocalStorage(username, data) {
     const syncData = {
         username: username,
         data: JSON.parse(data),
         lastSync: new Date().toISOString(),
-        device: getDeviceInfo(),
         version: '1.0'
     };
     
-    // Store in multiple shared locations
     const sharedKey = `broiler_sync_${username}`;
-    
-    // Primary storage
     localStorage.setItem(sharedKey, JSON.stringify(syncData));
-    
-    // Backup storage with timestamp
-    const timestampKey = `broiler_sync_${username}_${Date.now()}`;
-    localStorage.setItem(timestampKey, JSON.stringify(syncData));
-    
-    // Clean up old sync data (keep only last 5)
-    cleanupOldSyncData(username);
     
     return true;
 }
 
 async function getFromCrossDeviceStorage(username) {
     const sharedKey = `broiler_sync_${username}`;
-    
-    // Try to get the latest sync data
-    let data = localStorage.getItem(sharedKey);
-    if (data) {
-        return JSON.parse(data);
-    }
-    
-    // If no primary data, look for any recent sync data
-    const allKeys = Object.keys(localStorage);
-    const syncKeys = allKeys.filter(key => key.startsWith(`broiler_sync_${username}_`));
-    
-    if (syncKeys.length > 0) {
-        // Get the most recent one
-        syncKeys.sort().reverse();
-        const latestKey = syncKeys[0];
-        data = localStorage.getItem(latestKey);
-        if (data) {
-            return JSON.parse(data);
-        }
-    }
-    
-    return null;
-}
-
-// Clean up old sync data
-function cleanupOldSyncData(username) {
-    const allKeys = Object.keys(localStorage);
-    const syncKeys = allKeys.filter(key => key.startsWith(`broiler_sync_${username}_`));
-    
-    // Keep only the 5 most recent
-    if (syncKeys.length > 5) {
-        syncKeys.sort().reverse();
-        const keysToRemove = syncKeys.slice(5);
-        
-        keysToRemove.forEach(key => {
-            localStorage.removeItem(key);
-        });
-    }
-}
-
-// Get device information
-function getDeviceInfo() {
-    return {
-        userAgent: navigator.userAgent,
-        platform: navigator.platform,
-        timestamp: new Date().toISOString()
-    };
+    const data = localStorage.getItem(sharedKey);
+    return data ? JSON.parse(data) : null;
 }
 
 // Apply cloud data to local storage
@@ -783,32 +653,10 @@ async function applyCloudData(username, cloudData) {
             const user = JSON.parse(currentUser);
             loadUserData(user.username);
         }
-        
-        showNotification('Cloud data loaded successfully!');
     }
 }
 
-// Auto-sync functionality
-function toggleAutoSync() {
-    const autoSync = localStorage.getItem('autoSyncEnabled');
-    const newState = autoSync !== 'true';
-    
-    localStorage.setItem('autoSyncEnabled', newState.toString());
-    
-    if (newState) {
-        showSyncStatus('Auto-sync enabled', 'success');
-        autoSyncData();
-    } else {
-        showSyncStatus('Auto-sync disabled', 'error');
-    }
-    
-    // Update checkbox state
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        checkbox.checked = newState;
-    }
-}
-
+// Auto-sync data
 async function autoSyncData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) return;
@@ -821,32 +669,34 @@ async function autoSyncData() {
             await syncViaLocalStorage(user.username, userData);
             console.log('Auto-sync completed');
         } catch (error) {
-            console.log('Auto-sync failed:', error);
+            console.log('Auto-sync failed');
         }
     }
 }
 
-// Sync status display with safe element checking
+// Sync status display
 function showSyncStatus(message, type) {
     let statusEl = document.getElementById('sync-status');
     
-    // Create element if it doesn't exist
     if (!statusEl) {
-        createSyncStatusElement();
-        statusEl = document.getElementById('sync-status');
-    }
-    
-    // Double-check element exists
-    if (!statusEl) {
-        console.log('Sync Status:', message);
-        return; // Silently fail if element still doesn't exist
+        // Create element if it doesn't exist
+        statusEl = document.createElement('div');
+        statusEl.id = 'sync-status';
+        statusEl.className = 'sync-status';
+        statusEl.style.display = 'none';
+        
+        // Insert after total hours
+        const totalHours = document.querySelector('.total-hours');
+        if (totalHours && totalHours.parentNode) {
+            totalHours.parentNode.insertBefore(statusEl, totalHours.nextSibling);
+        }
     }
     
     statusEl.textContent = message;
     statusEl.className = `sync-status sync-${type}`;
     statusEl.style.display = 'block';
     
-    // Auto-hide after 5 seconds for success/error, keep loading visible
+    // Auto-hide after 5 seconds
     if (type !== 'loading') {
         setTimeout(() => {
             if (statusEl) {
@@ -856,7 +706,7 @@ function showSyncStatus(message, type) {
     }
 }
 
-// Enhanced export/import with cloud backup
+// Enhanced export with cloud backup
 async function exportData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) return;
@@ -869,46 +719,24 @@ async function exportData() {
         return;
     }
     
-    // Include cloud sync info in export
     const exportData = {
         userData: JSON.parse(userData),
-        cloudInfo: {
-            lastSync: localStorage.getItem('lastCloudSync'),
-            username: user.username,
-            exportDate: new Date().toISOString()
-        }
+        exportDate: new Date().toISOString()
     };
     
-    // Create downloadable file
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `broiler_data_${user.username}_${new Date().toISOString().split('T')[0]}.json`);
+    downloadAnchorNode.setAttribute("download", `broiler_data_${user.username}.json`);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
     
     showNotification('Data exported successfully!');
-    
-    // Auto-backup to cloud
-    setTimeout(() => {
-        syncToCloud().catch(console.error);
-    }, 1000);
 }
 
-// Initialize auto-sync checkbox state
-function initAutoSyncCheckbox() {
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        const autoSync = localStorage.getItem('autoSyncEnabled');
-        checkbox.checked = autoSync === 'true';
-    }
-}
-
-// Update your DOMContentLoaded event
+// Update DOMContentLoaded to initialize sync
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
-    initAutoSyncCheckbox();
     initCloudSync();
 });
-
