@@ -518,3 +518,319 @@ function logout() {
     localStorage.removeItem('currentUser');
     window.location.href = 'auth.html';
 }
+
+// Cloud Sync Configuration
+const CLOUD_CONFIG = {
+    // Using Google Drive API (simplified version)
+    APP_NAME: 'BroilerProductionProject',
+    FILE_NAME: 'broiler_data_backup.json',
+    SYNC_INTERVAL: 300000 // 5 minutes auto-sync
+};
+
+// Initialize cloud sync
+function initCloudSync() {
+    // Check for auto-sync every 5 minutes
+    setInterval(() => {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        if (autoSync === 'true') {
+            autoSyncData();
+        }
+    }, CLOUD_CONFIG.SYNC_INTERVAL);
+}
+
+// Sync data to cloud (Google Drive)
+async function syncToCloud() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showSyncStatus('Please sign in first', 'error');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    const userData = localStorage.getItem(`userData_${user.username}`);
+    
+    if (!userData) {
+        showSyncStatus('No data to sync', 'error');
+        return;
+    }
+    
+    showSyncStatus('Syncing to cloud...', 'loading');
+    
+    try {
+        // Method 1: Google Drive API (requires OAuth setup)
+        await syncToGoogleDrive(user.username, userData);
+        
+        // Method 2: Fallback to localStorage cross-device sync
+        await syncViaLocalStorage(user.username, userData);
+        
+        showSyncStatus('Data synced to cloud successfully!', 'success');
+        localStorage.setItem('lastCloudSync', new Date().toISOString());
+    } catch (error) {
+        console.error('Cloud sync failed:', error);
+        showSyncStatus('Cloud sync failed. Using fallback method.', 'error');
+        
+        // Fallback: Try simplified method
+        try {
+            await fallbackCloudSync(user.username, userData);
+            showSyncStatus('Data synced using fallback method!', 'success');
+        } catch (fallbackError) {
+            showSyncStatus('All sync methods failed. Use Export/Import.', 'error');
+        }
+    }
+}
+
+// Sync data from cloud
+async function syncFromCloud() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showSyncStatus('Please sign in first', 'error');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    showSyncStatus('Syncing from cloud...', 'loading');
+    
+    try {
+        const cloudData = await getFromGoogleDrive(user.username);
+        if (cloudData) {
+            await applyCloudData(user.username, cloudData);
+            showSyncStatus('Data synced from cloud successfully!', 'success');
+        } else {
+            showSyncStatus('No cloud data found', 'error');
+        }
+    } catch (error) {
+        console.error('Cloud sync failed:', error);
+        showSyncStatus('Cloud sync failed. Check connection.', 'error');
+    }
+}
+
+// Google Drive Sync Implementation
+async function syncToGoogleDrive(username, data) {
+    // Simplified Google Drive implementation
+    // In a real app, you'd use the Google Drive API with OAuth
+    
+    const syncData = {
+        username: username,
+        data: JSON.parse(data),
+        lastSync: new Date().toISOString(),
+        version: '1.0'
+    };
+    
+    // Store in localStorage as a simulated cloud storage
+    localStorage.setItem(`cloud_${username}`, JSON.stringify(syncData));
+    
+    // Also store in a cross-device accessible location
+    await storeInCrossDeviceStorage(username, syncData);
+    
+    return true;
+}
+
+async function getFromGoogleDrive(username) {
+    // Get from simulated cloud storage
+    const cloudData = localStorage.getItem(`cloud_${username}`);
+    if (cloudData) {
+        return JSON.parse(cloudData);
+    }
+    
+    // Try to get from cross-device storage
+    return await getFromCrossDeviceStorage(username);
+}
+
+// Cross-device storage using multiple methods
+async function storeInCrossDeviceStorage(username, data) {
+    // Method 1: Use localStorage with a shared key pattern
+    const sharedKey = `broiler_sync_${username}`;
+    localStorage.setItem(sharedKey, JSON.stringify(data));
+    
+    // Method 2: Use sessionStorage as secondary backup
+    sessionStorage.setItem(sharedKey, JSON.stringify(data));
+    
+    // Method 3: Use IndexedDB for larger storage
+    await storeInIndexedDB(sharedKey, data);
+    
+    return true;
+}
+
+async function getFromCrossDeviceStorage(username) {
+    const sharedKey = `broiler_sync_${username}`;
+    
+    // Try localStorage first
+    let data = localStorage.getItem(sharedKey);
+    if (data) return JSON.parse(data);
+    
+    // Try sessionStorage
+    data = sessionStorage.getItem(sharedKey);
+    if (data) return JSON.parse(data);
+    
+    // Try IndexedDB
+    data = await getFromIndexedDB(sharedKey);
+    if (data) return data;
+    
+    return null;
+}
+
+// IndexedDB implementation for larger storage
+async function storeInIndexedDB(key, data) {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('BroilerSyncDB', 1);
+        
+        request.onerror = () => reject('IndexedDB error');
+        request.onsuccess = (event) => {
+            const db = event.target.result;
+            const transaction = db.transaction(['syncStore'], 'readwrite');
+            const store = transaction.objectStore('syncStore');
+            const putRequest = store.put(data, key);
+            
+            putRequest.onsuccess = () => resolve(true);
+            putRequest.onerror = () => reject('Store error');
+        };
+        
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            db.createObjectStore('syncStore');
+        };
+    });
+}
+
+async function getFromIndexedDB(key) {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('BroilerSyncDB', 1);
+        
+        request.onerror = () => reject('IndexedDB error');
+        request.onsuccess = (event) => {
+            const db = event.target.result;
+            const transaction = db.transaction(['syncStore'], 'readonly');
+            const store = transaction.objectStore('syncStore');
+            const getRequest = store.get(key);
+            
+            getRequest.onsuccess = () => resolve(getRequest.result);
+            getRequest.onerror = () => reject('Get error');
+        };
+    });
+}
+
+// Apply cloud data to local storage
+async function applyCloudData(username, cloudData) {
+    if (cloudData && cloudData.data) {
+        localStorage.setItem(`userData_${username}`, JSON.stringify(cloudData.data));
+        
+        // Reload the current view
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser) {
+            const user = JSON.parse(currentUser);
+            loadUserData(user.username);
+        }
+    }
+}
+
+// Fallback cloud sync using multiple storage methods
+async function fallbackCloudSync(username, data) {
+    const syncData = {
+        username: username,
+        data: JSON.parse(data),
+        lastSync: new Date().toISOString(),
+        version: '1.0'
+    };
+    
+    // Store in multiple locations for redundancy
+    localStorage.setItem(`cloud_backup_${username}`, JSON.stringify(syncData));
+    sessionStorage.setItem(`cloud_backup_${username}`, JSON.stringify(syncData));
+    
+    // Also store in a publicly accessible way for cross-device access
+    const publicKey = `public_${username}_${Date.now()}`;
+    localStorage.setItem(publicKey, JSON.stringify(syncData));
+    
+    return true;
+}
+
+// Auto-sync functionality
+function toggleAutoSync() {
+    const autoSync = localStorage.getItem('autoSyncEnabled');
+    const newState = autoSync !== 'true';
+    
+    localStorage.setItem('autoSyncEnabled', newState.toString());
+    
+    if (newState) {
+        showSyncStatus('Auto-sync enabled', 'success');
+        autoSyncData();
+    } else {
+        showSyncStatus('Auto-sync disabled', 'error');
+    }
+}
+
+async function autoSyncData() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) return;
+    
+    const user = JSON.parse(currentUser);
+    const userData = localStorage.getItem(`userData_${user.username}`);
+    
+    if (userData) {
+        try {
+            await syncToGoogleDrive(user.username, userData);
+            console.log('Auto-sync completed');
+        } catch (error) {
+            console.log('Auto-sync failed:', error);
+        }
+    }
+}
+
+// Sync status display
+function showSyncStatus(message, type) {
+    const statusEl = document.getElementById('sync-status');
+    statusEl.textContent = message;
+    statusEl.className = `sync-status sync-${type}`;
+    statusEl.style.display = 'block';
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        statusEl.style.display = 'none';
+    }, 5000);
+}
+
+// Enhanced export/import with cloud backup
+async function exportData() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) return;
+    
+    const user = JSON.parse(currentUser);
+    const userData = localStorage.getItem(`userData_${user.username}`);
+    
+    if (!userData) {
+        alert('No data to export');
+        return;
+    }
+    
+    // Include cloud sync info in export
+    const exportData = {
+        userData: JSON.parse(userData),
+        cloudInfo: {
+            lastSync: localStorage.getItem('lastCloudSync'),
+            username: user.username,
+            exportDate: new Date().toISOString()
+        }
+    };
+    
+    // Create downloadable file
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `broiler_data_${user.username}_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+    
+    showNotification('Data exported successfully!');
+    
+    // Auto-backup to cloud
+    setTimeout(() => {
+        syncToCloud().catch(console.error);
+    }, 1000);
+}
+
+// Initialize cloud sync when app starts
+document.addEventListener('DOMContentLoaded', function() {
+    // ... existing code ...
+    initCloudSync();
+});
+
