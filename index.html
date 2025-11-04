@@ -41,6 +41,12 @@
                 
                 <label for="year-input" style="margin-left: 15px;">Year:</label>
                 <input type="number" id="year-input" value="2025" min="2020" max="2030">
+                <div class="sync-controls">
+                    <label>
+                        <input type="checkbox" id="auto-sync" onchange="toggleAutoSync()">
+                        Enable Auto-Sync (every 5 minutes)
+                    </label>
+                </div>
             </div>
             <button class="add-entry-btn" onclick="openModal()">Add New Entry</button>
         </div>
