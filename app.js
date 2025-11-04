@@ -28,22 +28,32 @@ function checkAuthentication() {
 
 // Initialize the application
 // Add this to your initializeApp function to debug month values
+// Check the initialization
 function initializeApp() {
     // Load last viewed month from localStorage
     const lastMonth = localStorage.getItem('lastViewedMonth');
     const lastYear = localStorage.getItem('lastViewedYear');
     
-    console.log('Initializing app. Last viewed month:', lastMonth, 'Last viewed year:', lastYear);
-    console.log('Current dropdown selection - Month:', document.getElementById('month-select').value, 'Year:', document.getElementById('year-input').value);
+    console.log('=== INIT DEBUG ===');
+    console.log('Last viewed month from storage:', lastMonth);
+    console.log('Last viewed year from storage:', lastYear);
     
     if (lastMonth !== null && lastYear !== null) {
         document.getElementById('month-select').value = lastMonth;
         document.getElementById('year-input').value = lastYear;
+        console.log('Set dropdown to - Month:', lastMonth, 'Year:', lastYear);
+    } else {
+        console.log('No last viewed data, using defaults');
     }
+    
+    const currentMonth = document.getElementById('month-select').value;
+    const currentYear = document.getElementById('year-input').value;
+    console.log('Current dropdown values - Month:', currentMonth, 'Year:', currentYear);
+    console.log('=== END INIT DEBUG ===');
     
     // Add event listeners for date controls
     document.getElementById('month-select').addEventListener('change', function() {
-        console.log('Month changed to:', this.value, 'which is:', monthNames[this.value]);
+        console.log('Month changed to:', this.value);
         updateFormDate();
         saveCurrentMonth();
         loadCurrentMonthData();
@@ -57,13 +67,6 @@ function initializeApp() {
     });
     
     updateFormDate();
-    
-    // Load current month data after initialization
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        const user = JSON.parse(currentUser);
-        loadUserData(user.username);
-    }
 }
 
 // Save current month/year to localStorage
