@@ -5,6 +5,13 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
 
+// Service Worker Sync Manager
+const SW_SYNC = {
+    registration: null,
+    isSupported: 'serviceWorker' in navigator && 'SyncManager' in window,
+    syncInProgress: false
+};
+
 // Configuration
 const CONFIG = {
     SYNC: {
@@ -16,7 +23,8 @@ const CONFIG = {
 // DOM Content Loaded
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
-    initCloudSync();
+    initServiceWorkerSync();
+    addSyncControlsToUI();
 });
 
 // Authentication
@@ -121,7 +129,23 @@ function saveUserData() {
     allData[monthYear] = currentFormData;
     localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
     
-    showNotification('Form data saved successfully!');
+    // Queue for Service Worker background sync
+    if (SW_SYNC.isSupported && navigator.serviceWorker.controller) {
+        queueDataForSync({
+            username: user.username,
+            data: allData,
+            timestamp: new Date().toISOString(),
+            type: 'full_sync'
+        });
+    }
+    
+    // Trigger immediate cloud sync if auto-sync is enabled
+    const autoSync = localStorage.getItem('autoSyncEnabled');
+    if (autoSync === 'true' && navigator.onLine) {
+        setTimeout(() => syncToCloud(), 1000);
+    }
+    
+    showNotification('Form data saved and queued for sync!');
 }
 
 // Notification System
@@ -508,16 +532,7 @@ function addPDFFooter(doc) {
     doc.line(145, signatureY + 10, 185, signatureY + 10);
 }
 
-// Replace the entire cloud sync section with this simplified version:
-
-// Service Worker Sync Manager
-const SW_SYNC = {
-    registration: null,
-    isSupported: 'serviceWorker' in navigator && 'SyncManager' in window,
-    syncInProgress: false
-};
-
-// Initialize Service Worker Sync
+// Service Worker Sync Functions
 async function initServiceWorkerSync() {
     if (!SW_SYNC.isSupported) {
         console.log('Service Worker sync not supported');
@@ -553,7 +568,6 @@ async function initServiceWorkerSync() {
     }
 }
 
-// Setup message listeners for Service Worker
 function setupSyncListeners() {
     // Listen for messages from Service Worker
     navigator.serviceWorker.addEventListener('message', (event) => {
@@ -589,33 +603,27 @@ function setupSyncListeners() {
     });
 }
 
-// Register background sync
 async function registerBackgroundSync() {
     try {
         const registration = await navigator.serviceWorker.ready;
-        
-        // Register for background sync
         await registration.sync.register('broiler-background-sync');
         console.log('Background sync registered');
-        
     } catch (error) {
         console.error('Background sync registration failed:', error);
     }
 }
 
-// Register periodic background sync
 async function registerPeriodicSync() {
     try {
         const registration = await navigator.serviceWorker.ready;
         
-        // Check if periodic sync is supported and allowed
         const status = await navigator.permissions.query({
             name: 'periodic-background-sync'
         });
         
         if (status.state === 'granted') {
             await registration.periodicSync.register('broiler-periodic-sync', {
-                minInterval: 15 * 60 * 1000 // 15 minutes minimum
+                minInterval: 15 * 60 * 1000
             });
             console.log('Periodic sync registered');
         } else {
@@ -627,14 +635,12 @@ async function registerPeriodicSync() {
     }
 }
 
-// Trigger immediate sync
 async function triggerSync() {
     if (!SW_SYNC.registration || SW_SYNC.syncInProgress) {
         return;
     }
 
     try {
-        // Get current user data
         const currentUser = localStorage.getItem('currentUser');
         if (!currentUser) return;
         
@@ -643,7 +649,6 @@ async function triggerSync() {
         
         if (!userData) return;
         
-        // Prepare sync data
         const syncData = {
             username: user.username,
             data: JSON.parse(userData),
@@ -671,7 +676,6 @@ async function triggerSync() {
     }
 }
 
-// Queue data changes for sync
 function queueDataForSync(data) {
     if (!navigator.serviceWorker.controller) {
         return;
@@ -681,180 +685,439 @@ function queueDataForSync(data) {
         type: 'QUEUE_DATA',
         payload: data
     });
-    
-    // Trigger sync after short delay
-    setTimeout(() => triggerSync(), 1000);
 }
 
-// Enhanced saveUserData that triggers sync
-function saveUserData() {
+// Cloud Sync Functions
+function addSyncControlsToUI() {
+    const syncControls = `
+        <div class="sync-controls" style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #f8f9fa;">
+            <h3 style="margin: 0 0 15px 0; color: #333;">🔄 Data Synchronization</h3>
+            
+            <!-- Automatic Sync Section -->
+            <div style="margin-bottom: 15px; padding: 10px; background: white; border-radius: 5px;">
+                <h4 style="margin: 0 0 10px 0; font-size: 14px;">Automatic Sync</h4>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <button onclick="manualSync()" class="sync-btn" id="manual-sync-btn">
+                        <span class="btn-icon">🔄</span> Sync Now
+                    </button>
+                    <span id="sync-status-display" style="font-size: 12px; color: #666;">
+                        Checking sync status...
+                    </span>
+                </div>
+                <div style="display: flex; align-items: center; margin-top: 10px;">
+                    <input type="checkbox" id="auto-sync" onchange="toggleAutoSync()" style="margin-right: 8px;">
+                    <label for="auto-sync" style="font-size: 12px; color: #666;">
+                        Enable automatic background sync
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Manual Cloud Sync Section -->
+            <div style="padding: 10px; background: white; border-radius: 5px;">
+                <h4 style="margin: 0 0 10px 0; font-size: 14px;">Manual Cloud Sync</h4>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="manualSyncToCloud()" class="cloud-sync-btn" style="background: #2196F3;">
+                        <span class="btn-icon">📤</span> Push to Cloud
+                    </button>
+                    <button onclick="manualSyncFromCloud()" class="cloud-sync-btn" style="background: #4CAF50;">
+                        <span class="btn-icon">📥</span> Pull from Cloud
+                    </button>
+                    <button onclick="exportData()" class="cloud-sync-btn" style="background: #FF9800;">
+                        <span class="btn-icon">💾</span> Export Backup
+                    </button>
+                </div>
+                <div style="font-size: 11px; color: #888; margin-top: 8px;">
+                    Use these buttons for manual cloud synchronization
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const formSection = document.querySelector('.form-container') || 
+                       document.querySelector('.container') || 
+                       document.getElementById('main-content');
+    
+    if (formSection) {
+        formSection.insertAdjacentHTML('afterend', syncControls);
+        updateSyncStatusDisplay();
+        initAutoSyncCheckbox();
+    }
+    
+    // Add sync styles
+    addSyncStyles();
+}
+
+function addSyncStyles() {
+    if (!document.querySelector('#sync-styles')) {
+        const styleSheet = document.createElement('style');
+        styleSheet.id = 'sync-styles';
+        styleSheet.textContent = `
+            .sync-controls {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            
+            .sync-btn, .cloud-sync-btn {
+                color: white;
+                border: none;
+                padding: 10px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+            
+            .sync-btn:hover, .cloud-sync-btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            }
+            
+            .sync-btn:active, .cloud-sync-btn:active {
+                transform: translateY(0);
+            }
+            
+            .sync-btn:disabled {
+                background: #ccc !important;
+                cursor: not-allowed;
+                transform: none;
+            }
+            
+            .btn-icon {
+                font-size: 16px;
+            }
+            
+            #sync-status-display {
+                padding: 4px 8px;
+                border-radius: 4px;
+                background: #f5f5f5;
+                font-family: monospace;
+            }
+        `;
+        document.head.appendChild(styleSheet);
+    }
+}
+
+async function manualSync() {
+    if (SW_SYNC.isSupported && SW_SYNC.registration) {
+        showSyncStatus('🔄 Starting background sync...', 'loading');
+        await triggerSync();
+    } else {
+        showSyncStatus('🔄 Starting manual sync...', 'loading');
+        await manualSyncToCloud();
+        await manualSyncFromCloud();
+    }
+}
+
+async function manualSyncToCloud() {
+    showSyncStatus('📤 Pushing data to cloud...', 'loading');
+    
+    try {
+        const success = await syncToCloud();
+        if (success) {
+            showSyncStatus('✅ Data pushed to cloud successfully!', 'success');
+        } else {
+            showSyncStatus('❌ Failed to push to cloud', 'error');
+        }
+    } catch (error) {
+        console.error('Manual sync to cloud failed:', error);
+        showSyncStatus('❌ Cloud push failed', 'error');
+    }
+}
+
+async function manualSyncFromCloud() {
+    showSyncStatus('📥 Pulling data from cloud...', 'loading');
+    
+    try {
+        const currentUser = localStorage.getItem('currentUser');
+        if (!currentUser) {
+            showSyncStatus('❌ Please sign in first', 'error');
+            return;
+        }
+        
+        const user = JSON.parse(currentUser);
+        const cloudData = await getFromMultipleCloudServices(user.username);
+        
+        if (cloudData) {
+            await applyCloudData(user.username, cloudData);
+            showSyncStatus('✅ Cloud data loaded successfully!', 'success');
+        } else {
+            showSyncStatus('ℹ️ No cloud data found', 'info');
+        }
+    } catch (error) {
+        console.error('Manual sync from cloud failed:', error);
+        showSyncStatus('❌ Cloud pull failed', 'error');
+    }
+}
+
+async function syncToCloud() {
     const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) return;
+    if (!currentUser) {
+        return false;
+    }
     
     const user = JSON.parse(currentUser);
-    const month = parseInt(document.getElementById('month-select').value);
-    const year = document.getElementById('year-input').value;
-    const monthYear = `${month}-${year}`;
+    const userData = localStorage.getItem(`userData_${user.username}`);
     
-    // Get existing user data
-    const existingData = localStorage.getItem(`userData_${user.username}`);
-    let allData = existingData ? JSON.parse(existingData) : {};
-    
-    // Update data for current month
-    allData[monthYear] = currentFormData;
-    
-    // Save back to localStorage
-    localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
-    
-    // Queue for background sync
-    queueDataForSync({
-        username: user.username,
-        data: allData,
-        timestamp: new Date().toISOString(),
-        type: 'full_sync'
-    });
-    
-    // Show save confirmation
-    showNotification('Form data saved and queued for sync!');
-}
-
-// Manual sync function
-async function manualSync() {
-    if (SW_SYNC.syncInProgress) {
-        showSyncStatus('🔄 Sync already in progress...', 'loading');
-        return;
+    if (!userData) {
+        return false;
     }
     
-    showSyncStatus('🔄 Starting manual sync...', 'loading');
-    await triggerSync();
+    try {
+        const syncData = {
+            username: user.username,
+            data: JSON.parse(userData),
+            timestamp: new Date().toISOString(),
+            device: getDeviceInfo()
+        };
+        
+        const encryptedData = btoa(JSON.stringify(syncData));
+        await storeInMultipleCloudServices(user.username, encryptedData);
+        
+        localStorage.setItem('lastCloudSync', new Date().toISOString());
+        return true;
+    } catch (error) {
+        console.error('Cloud sync failed:', error);
+        return false;
+    }
 }
 
-// Update last sync time
-function updateLastSyncTime() {
-    localStorage.setItem('lastSyncTime', new Date().toISOString());
-    updateSyncStatusDisplay();
+async function storeInMultipleCloudServices(username, encryptedData) {
+    await storeInGitHubGist(username, encryptedData);
+    await storeInPastebinService(username, encryptedData);
+    storeInSharedLocalStorage(username, encryptedData);
+    return true;
 }
 
-// Update sync status display
-function updateSyncStatusDisplay() {
-    const lastSync = localStorage.getItem('lastSyncTime');
-    const statusElement = document.getElementById('sync-status-display');
+async function getFromMultipleCloudServices(username) {
+    let data = await getFromGitHubGist(username);
+    if (data) return data;
     
-    if (statusElement) {
-        if (lastSync) {
-            const lastSyncDate = new Date(lastSync);
-            statusElement.textContent = `Last sync: ${lastSyncDate.toLocaleTimeString()}`;
-            statusElement.style.color = '#4CAF50';
-        } else {
-            statusElement.textContent = 'Never synced';
-            statusElement.style.color = '#f44336';
+    data = await getFromPastebinService(username);
+    if (data) return data;
+    
+    data = getFromSharedLocalStorage(username);
+    if (data) return data;
+    
+    return null;
+}
+
+async function storeInGitHubGist(username, encryptedData) {
+    try {
+        const gistData = {
+            public: false,
+            description: `Broiler Data Sync - ${username}`,
+            files: {
+                [`broiler_${username}.json`]: {
+                    content: encryptedData
+                }
+            }
+        };
+        
+        const existingGistId = localStorage.getItem(`github_gist_${username}`);
+        const url = existingGistId 
+            ? `https://api.github.com/gists/${existingGistId}`
+            : 'https://api.github.com/gists';
+        const method = existingGistId ? 'PATCH' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/vnd.github.v3+json'
+            },
+            body: JSON.stringify(gistData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            localStorage.setItem(`github_gist_${username}`, result.id);
+            return true;
         }
+    } catch (error) {
+        console.log('GitHub Gist storage failed:', error);
+    }
+    return false;
+}
+
+async function getFromGitHubGist(username) {
+    try {
+        const gistId = localStorage.getItem(`github_gist_${username}`);
+        if (!gistId) return null;
+        
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+            headers: {
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+        
+        if (response.ok) {
+            const gist = await response.json();
+            const fileContent = gist.files[`broiler_${username}.json`].content;
+            return JSON.parse(atob(fileContent));
+        }
+    } catch (error) {
+        console.log('GitHub Gist retrieval failed:', error);
+    }
+    return null;
+}
+
+async function storeInPastebinService(username, encryptedData) {
+    const pasteData = {
+        description: `Broiler Sync - ${username}`,
+        sections: [
+            {
+                name: 'data',
+                contents: encryptedData
+            }
+        ]
+    };
+    
+    try {
+        const response = await fetch('https://api.paste.ee/v1/pastes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(pasteData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            localStorage.setItem(`pasteee_${username}`, result.id);
+            return true;
+        }
+    } catch (error) {
+        console.log('Paste.ee storage failed:', error);
+    }
+    return false;
+}
+
+async function getFromPastebinService(username) {
+    try {
+        const pasteId = localStorage.getItem(`pasteee_${username}`);
+        if (pasteId) {
+            const response = await fetch(`https://api.paste.ee/v1/pastes/${pasteId}`);
+            if (response.ok) {
+                const paste = await response.json();
+                const content = paste.sections[0].contents;
+                return JSON.parse(atob(content));
+            }
+        }
+    } catch (error) {
+        console.log('Paste.ee retrieval failed:', error);
+    }
+    return null;
+}
+
+function storeInSharedLocalStorage(username, encryptedData) {
+    const sharedKey = `shared_${btoa(username)}_sync`;
+    localStorage.setItem(sharedKey, encryptedData);
+    return true;
+}
+
+function getFromSharedLocalStorage(username) {
+    const sharedKey = `shared_${btoa(username)}_sync`;
+    const data = localStorage.getItem(sharedKey);
+    if (data) {
+        return JSON.parse(atob(data));
+    }
+    return null;
+}
+
+async function applyCloudData(username, cloudData) {
+    if (cloudData && cloudData.data) {
+        localStorage.setItem(`userData_${username}`, JSON.stringify(cloudData.data));
+        reloadUserData();
     }
 }
 
-// Fallback sync for unsupported browsers
+function getDeviceInfo() {
+    return {
+        userAgent: navigator.userAgent.substring(0, 100),
+        platform: navigator.platform,
+        timestamp: new Date().toISOString()
+    };
+}
+
+// Auto-sync functions
+function initAutoSyncCheckbox() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        checkbox.checked = autoSync === 'true';
+    }
+}
+
+function toggleAutoSync() {
+    const checkbox = document.getElementById('auto-sync');
+    const newState = checkbox.checked;
+    
+    localStorage.setItem('autoSyncEnabled', newState.toString());
+    
+    if (newState) {
+        showSyncStatus('Auto-sync enabled', 'success');
+        triggerSync();
+    } else {
+        showSyncStatus('Auto-sync disabled', 'error');
+    }
+}
+
 function initFallbackSync() {
     console.log('Using fallback sync');
     
-    // Sync every 5 minutes
     setInterval(() => {
         if (navigator.onLine) {
             autoSyncData();
         }
     }, 5 * 60 * 1000);
     
-    // Sync when coming online
     window.addEventListener('online', () => {
         setTimeout(() => autoSyncData(), 2000);
     });
 }
 
-// Enhanced autoSyncData for fallback
 async function autoSyncData() {
-    // Your existing autoSyncData implementation
-    console.log('Fallback auto-sync running');
-}
-
-// Update your existing cloud sync functions to use Service Worker
-async function syncToCloud() {
-    await triggerSync();
-}
-
-async function syncFromCloud() {
-    await triggerSync();
-}
-
-// Update DOMContentLoaded
-document.addEventListener('DOMContentLoaded', function() {
-    checkAuthentication();
-    initServiceWorkerSync(); // Replace initCloudSync() with this
+    if (!navigator.onLine) {
+        return;
+    }
     
-    // Add sync status display to UI
-    addSyncStatusToUI();
-});
-
-// Add sync status to UI
-function addSyncStatusToUI() {
-    const syncControls = `
-        <div class="sync-controls" style="margin: 15px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-            <h3>🔄 Automatic Sync</h3>
-            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <button onclick="manualSync()" class="sync-btn">Sync Now</button>
-                <span id="sync-status-display" style="font-size: 12px; color: #666;">
-                    Checking sync status...
-                </span>
-            </div>
-            <div style="font-size: 11px; color: #888; margin-top: 5px;">
-                Data syncs automatically in background
-            </div>
-        </div>
-    `;
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) return;
     
-    // Insert into your UI
-    const formSection = document.querySelector('.form-container');
-    if (formSection) {
-        formSection.insertAdjacentHTML('afterend', syncControls);
-        updateSyncStatusDisplay();
+    const user = JSON.parse(currentUser);
+    
+    try {
+        const cloudData = await getFromMultipleCloudServices(user.username);
+        if (cloudData) {
+            await applyCloudData(user.username, cloudData);
+        }
+        await syncToCloud();
+        console.log('Auto-sync completed');
+    } catch (error) {
+        console.log('Auto-sync failed:', error);
     }
 }
 
-// Add some CSS for sync controls
-const syncStyles = `
-    .sync-btn {
-        background: #2196F3;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-    }
+// Sync status display
+function showSyncStatus(message, type) {
+    let statusEl = document.getElementById('sync-status');
     
-    .sync-btn:hover {
-        background: #1976D2;
-    }
-    
-    .sync-btn:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-    }
-    
-    .sync-controls {
-        background: #f9f9f9;
-    }
-`;
-
-// Add styles to document
-const styleSheet = document.createElement('style');
-styleSheet.textContent = syncStyles;
-document.head.appendChild(styleSheet);
-
-// Utility Functions
-function saveForm() {
-    saveUserData();
-}
-
-function logout() {
-    localStorage.removeItem('currentUser');
-    window.location.href = 'auth.html';
-}
+    if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.id = 'sync-status';
+        statusEl.className = 'sync-status';
+        statusEl.style.cssText = `
+            position: fixed;
+            top: 70px;
+            right: 10px;
+            left: 10px;
+            background: ${getStatusColor(type)};
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            text-align:
