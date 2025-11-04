@@ -27,10 +27,14 @@ function checkAuthentication() {
 }
 
 // Initialize the application
+// Add this to your initializeApp function to debug month values
 function initializeApp() {
     // Load last viewed month from localStorage
     const lastMonth = localStorage.getItem('lastViewedMonth');
     const lastYear = localStorage.getItem('lastViewedYear');
+    
+    console.log('Initializing app. Last viewed month:', lastMonth, 'Last viewed year:', lastYear);
+    console.log('Current dropdown selection - Month:', document.getElementById('month-select').value, 'Year:', document.getElementById('year-input').value);
     
     if (lastMonth !== null && lastYear !== null) {
         document.getElementById('month-select').value = lastMonth;
@@ -39,18 +43,27 @@ function initializeApp() {
     
     // Add event listeners for date controls
     document.getElementById('month-select').addEventListener('change', function() {
+        console.log('Month changed to:', this.value, 'which is:', monthNames[this.value]);
         updateFormDate();
         saveCurrentMonth();
         loadCurrentMonthData();
     });
     
     document.getElementById('year-input').addEventListener('change', function() {
+        console.log('Year changed to:', this.value);
         updateFormDate();
         saveCurrentMonth();
         loadCurrentMonthData();
     });
     
     updateFormDate();
+    
+    // Load current month data after initialization
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        const user = JSON.parse(currentUser);
+        loadUserData(user.username);
+    }
 }
 
 // Save current month/year to localStorage
@@ -78,11 +91,11 @@ function loadUserData(username) {
 
 // Load data for current month
 function loadCurrentMonthData(allData = null) {
-    const month = document.getElementById('month-select').value;
+    const month = parseInt(document.getElementById('month-select').value); // Ensure it's a number
     const year = document.getElementById('year-input').value;
     const monthYear = `${month}-${year}`;
     
-    console.log('Loading data for month:', monthYear, 'Available data:', allData);
+    console.log('Loading data for month:', monthYear, 'which is:', monthNames[month], year, 'Available data:', allData);
     
     const tableBody = document.querySelector('#time-table tbody');
     tableBody.innerHTML = '';
@@ -95,10 +108,27 @@ function loadCurrentMonthData(allData = null) {
             addRowToTable(entry);
             currentFormData.push(entry);
         });
+    } else {
+        console.log('No data found for month:', monthYear);
     }
     
     calculateTotal();
 }
+
+// Add this debug function
+function debugMonthSelection() {
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    console.log('=== MONTH DEBUG ===');
+    console.log('Dropdown selected index:', monthSelect.selectedIndex);
+    console.log('Dropdown value:', monthSelect.value);
+    console.log('Dropdown text:', monthSelect.options[monthSelect.selectedIndex].text);
+    console.log('Year value:', yearInput.value);
+    console.log('Month names index:', monthNames[monthSelect.value]);
+    console.log('=== END DEBUG ===');
+}
+
+// Call this in initializeApp and in the change event listeners
 
 // Save user data
 function saveUserData() {
@@ -109,11 +139,11 @@ function saveUserData() {
     }
     
     const user = JSON.parse(currentUser);
-    const month = document.getElementById('month-select').value;
+    const month = parseInt(document.getElementById('month-select').value); // Ensure it's a number
     const year = document.getElementById('year-input').value;
     const monthYear = `${month}-${year}`;
     
-    console.log('Saving data for user:', user.username, 'Month:', monthYear, 'Data:', currentFormData);
+    console.log('Saving data for user:', user.username, 'Month:', monthYear, 'which is:', monthNames[month], 'Data:', currentFormData);
     
     // Get existing user data
     const existingData = localStorage.getItem(`userData_${user.username}`);
