@@ -601,6 +601,8 @@ button:hover {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
 }
 
 /* Add vertical space between buttons on mobile */
