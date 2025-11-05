@@ -632,3 +632,10 @@ button:hover {
         margin-bottom: 10px;
     }
 }
+@media (max-width: 768px) {
+    .auto-sync-container {
+        margin-top: 20px;
+        margin-bottom: 10px;
+        order: 999;
+    }
+}
