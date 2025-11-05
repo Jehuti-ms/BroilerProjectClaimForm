@@ -632,10 +632,51 @@ button:hover {
         margin-bottom: 10px;
     }
 }
+/* Default desktop style - keep it where it is */
+.auto-sync-container {
+    margin: 10px 0;
+    padding: 8px 12px;
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    text-align: center;
+    font-size: 14px;
+}
+
+.auto-sync-container label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    color: #6c757d;
+    margin: 0;
+}
+
+/* Mobile responsive - move it away from title */
 @media (max-width: 768px) {
     .auto-sync-container {
+        order: 999; /* Move to bottom of flex container */
         margin-top: 20px;
         margin-bottom: 10px;
-        order: 999;
+        background: rgba(248, 249, 250, 0.9);
+    }
+    
+    /* If it's in a specific section, move it to the bottom */
+    .cloud-sync-section .auto-sync-container {
+        margin-top: 15px;
+        border-top: 1px solid #dee2e6;
+        padding-top: 15px;
+    }
+}
+
+/* Alternative: Move to bottom on mobile only */
+@media (max-width: 768px) {
+    .auto-sync-mobile-bottom {
+        position: static;
+        margin-top: auto; /* Push to bottom in flex container */
+        padding: 10px;
+        background: rgba(248, 249, 250, 0.9);
+        border-top: 1px solid #dee2e6;
     }
 }
