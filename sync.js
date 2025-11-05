@@ -313,3 +313,41 @@ if (typeof module !== 'undefined' && module.exports) {
         testSupabaseConnection
     };
 }
+
+// Add this to sync.js - Debug function
+async function debugSupabaseConnection() {
+    console.log('=== SUPABASE DEBUG INFO ===');
+    console.log('Supabase client exists:', !!window.supabase);
+    console.log('Supabase URL:', SUPABASE_CONFIG?.url);
+    console.log('Current user:', localStorage.getItem('currentUser'));
+    
+    if (window.supabase) {
+        try {
+            // Test simple query
+            const { data, error } = await supabase
+                .from('user_data')
+                .select('user_id')
+                .limit(1);
+
+            console.log('Supabase test query - Error:', error);
+            console.log('Supabase test query - Data:', data);
+            
+            if (error) {
+                console.error('Supabase error details:', error);
+                showNotification('Supabase error: ' + error.message, 'error');
+            } else {
+                console.log('✅ Supabase connection successful!');
+                showNotification('Supabase connected!', 'success');
+            }
+        } catch (error) {
+            console.error('Supabase test failed:', error);
+            showNotification('Supabase test failed: ' + error.message, 'error');
+        }
+    } else {
+        console.error('Supabase client not loaded');
+        showNotification('Supabase not loaded - check config.js', 'error');
+    }
+}
+
+// Call this to test - add to your console or create a button
+// debugSupabaseConnection();
