@@ -194,3 +194,39 @@ function listAllUsers() {
     });
     return users;
 }
+
+// auth.js - Remember employee name until changed
+function handleLogin() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    const employeeName = document.getElementById('employee-name').value.trim();
+
+    if (!username || !password || !employeeName) {
+        alert('Please fill in all fields');
+        return;
+    }
+
+    // Save user data
+    const userData = {
+        username: username,
+        employeeName: employeeName,
+        loginTime: new Date().toISOString()
+    };
+
+    localStorage.setItem('currentUser', JSON.stringify(userData));
+    
+    // Always remember the employee name
+    localStorage.setItem('lastEmployeeName', employeeName);
+    
+    window.location.href = 'index.html';
+}
+
+// Auto-fill employee name on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const lastEmployeeName = localStorage.getItem('lastEmployeeName');
+    const employeeNameInput = document.getElementById('employee-name');
+    
+    if (lastEmployeeName && employeeNameInput) {
+        employeeNameInput.value = lastEmployeeName;
+    }
+});
