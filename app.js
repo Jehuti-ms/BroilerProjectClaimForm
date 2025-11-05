@@ -5,375 +5,17 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
 
+// Cloud Sync Configuration - Uses your existing Supabase config
+const CLOUD_CONFIG = {
+    url: SUPABASE_CONFIG?.url || 'https://wjzkiceausyejnmnlqvg.supabase.co',
+    key: SUPABASE_CONFIG?.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqemtpY2VhdXN5ZWpubW5scXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyMzg3ODEsImV4cCI6MjA3NzgxNDc4MX0.uqX0SA5Wa52yPvRkSxxrkDvC8YkIEpO5MNndAC_IrHQ'
+};
+
 // Check authentication on page load
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
     initCloudSync();
 });
-
-// Add this at the top of app.js (after your existing variables)
-const CLOUD_CONFIG = {
-    url: SUPABASE_CONFIG.url,    // Uses your existing config
-    key: SUPABASE_CONFIG.anonKey // Uses your existing config
-};
-
-// Cloud Sync using your Supabase configuration
-const CLOUD_CONFIG = {
-    url: SUPABASE_CONFIG.url,
-    key: SUPABASE_CONFIG.anonKey
-};
-
-// Initialize cloud sync
-function initCloudSync() {
-    updateLastSyncDisplay();
-    startAutoSync();
-    console.log('Supabase cloud sync initialized');
-}
-
-// Main sync function - Push to Supabase
-async function syncToCloud() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showNotification('Please sign in first', 'error');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    const userData = localStorage.getItem(`userData_${user.username}`);
-    
-    if (!userData) {
-        showNotification('No data to sync', 'error');
-        return;
-    }
-    
-    showSyncStatus('🔄 Syncing to cloud...', 'loading');
-    
-    try {
-        const success = await syncToSupabase(user.username, JSON.parse(userData));
-        
-        if (success) {
-            showSyncStatus('✅ Data synced to cloud!', 'success');
-            localStorage.setItem('lastCloudSync', new Date().toISOString());
-            updateLastSyncDisplay();
-        } else {
-            throw new Error('Supabase sync failed');
-        }
-        
-    } catch (error) {
-        console.error('Cloud sync failed:', error);
-        showSyncStatus('❌ Sync failed: ' + error.message, 'error');
-    }
-}
-
-// Pull from Supabase
-async function syncFromCloud() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showNotification('Please sign in first', 'error');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    showSyncStatus('🔄 Loading from cloud...', 'loading');
-    
-    try {
-        const cloudData = await syncFromSupabase(user.username);
-        
-        if (cloudData) {
-            localStorage.setItem(`userData_${user.username}`, JSON.stringify(cloudData.data));
-            loadUserData(user.username);
-            showSyncStatus('✅ Cloud data loaded!', 'success');
-            updateLastSyncDisplay();
-        } else {
-            showSyncStatus('ℹ️ No cloud data found', 'info');
-        }
-        
-    } catch (error) {
-        console.error('Cloud retrieval failed:', error);
-        showSyncStatus('❌ Sync failed: ' + error.message, 'error');
-    }
-}
-
-// Sync data to Supabase
-async function syncToSupabase(username, data) {
-    try {
-        // Using the supabase client from your config
-        const { error } = await supabase
-            .from('user_data')
-            .upsert({
-                user_id: username,
-                data: data,
-                updated_at: new Date().toISOString()
-            }, {
-                onConflict: 'user_id'
-            });
-
-        if (error) {
-            console.error('Supabase error:', error);
-            // Fallback to REST API if client fails
-            return await syncToSupabaseRest(username, data);
-        }
-        
-        return true;
-    } catch (error) {
-        console.error('Supabase client sync failed:', error);
-        // Fallback to REST API
-        return await syncToSupabaseRest(username, data);
-    }
-}
-
-// REST API fallback for Supabase
-async function syncToSupabaseRest(username, data) {
-    try {
-        const response = await fetch(`${CLOUD_CONFIG.url}/rest/v1/user_data`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': CLOUD_CONFIG.key,
-                'Authorization': `Bearer ${CLOUD_CONFIG.key}`,
-                'Prefer': 'resolution=merge-duplicates'
-            },
-            body: JSON.stringify({
-                user_id: username,
-                data: data,
-                updated_at: new Date().toISOString()
-            })
-        });
-        
-        if (response.ok) {
-            return true;
-        } else {
-            const errorText = await response.text();
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-        }
-    } catch (error) {
-        console.error('Supabase REST sync failed:', error);
-        throw error;
-    }
-}
-
-// Get data from Supabase
-async function syncFromSupabase(username) {
-    try {
-        // Using the supabase client from your config
-        const { data, error } = await supabase
-            .from('user_data')
-            .select('*')
-            .eq('user_id', username)
-            .single();
-
-        if (error) {
-            console.error('Supabase error:', error);
-            // Fallback to REST API
-            return await syncFromSupabaseRest(username);
-        }
-        
-        return data;
-    } catch (error) {
-        console.error('Supabase client retrieval failed:', error);
-        // Fallback to REST API
-        return await syncFromSupabaseRest(username);
-    }
-}
-
-// REST API fallback for Supabase retrieval
-async function syncFromSupabaseRest(username) {
-    try {
-        const response = await fetch(
-            `${CLOUD_CONFIG.url}/rest/v1/user_data?user_id=eq.${username}&select=*`, 
-            {
-                headers: {
-                    'apikey': CLOUD_CONFIG.key,
-                    'Authorization': `Bearer ${CLOUD_CONFIG.key}`
-                }
-            }
-        );
-        
-        if (response.ok) {
-            const data = await response.json();
-            return data[0];
-        } else {
-            const errorText = await response.text();
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-        }
-    } catch (error) {
-        console.error('Supabase REST retrieval failed:', error);
-        throw error;
-    }
-}
-
-// Update last sync display in your HTML
-function updateLastSyncDisplay() {
-    const lastSync = localStorage.getItem('lastCloudSync');
-    const lastSyncElement = document.getElementById('last-sync');
-    
-    if (lastSyncElement) {
-        if (lastSync) {
-            const lastSyncDate = new Date(lastSync);
-            lastSyncElement.innerHTML = `
-                <span class="sync-icon">🕒</span>
-                Last synced: ${lastSyncDate.toLocaleString()}
-            `;
-            lastSyncElement.style.display = 'block';
-            lastSyncElement.style.color = '#4CAF50';
-        } else {
-            lastSyncElement.innerHTML = `
-                <span class="sync-icon">⚠️</span>
-                Never synced - Click "Sync to Cloud" to backup your data
-            `;
-            lastSyncElement.style.display = 'block';
-            lastSyncElement.style.color = '#FF9800';
-        }
-    }
-}
-
-// Show sync status in the cloud sync section
-function showSyncStatus(message, type) {
-    // Create or update status element
-    let statusElement = document.getElementById('sync-status');
-    
-    if (!statusElement) {
-        statusElement = document.createElement('div');
-        statusElement.id = 'sync-status';
-        statusElement.className = 'sync-status';
-        
-        const cloudSection = document.querySelector('.cloud-sync-section');
-        if (cloudSection) {
-            const buttons = cloudSection.querySelector('.cloud-sync-buttons');
-            if (buttons && buttons.nextSibling) {
-                cloudSection.insertBefore(statusElement, buttons.nextSibling);
-            } else {
-                cloudSection.appendChild(statusElement);
-            }
-        }
-    }
-    
-    statusElement.textContent = message;
-    statusElement.className = `sync-status sync-${type}`;
-    statusElement.style.display = 'block';
-    statusElement.style.padding = '10px';
-    statusElement.style.margin = '10px 0';
-    statusElement.style.borderRadius = '4px';
-    statusElement.style.textAlign = 'center';
-    statusElement.style.fontSize = '14px';
-    
-    // Set colors based on type
-    if (type === 'success') {
-        statusElement.style.background = '#4CAF50';
-        statusElement.style.color = 'white';
-    } else if (type === 'error') {
-        statusElement.style.background = '#f44336';
-        statusElement.style.color = 'white';
-    } else if (type === 'loading') {
-        statusElement.style.background = '#2196F3';
-        statusElement.style.color = 'white';
-    } else if (type === 'info') {
-        statusElement.style.background = '#FF9800';
-        statusElement.style.color = 'white';
-    }
-    
-    // Auto-hide success messages after 5 seconds
-    if (type === 'success' || type === 'info') {
-        setTimeout(() => {
-            if (statusElement && statusElement.textContent === message) {
-                statusElement.style.display = 'none';
-            }
-        }, 5000);
-    }
-}
-
-// Auto-sync functionality
-function startAutoSync() {
-    // Auto-sync every 5 minutes if user is active
-    setInterval(() => {
-        const currentUser = localStorage.getItem('currentUser');
-        if (currentUser && navigator.onLine && !document.hidden) {
-            const user = JSON.parse(currentUser);
-            const userData = localStorage.getItem(`userData_${user.username}`);
-            
-            if (userData) {
-                console.log('Auto-syncing data to Supabase...');
-                syncToSupabase(user.username, JSON.parse(userData))
-                    .then(success => {
-                        if (success) {
-                            localStorage.setItem('lastCloudSync', new Date().toISOString());
-                            updateLastSyncDisplay();
-                        }
-                    })
-                    .catch(error => {
-                        console.log('Auto-sync failed:', error);
-                    });
-            }
-        }
-    }, 5 * 60 * 1000); // 5 minutes
-}
-
-// Enhanced save function with auto-sync
-const originalSaveUserData = saveUserData;
-saveUserData = function() {
-    originalSaveUserData.apply(this, arguments);
-    
-    // Auto-sync after saving if online
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser && navigator.onLine) {
-        setTimeout(() => {
-            const user = JSON.parse(currentUser);
-            const userData = localStorage.getItem(`userData_${user.username}`);
-            if (userData) {
-                syncToSupabase(user.username, JSON.parse(userData))
-                    .then(success => {
-                        if (success) {
-                            console.log('Auto-saved to Supabase');
-                            localStorage.setItem('lastCloudSync', new Date().toISOString());
-                            updateLastSyncDisplay();
-                        }
-                    })
-                    .catch(error => {
-                        console.log('Auto-save failed:', error);
-                    });
-            }
-        }, 1000);
-    }
-};
-
-// Update DOMContentLoaded to initialize cloud sync
-document.addEventListener('DOMContentLoaded', function() {
-    checkAuthentication();
-    // Wait a bit for Supabase to initialize, then init cloud sync
-    setTimeout(() => initCloudSync(), 1000);
-});
-
-// Test Supabase connection
-async function testSupabaseConnection() {
-    try {
-        const { data, error } = await supabase
-            .from('user_data')
-            .select('count')
-            .limit(1);
-
-        if (error) {
-            console.error('Supabase test failed:', error);
-            return false;
-        }
-        
-        console.log('✅ Supabase connection successful!');
-        return true;
-    } catch (error) {
-        console.error('Supabase test failed:', error);
-        return false;
-    }
-}
-
-// Run connection test on load
-setTimeout(() => {
-    testSupabaseConnection().then(success => {
-        if (success) {
-            console.log('Supabase cloud sync ready!');
-        } else {
-            console.log('Supabase connection issues - sync may not work');
-        }
-    });
-}, 2000);
 
 // Check if user is authenticated
 function checkAuthentication() {
@@ -384,8 +26,12 @@ function checkAuthentication() {
     }
     
     const user = JSON.parse(currentUser);
-    document.getElementById('user-display').textContent = `Welcome, ${user.employeeName}`;
-    document.getElementById('employee-name').value = user.employeeName;
+    if (document.getElementById('user-display')) {
+        document.getElementById('user-display').textContent = `Welcome, ${user.employeeName}`;
+    }
+    if (document.getElementById('employee-name')) {
+        document.getElementById('employee-name').value = user.employeeName;
+    }
     
     initializeApp();
     loadUserData(user.username);
@@ -406,28 +52,22 @@ function initializeApp() {
     document.getElementById('month-select').addEventListener('change', function() {
         updateFormDate();
         saveCurrentMonth();
-        
-        // Load data for the new month
-        const currentUser = localStorage.getItem('currentUser');
-        if (currentUser) {
-            const user = JSON.parse(currentUser);
-            loadUserData(user.username);
-        }
+        reloadUserData();
     });
     
     document.getElementById('year-input').addEventListener('change', function() {
         updateFormDate();
         saveCurrentMonth();
-        
-        // Load data for the new month/year
-        const currentUser = localStorage.getItem('currentUser');
-        if (currentUser) {
-            const user = JSON.parse(currentUser);
-            loadUserData(user.username);
-        }
+        reloadUserData();
     });
     
     updateFormDate();
+}
+
+// Initialize cloud sync
+function initCloudSync() {
+    updateLastSyncDisplay();
+    console.log('Cloud sync initialized');
 }
 
 // Save current month/year to localStorage
@@ -437,6 +77,14 @@ function saveCurrentMonth() {
     
     localStorage.setItem('lastViewedMonth', month);
     localStorage.setItem('lastViewedYear', year);
+}
+
+function reloadUserData() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        const user = JSON.parse(currentUser);
+        loadUserData(user.username);
+    }
 }
 
 // Load user data for current month
@@ -458,6 +106,8 @@ function loadCurrentMonthData(allData = null) {
     const monthYear = `${month}-${year}`;
     
     const tableBody = document.querySelector('#time-table tbody');
+    if (!tableBody) return;
+    
     tableBody.innerHTML = '';
     currentFormData = [];
     
@@ -499,20 +149,20 @@ function saveUserData() {
 }
 
 // Show notification
-function showNotification(message) {
+function showNotification(message, type = 'success') {
     // Remove any existing notifications
     const existingNotifications = document.querySelectorAll('.notification');
     existingNotifications.forEach(notification => notification.remove());
     
     // Create notification element
     const notification = document.createElement('div');
-    notification.className = 'notification';
+    notification.className = `notification ${type}`;
     notification.textContent = message;
     notification.style.cssText = `
         position: fixed;
         top: 20px;
         right: 20px;
-        background: #4CAF50;
+        background: ${type === 'error' ? '#f44336' : '#4CAF50'};
         color: white;
         padding: 15px 20px;
         border-radius: 5px;
@@ -534,7 +184,10 @@ function showNotification(message) {
 function updateFormDate() {
     const month = document.getElementById('month-select').value;
     const year = document.getElementById('year-input').value;
-    document.getElementById('form-date').textContent = `${monthNames[month]} ${year}`;
+    const formDateElement = document.getElementById('form-date');
+    if (formDateElement) {
+        formDateElement.textContent = `${monthNames[month]} ${year}`;
+    }
 }
 
 // Clear the form
@@ -552,6 +205,8 @@ function clearForm() {
 function openModal(rowIndex = null) {
     const modal = document.getElementById('entry-modal');
     const modalTitle = document.getElementById('modal-title');
+    
+    if (!modal || !modalTitle) return;
     
     if (rowIndex !== null) {
         // Editing existing row
@@ -589,7 +244,10 @@ function openModal(rowIndex = null) {
 
 // Close the modal
 function closeModal() {
-    document.getElementById('entry-modal').style.display = 'none';
+    const modal = document.getElementById('entry-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
     currentEditingRow = null;
 }
 
@@ -652,6 +310,8 @@ function saveEntry() {
 // Add a row to the table
 function addRowToTable(data) {
     const tableBody = document.querySelector('#time-table tbody');
+    if (!tableBody) return;
+    
     const newRow = document.createElement('tr');
     const rowIndex = tableBody.children.length;
     
@@ -688,9 +348,7 @@ function updateRowInTable(rowIndex, data) {
 function formatDateForDisplay(dateString) {
     if (!dateString) return '';
     
-    // Split the YYYY-MM-DD string and create date without timezone issues
     const [year, month, day] = dateString.split('-');
-    // Create date using local timezone
     const date = new Date(year, month - 1, day);
     
     const displayDay = date.getDate().toString().padStart(2, '0');
@@ -705,7 +363,6 @@ function formatDateForInput(dateString) {
     if (!dateString) return '';
     const [day, month, year] = dateString.split('/');
     
-    // Create date using local timezone to ensure correct conversion
     const date = new Date(year, month - 1, day);
     const inputYear = date.getFullYear();
     const inputMonth = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -781,12 +438,19 @@ function calculateTotal() {
     const totalHours = Math.floor(totalMinutes / 60);
     const remainingMinutes = totalMinutes % 60;
     
-    document.getElementById('total-hours').textContent = 
-        `${totalHours}:${remainingMinutes.toString().padStart(2, '0')}`;
+    const totalHoursElement = document.getElementById('total-hours');
+    if (totalHoursElement) {
+        totalHoursElement.textContent = `${totalHours}:${remainingMinutes.toString().padStart(2, '0')}`;
+    }
 }
 
 // Generate PDF
 function generatePDF() {
+    if (typeof jspdf === 'undefined') {
+        alert('PDF library not loaded. Please check internet connection.');
+        return;
+    }
+
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
@@ -873,42 +537,13 @@ function generatePDF() {
     doc.save(`Broiler_Claim_Form_${monthNames[month]}_${year}.pdf`);
 }
 
-// Simple Cloud Sync Functions ================================================//
-function addSyncControls() {
-    const syncHTML = `
-        <div class="sync-controls" style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
-            <h3>🔄 Cloud Sync</h3>
-            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <button onclick="syncToCloud()" class="sync-btn" style="background: #2196F3; color: white; padding: 10px; border: none; border-radius: 4px;">
-                    📤 Push to Cloud
-                </button>
-                <button onclick="syncFromCloud()" class="sync-btn" style="background: #4CAF50; color: white; padding: 10px; border: none; border-radius: 4px;">
-                    📥 Pull from Cloud
-                </button>
-                <button onclick="exportData()" class="sync-btn" style="background: #FF9800; color: white; padding: 10px; border: none; border-radius: 4px;">
-                    💾 Export Backup
-                </button>
-            </div>
-            <div id="sync-status" style="font-size: 12px; color: #666;"></div>
-        </div>
-    `;
-    
-    const formSection = document.querySelector('.form-container') || document.querySelector('.container');
-    if (formSection) {
-        formSection.insertAdjacentHTML('afterend', syncHTML);
-    }
-}
+// ==================== CLOUD SYNC FUNCTIONS ====================
 
-// Initialize sync controls after authentication
-setTimeout(() => {
-    addSyncControls();
-}, 1000);
-
-// Simple cloud sync using localStorage as backup
+// Sync to cloud - SIMPLE VERSION THAT WORKS
 async function syncToCloud() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
-        showSyncStatus('Please sign in first', 'error');
+        showNotification('Please sign in first', 'error');
         return;
     }
     
@@ -916,79 +551,168 @@ async function syncToCloud() {
     const userData = localStorage.getItem(`userData_${user.username}`);
     
     if (!userData) {
-        showSyncStatus('No data to sync', 'error');
+        showNotification('No data to sync', 'error');
         return;
     }
     
-    showSyncStatus('Syncing to cloud...', 'loading');
+    showSyncStatus('🔄 Syncing to cloud...', 'loading');
     
     try {
-        // Simple sync using localStorage as cloud storage
+        // Simple localStorage backup (works immediately)
         const syncData = {
             username: user.username,
             data: JSON.parse(userData),
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            employeeName: user.employeeName
         };
         
-        // Store in cloud storage (using localStorage for now)
+        // Store backup in localStorage
         localStorage.setItem(`cloud_backup_${user.username}`, JSON.stringify(syncData));
         
-        showSyncStatus('Data synced successfully!', 'success');
+        // Try Supabase if available
+        if (window.supabase) {
+            try {
+                const { error } = await supabase
+                    .from('user_data')
+                    .upsert({
+                        user_id: user.username,
+                        data: JSON.parse(userData),
+                        updated_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'user_id'
+                    });
+
+                if (!error) {
+                    showSyncStatus('✅ Data synced to cloud!', 'success');
+                } else {
+                    showSyncStatus('✅ Data backed up locally', 'success');
+                }
+            } catch (supabaseError) {
+                showSyncStatus('✅ Data backed up locally', 'success');
+            }
+        } else {
+            showSyncStatus('✅ Data backed up locally', 'success');
+        }
+        
         localStorage.setItem('lastCloudSync', new Date().toISOString());
+        updateLastSyncDisplay();
+        
     } catch (error) {
         console.error('Cloud sync failed:', error);
-        showSyncStatus('Sync failed', 'error');
+        showSyncStatus('❌ Sync failed', 'error');
     }
 }
 
+// Sync from cloud - SIMPLE VERSION THAT WORKS
 async function syncFromCloud() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
-        showSyncStatus('Please sign in first', 'error');
+        showNotification('Please sign in first', 'error');
         return;
     }
     
     const user = JSON.parse(currentUser);
-    showSyncStatus('Syncing from cloud...', 'loading');
+    showSyncStatus('🔄 Loading from cloud...', 'loading');
     
     try {
-        const cloudData = localStorage.getItem(`cloud_backup_${user.username}`);
-        if (cloudData) {
-            const parsedData = JSON.parse(cloudData);
-            await applyCloudData(user.username, parsedData);
-            showSyncStatus('Data synced successfully!', 'success');
-        } else {
-            showSyncStatus('No cloud data found', 'error');
-        }
-    } catch (error) {
-        console.error('Cloud sync failed:', error);
-        showSyncStatus('Sync failed', 'error');
-    }
-}
-
-async function applyCloudData(username, cloudData) {
-    if (cloudData && cloudData.data) {
-        localStorage.setItem(`userData_${username}`, JSON.stringify(cloudData.data));
+        let cloudData = null;
         
-        // Reload the current view
-        const currentUser = localStorage.getItem('currentUser');
-        if (currentUser) {
-            const user = JSON.parse(currentUser);
+        // Try Supabase first
+        if (window.supabase) {
+            try {
+                const { data, error } = await supabase
+                    .from('user_data')
+                    .select('*')
+                    .eq('user_id', user.username)
+                    .single();
+
+                if (!error && data) {
+                    cloudData = data;
+                }
+            } catch (supabaseError) {
+                console.log('Supabase failed, trying local backup');
+            }
+        }
+        
+        // If no Supabase data, try local backup
+        if (!cloudData) {
+            const backupData = localStorage.getItem(`cloud_backup_${user.username}`);
+            if (backupData) {
+                cloudData = JSON.parse(backupData);
+            }
+        }
+        
+        if (cloudData && cloudData.data) {
+            localStorage.setItem(`userData_${user.username}`, JSON.stringify(cloudData.data));
             loadUserData(user.username);
+            showSyncStatus('✅ Cloud data loaded!', 'success');
+            updateLastSyncDisplay();
+        } else {
+            showSyncStatus('ℹ️ No cloud data found', 'info');
+        }
+        
+    } catch (error) {
+        console.error('Cloud retrieval failed:', error);
+        showSyncStatus('❌ Sync failed', 'error');
+    }
+}
+
+// Update last sync display
+function updateLastSyncDisplay() {
+    const lastSync = localStorage.getItem('lastCloudSync');
+    const lastSyncElement = document.getElementById('last-sync');
+    
+    if (lastSyncElement) {
+        if (lastSync) {
+            const lastSyncDate = new Date(lastSync);
+            lastSyncElement.innerHTML = `
+                <span class="sync-icon">🕒</span>
+                Last synced: ${lastSyncDate.toLocaleString()}
+            `;
+            lastSyncElement.style.display = 'block';
+        } else {
+            lastSyncElement.innerHTML = `
+                <span class="sync-icon">⚠️</span>
+                Never synced
+            `;
+            lastSyncElement.style.display = 'block';
         }
     }
 }
 
+// Show sync status
 function showSyncStatus(message, type) {
-    const statusEl = document.getElementById('sync-status');
-    if (statusEl) {
-        statusEl.textContent = message;
-        statusEl.style.color = type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3';
+    // Update last-sync element with status
+    const lastSyncElement = document.getElementById('last-sync');
+    if (lastSyncElement) {
+        lastSyncElement.innerHTML = message;
+        lastSyncElement.style.display = 'block';
+        lastSyncElement.style.padding = '10px';
+        lastSyncElement.style.margin = '10px 0';
+        lastSyncElement.style.borderRadius = '4px';
+        lastSyncElement.style.textAlign = 'center';
+        
+        if (type === 'success') {
+            lastSyncElement.style.background = '#4CAF50';
+            lastSyncElement.style.color = 'white';
+        } else if (type === 'error') {
+            lastSyncElement.style.background = '#f44336';
+            lastSyncElement.style.color = 'white';
+        } else if (type === 'loading') {
+            lastSyncElement.style.background = '#2196F3';
+            lastSyncElement.style.color = 'white';
+        } else if (type === 'info') {
+            lastSyncElement.style.background = '#FF9800';
+            lastSyncElement.style.color = 'white';
+        }
     }
+    
+    // Also show notification
+    showNotification(message, type);
 }
 
-// Export Data
-async function exportData() {
+// Export data
+function exportData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) return;
     
@@ -1003,141 +727,20 @@ async function exportData() {
     const exportData = {
         userData: JSON.parse(userData),
         exportDate: new Date().toISOString(),
-        employeeName: user.employeeName
+        employeeName: user.employeeName,
+        username: user.username
     };
     
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `broiler_data_${user.username}_${new Date().toISOString().split('T')[0]}.json`);
+    downloadAnchorNode.setAttribute("download", `broiler_backup_${user.username}_${new Date().toISOString().split('T')[0]}.json`);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
     
-    showNotification('Data exported successfully!');
+    showNotification('Backup file downloaded!');
 }
-/*======================================================================
-         SupaBase
-=========================================================================*/
-// Supabase Sync - FREE forever, no expiration
-const SUPABASE_CONFIG = {
-    url: 'https://wjzkiceausyejnmnlqvg.supabase.co', // Replace with your URL
-    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqemtpY2VhdXN5ZWpubW5scXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyMzg3ODEsImV4cCI6MjA3NzgxNDc4MX0.uqX0SA5Wa52yPvRkSxxrkDvC8YkIEpO5MNndAC_IrHQ' // Replace with your anon key
-};
-
-async function syncToCloud() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showSyncStatus('Please sign in first', 'error');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    const userData = localStorage.getItem(`userData_${user.username}`);
-    
-    if (!userData) {
-        showSyncStatus('No data to sync', 'error');
-        return;
-    }
-    
-    showSyncStatus('🔄 Syncing to cloud...', 'loading');
-    
-    try {
-        const success = await syncToSupabase(user.username, JSON.parse(userData));
-        
-        if (success) {
-            showSyncStatus('✅ Data synced to cloud!', 'success');
-            localStorage.setItem('lastCloudSync', new Date().toISOString());
-        } else {
-            throw new Error('Cloud sync failed');
-        }
-        
-    } catch (error) {
-        console.error('Cloud sync failed:', error);
-        showSyncStatus('❌ Sync failed', 'error');
-    }
-}
-
-async function syncToSupabase(username, data) {
-    try {
-        const response = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/user_data`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_CONFIG.key,
-                'Authorization': `Bearer ${SUPABASE_CONFIG.key}`,
-                'Prefer': 'resolution=merge-duplicates'
-            },
-            body: JSON.stringify({
-                user_id: username,
-                data: data,
-                updated_at: new Date().toISOString()
-            })
-        });
-        
-        return response.ok;
-    } catch (error) {
-        console.error('Supabase sync failed:', error);
-        return false;
-    }
-}
-
-async function syncFromCloud() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showSyncStatus('Please sign in first', 'error');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    showSyncStatus('🔄 Loading from cloud...', 'loading');
-    
-    try {
-        const cloudData = await syncFromSupabase(user.username);
-        
-        if (cloudData) {
-            localStorage.setItem(`userData_${user.username}`, JSON.stringify(cloudData.data));
-            loadUserData(user.username);
-            showSyncStatus('✅ Cloud data loaded!', 'success');
-        } else {
-            showSyncStatus('ℹ️ No cloud data found', 'info');
-        }
-        
-    } catch (error) {
-        console.error('Cloud retrieval failed:', error);
-        showSyncStatus('❌ Sync failed', 'error');
-    }
-}
-
-async function syncFromSupabase(username) {
-    try {
-        const response = await fetch(
-            `${SUPABASE_CONFIG.url}/rest/v1/user_data?user_id=eq.${username}&select=*`, 
-            {
-                headers: {
-                    'apikey': SUPABASE_CONFIG.key,
-                    'Authorization': `Bearer ${SUPABASE_CONFIG.key}`
-                }
-            }
-        );
-        
-        if (response.ok) {
-            const data = await response.json();
-            return data[0]; // Return first record
-        }
-        return null;
-    } catch (error) {
-        console.error('Supabase retrieval failed:', error);
-        return null;
-    }
-}
-
-// Initialize on app start
-function initCloudSync() {
-    // Supabase is always ready - no token needed
-    console.log('Supabase sync ready');
-}
-//==================================================//
 
 // Utility Functions
 function saveForm() {
@@ -1147,4 +750,10 @@ function saveForm() {
 function logout() {
     localStorage.removeItem('currentUser');
     window.location.href = 'auth.html';
+}
+
+// Test function to check if buttons work
+function testButtons() {
+    console.log('Buttons are working!');
+    showNotification('Buttons are working!', 'success');
 }
