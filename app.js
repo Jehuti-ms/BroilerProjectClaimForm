@@ -5,7 +5,7 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
 
-// Cloud Sync Configuration - Uses your existing Supabase config
+// Cloud Sync Configuration
 const CLOUD_CONFIG = {
     url: SUPABASE_CONFIG?.url || 'https://wjzkiceausyejnmnlqvg.supabase.co',
     key: SUPABASE_CONFIG?.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqemtpY2VhdXN5ZWpubW5scXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyMzg3ODEsImV4cCI6MjA3NzgxNDc4MX0.uqX0SA5Wa52yPvRkSxxrkDvC8YkIEpO5MNndAC_IrHQ'
@@ -48,6 +48,15 @@ function initializeApp() {
         document.getElementById('year-input').value = lastYear;
     }
     
+    updateFormDate();
+    
+    // Load initial data for current month/year
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        const user = JSON.parse(currentUser);
+        loadUserData(user.username);
+    }
+    
     // Add event listeners for date controls
     document.getElementById('month-select').addEventListener('change', function() {
         updateFormDate();
@@ -60,14 +69,6 @@ function initializeApp() {
         saveCurrentMonth();
         reloadUserData();
     });
-    
-    updateFormDate();
-}
-
-// Initialize cloud sync
-function initCloudSync() {
-    updateLastSyncDisplay();
-    console.log('Cloud sync initialized');
 }
 
 // Save current month/year to localStorage
@@ -108,6 +109,7 @@ function loadCurrentMonthData(allData = null) {
     const tableBody = document.querySelector('#time-table tbody');
     if (!tableBody) return;
     
+    // Clear the table
     tableBody.innerHTML = '';
     currentFormData = [];
     
@@ -143,6 +145,11 @@ function saveUserData() {
     
     // Save back to localStorage
     localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
+    
+    // Auto-sync after saving
+    if (navigator.onLine) {
+        setTimeout(() => syncToCloud(), 1000);
+    }
     
     // Show save confirmation
     showNotification('Form data saved successfully!');
@@ -180,7 +187,7 @@ function showNotification(message, type = 'success') {
     }, 3000);
 }
 
-// Update the form date display
+// Update the form date display - FIXED THIS FUNCTION
 function updateFormDate() {
     const month = document.getElementById('month-select').value;
     const year = document.getElementById('year-input').value;
@@ -539,7 +546,14 @@ function generatePDF() {
 
 // ==================== CLOUD SYNC FUNCTIONS ====================
 
-// Sync to cloud - SIMPLE VERSION THAT WORKS
+// Initialize cloud sync
+function initCloudSync() {
+    updateLastSyncDisplay();
+    startAutoSync();
+    console.log('Cloud sync initialized');
+}
+
+// Sync to cloud
 async function syncToCloud() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -603,7 +617,7 @@ async function syncToCloud() {
     }
 }
 
-// Sync from cloud - SIMPLE VERSION THAT WORKS
+// Sync from cloud
 async function syncFromCloud() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -711,6 +725,23 @@ function showSyncStatus(message, type) {
     showNotification(message, type);
 }
 
+// Auto-sync functionality
+function startAutoSync() {
+    // Auto-sync every 5 minutes if user is active
+    setInterval(() => {
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser && navigator.onLine && !document.hidden) {
+            const user = JSON.parse(currentUser);
+            const userData = localStorage.getItem(`userData_${user.username}`);
+            
+            if (userData) {
+                console.log('Auto-syncing data to cloud...');
+                syncToCloud(); // This will handle both Supabase and local backup
+            }
+        }
+    }, 5 * 60 * 1000); // 5 minutes
+}
+
 // Export data
 function exportData() {
     const currentUser = localStorage.getItem('currentUser');
@@ -750,10 +781,4 @@ function saveForm() {
 function logout() {
     localStorage.removeItem('currentUser');
     window.location.href = 'auth.html';
-}
-
-// Test function to check if buttons work
-function testButtons() {
-    console.log('Buttons are working!');
-    showNotification('Buttons are working!', 'success');
 }
