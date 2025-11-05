@@ -596,6 +596,10 @@ button:hover {
         width: 100%;
     }
 }
+/* Center the entire cloud sync section */
+.cloud-sync-section {
+    text-align: center;
+}
 /* Responsive spacing for sync buttons */
 .cloud-sync-buttons {
     display: flex;
