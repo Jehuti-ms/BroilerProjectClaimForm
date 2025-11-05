@@ -596,3 +596,33 @@ button:hover {
         width: 100%;
     }
 }
+/* Responsive spacing for sync buttons */
+.cloud-sync-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Add vertical space between buttons on mobile */
+@media (max-width: 768px) {
+    .cloud-sync-buttons {
+        gap: 15px; /* Increased gap on mobile */
+    }
+    
+    .cloud-sync-buttons .cloud-btn {
+        margin-bottom: 8px; /* Extra bottom margin */
+    }
+}
+
+/* For very small screens */
+@media (max-width: 480px) {
+    .cloud-sync-buttons {
+        gap: 12px;
+        flex-direction: column; /* Stack buttons vertically */
+    }
+    
+    .cloud-sync-buttons .cloud-btn {
+        width: 100%; /* Full width buttons on mobile */
+        margin-bottom: 10px;
+    }
+}
