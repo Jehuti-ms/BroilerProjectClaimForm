@@ -644,32 +644,32 @@ function logout() {
     window.location.href = 'auth.html';
 }
 
-// Save employee name when form is submitted or saved
-function saveEmployeeName() {
-    const employeeName = document.getElementById('employee-name').value.trim();
-    if (employeeName) {
-        localStorage.setItem('savedEmployeeName', employeeName);
-    }
-}
+// Add these functions to app.js to remember the employee name in the main form
 
-// Load saved employee name on page load
-function loadEmployeeName() {
-    const savedName = localStorage.getItem('savedEmployeeName');
+// Save employee name when it's typed in the main form
+function setupEmployeeNameMemory() {
     const employeeNameInput = document.getElementById('employee-name');
     
-    if (savedName && employeeNameInput) {
-        employeeNameInput.value = savedName;
+    if (employeeNameInput) {
+        // Load saved employee name on page load
+        const savedName = localStorage.getItem('mainAppEmployeeName');
+        if (savedName) {
+            employeeNameInput.value = savedName;
+        }
+        
+        // Save employee name whenever it changes
+        employeeNameInput.addEventListener('input', function() {
+            localStorage.setItem('mainAppEmployeeName', this.value);
+        });
+        
+        // Also save when user leaves the field
+        employeeNameInput.addEventListener('blur', function() {
+            localStorage.setItem('mainAppEmployeeName', this.value);
+        });
     }
 }
 
-// Update the saveUserData function to also save the employee name
-const originalSaveUserData = saveUserData;
-saveUserData = function() {
-    saveEmployeeName(); // Save the employee name first
-    originalSaveUserData.apply(this, arguments); // Then save the form data
-};
-
-// Update DOMContentLoaded to load the saved name
+// Update DOMContentLoaded to set up the employee name memory
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
     initAutoSyncCheckbox();
@@ -680,6 +680,7 @@ document.addEventListener('DOMContentLoaded', function() {
         autoSyncCheckbox.addEventListener('change', toggleAutoSync);
     }
     
-    // Load the saved employee name
-    loadEmployeeName();
+    // Set up employee name memory
+    setupEmployeeNameMemory();
 });
+
