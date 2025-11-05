@@ -8,6 +8,13 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 // Check authentication on page load
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
+    initAutoSyncCheckbox();
+    
+    // Add event listener for auto-sync checkbox
+    const autoSyncCheckbox = document.getElementById('auto-sync');
+    if (autoSyncCheckbox) {
+        autoSyncCheckbox.addEventListener('change', toggleAutoSync);
+    }
 });
 
 // Check if user is authenticated
@@ -63,6 +70,37 @@ function initializeApp() {
     });
     
     updateFormDate();
+}
+
+// Auto-sync functions
+function toggleAutoSync() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const isEnabled = checkbox.checked;
+        localStorage.setItem('autoSyncEnabled', isEnabled.toString());
+        
+        if (isEnabled) {
+            showNotification('Auto-sync enabled');
+            // Start auto-sync if the function exists
+            if (typeof startAutoSync === 'function') {
+                startAutoSync();
+            }
+        } else {
+            showNotification('Auto-sync disabled');
+            // Stop auto-sync if the function exists
+            if (typeof stopAutoSync === 'function') {
+                stopAutoSync();
+            }
+        }
+    }
+}
+
+function initAutoSyncCheckbox() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        checkbox.checked = autoSync === 'true';
+    }
 }
 
 // Save current month/year to localStorage
@@ -505,38 +543,6 @@ function generatePDF() {
     doc.save(`Broiler_Claim_Form_${monthNames[month]}_${year}.pdf`);
 }
 
-
-// In app.js - keep this simple version
-function saveUserData() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    const month = parseInt(document.getElementById('month-select').value);
-    const year = document.getElementById('year-input').value;
-    const monthYear = `${month}-${year}`;
-    
-    // Get existing user data
-    const existingData = localStorage.getItem(`userData_${user.username}`);
-    let allData = existingData ? JSON.parse(existingData) : {};
-    
-    // Update data for current month
-    allData[monthYear] = currentFormData;
-    
-    // Save back to localStorage
-    localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
-    
-    // Trigger auto-sync (function from sync.js)
-    if (typeof triggerAutoSync === 'function') {
-        triggerAutoSync(user.username, allData);
-    }
-    
-    // Show save confirmation
-    showNotification('Form data saved successfully!');
-}
-
 // Export Data
 function exportData() {
     const currentUser = localStorage.getItem('currentUser');
@@ -576,47 +582,3 @@ function logout() {
     localStorage.removeItem('currentUser');
     window.location.href = 'auth.html';
 }
-
-// Initialize last sync display
-setTimeout(() => {
-    updateLastSyncDisplay();
-}, 1000);
-
-// Add this to app.js
-function toggleAutoSync() {
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        const isEnabled = checkbox.checked;
-        localStorage.setItem('autoSyncEnabled', isEnabled.toString());
-        
-        if (isEnabled) {
-            showNotification('Auto-sync enabled');
-            // Start auto-sync if the function exists
-            if (typeof startAutoSync === 'function') {
-                startAutoSync();
-            }
-        } else {
-            showNotification('Auto-sync disabled');
-            // Stop auto-sync if the function exists
-            if (typeof stopAutoSync === 'function') {
-                stopAutoSync();
-            }
-        }
-    }
-}
-
-// Initialize auto-sync checkbox state
-function initAutoSyncCheckbox() {
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        const autoSync = localStorage.getItem('autoSyncEnabled');
-        checkbox.checked = autoSync === 'true';
-    }
-}
-
-// Call this in your DOMContentLoaded
-document.addEventListener('DOMContentLoaded', function() {
-    checkAuthentication();
-    initAutoSyncCheckbox(); // Add this line
-});
-
