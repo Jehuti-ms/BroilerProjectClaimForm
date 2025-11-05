@@ -505,73 +505,8 @@ function generatePDF() {
     doc.save(`Broiler_Claim_Form_${monthNames[month]}_${year}.pdf`);
 }
 
-// Simple Cloud Sync Functions
-function syncToCloud() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showNotification('Please sign in first', 'error');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    const userData = localStorage.getItem(`userData_${user.username}`);
-    
-    if (!userData) {
-        showNotification('No data to sync', 'error');
-        return;
-    }
-    
-    // Simple localStorage backup
-    const syncData = {
-        username: user.username,
-        data: JSON.parse(userData),
-        timestamp: new Date().toISOString(),
-        employeeName: user.employeeName
-    };
-    
-    localStorage.setItem(`cloud_backup_${user.username}`, JSON.stringify(syncData));
-    localStorage.setItem('lastCloudSync', new Date().toISOString());
-    
-    updateLastSyncDisplay();
-    showNotification('Data synced to cloud successfully!');
-}
 
-function syncFromCloud() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showNotification('Please sign in first', 'error');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    const backupData = localStorage.getItem(`cloud_backup_${user.username}`);
-    
-    if (backupData) {
-        const cloudData = JSON.parse(backupData);
-        localStorage.setItem(`userData_${user.username}`, JSON.stringify(cloudData.data));
-        loadUserData(user.username);
-        showNotification('Cloud data loaded successfully!');
-        updateLastSyncDisplay();
-    } else {
-        showNotification('No cloud data found', 'error');
-    }
-}
 
-function updateLastSyncDisplay() {
-    const lastSync = localStorage.getItem('lastCloudSync');
-    const lastSyncElement = document.getElementById('last-sync');
-    
-    if (lastSyncElement) {
-        if (lastSync) {
-            const lastSyncDate = new Date(lastSync);
-            lastSyncElement.innerHTML = `Last synced: ${lastSyncDate.toLocaleString()}`;
-            lastSyncElement.style.display = 'block';
-        } else {
-            lastSyncElement.innerHTML = 'Never synced';
-            lastSyncElement.style.display = 'block';
-        }
-    }
-}
 
 // Export Data
 function exportData() {
