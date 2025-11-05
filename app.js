@@ -506,7 +506,36 @@ function generatePDF() {
 }
 
 
-
+// In app.js - keep this simple version
+function saveUserData() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    const month = parseInt(document.getElementById('month-select').value);
+    const year = document.getElementById('year-input').value;
+    const monthYear = `${month}-${year}`;
+    
+    // Get existing user data
+    const existingData = localStorage.getItem(`userData_${user.username}`);
+    let allData = existingData ? JSON.parse(existingData) : {};
+    
+    // Update data for current month
+    allData[monthYear] = currentFormData;
+    
+    // Save back to localStorage
+    localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
+    
+    // Trigger auto-sync (function from sync.js)
+    if (typeof triggerAutoSync === 'function') {
+        triggerAutoSync(user.username, allData);
+    }
+    
+    // Show save confirmation
+    showNotification('Form data saved successfully!');
+}
 
 // Export Data
 function exportData() {
