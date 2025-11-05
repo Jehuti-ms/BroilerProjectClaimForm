@@ -573,6 +573,67 @@ function exportData() {
     showNotification('Data exported successfully!');
 }
 
+// Import Data Function
+function importData() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    
+    fileInput.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const importData = JSON.parse(event.target.result);
+                
+                // Validate the import file structure
+                if (!importData.userData || !importData.username) {
+                    throw new Error('Invalid backup file format');
+                }
+                
+                // Check if the imported user matches current user
+                const currentUser = localStorage.getItem('currentUser');
+                if (currentUser) {
+                    const user = JSON.parse(currentUser);
+                    if (importData.username !== user.username) {
+                        if (!confirm(`This backup is for user "${importData.username}". Import anyway?`)) {
+                            return;
+                        }
+                    }
+                }
+                
+                // Apply the imported data
+                localStorage.setItem(`userData_${importData.username}`, JSON.stringify(importData.userData));
+                
+                // Reload the current view
+                if (currentUser) {
+                    const user = JSON.parse(currentUser);
+                    loadUserData(user.username);
+                }
+                
+                showNotification('Data imported successfully!');
+                
+                // Auto-sync the imported data to cloud
+                setTimeout(() => {
+                    if (typeof syncToCloud === 'function') {
+                        syncToCloud();
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Import error:', error);
+                showNotification('Error importing file: ' + error.message, 'error');
+            }
+        };
+        
+        reader.readAsText(file);
+    };
+    
+    fileInput.click();
+}
+
 // Utility Functions
 function saveForm() {
     saveUserData();
