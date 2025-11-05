@@ -643,3 +643,43 @@ function logout() {
     localStorage.removeItem('currentUser');
     window.location.href = 'auth.html';
 }
+
+// Save employee name when form is submitted or saved
+function saveEmployeeName() {
+    const employeeName = document.getElementById('employee-name').value.trim();
+    if (employeeName) {
+        localStorage.setItem('savedEmployeeName', employeeName);
+    }
+}
+
+// Load saved employee name on page load
+function loadEmployeeName() {
+    const savedName = localStorage.getItem('savedEmployeeName');
+    const employeeNameInput = document.getElementById('employee-name');
+    
+    if (savedName && employeeNameInput) {
+        employeeNameInput.value = savedName;
+    }
+}
+
+// Update the saveUserData function to also save the employee name
+const originalSaveUserData = saveUserData;
+saveUserData = function() {
+    saveEmployeeName(); // Save the employee name first
+    originalSaveUserData.apply(this, arguments); // Then save the form data
+};
+
+// Update DOMContentLoaded to load the saved name
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthentication();
+    initAutoSyncCheckbox();
+    
+    // Add event listener for auto-sync checkbox
+    const autoSyncCheckbox = document.getElementById('auto-sync');
+    if (autoSyncCheckbox) {
+        autoSyncCheckbox.addEventListener('change', toggleAutoSync);
+    }
+    
+    // Load the saved employee name
+    loadEmployeeName();
+});
