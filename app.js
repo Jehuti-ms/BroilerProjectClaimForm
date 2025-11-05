@@ -581,3 +581,42 @@ function logout() {
 setTimeout(() => {
     updateLastSyncDisplay();
 }, 1000);
+
+// Add this to app.js
+function toggleAutoSync() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const isEnabled = checkbox.checked;
+        localStorage.setItem('autoSyncEnabled', isEnabled.toString());
+        
+        if (isEnabled) {
+            showNotification('Auto-sync enabled');
+            // Start auto-sync if the function exists
+            if (typeof startAutoSync === 'function') {
+                startAutoSync();
+            }
+        } else {
+            showNotification('Auto-sync disabled');
+            // Stop auto-sync if the function exists
+            if (typeof stopAutoSync === 'function') {
+                stopAutoSync();
+            }
+        }
+    }
+}
+
+// Initialize auto-sync checkbox state
+function initAutoSyncCheckbox() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        checkbox.checked = autoSync === 'true';
+    }
+}
+
+// Call this in your DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthentication();
+    initAutoSyncCheckbox(); // Add this line
+});
+
