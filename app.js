@@ -684,3 +684,40 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEmployeeNameMemory();
 });
 
+// Add employee name memory for main app form
+function setupEmployeeNameMemory() {
+    const employeeNameInput = document.getElementById('employee-name');
+    
+    if (employeeNameInput) {
+        // Load saved employee name on page load
+        const savedName = localStorage.getItem('mainAppEmployeeName');
+        if (savedName) {
+            employeeNameInput.value = savedName;
+        }
+        
+        // Save employee name whenever it changes
+        employeeNameInput.addEventListener('input', function() {
+            localStorage.setItem('mainAppEmployeeName', this.value);
+        });
+        
+        // Also save when user leaves the field
+        employeeNameInput.addEventListener('blur', function() {
+            localStorage.setItem('mainAppEmployeeName', this.value);
+        });
+    }
+}
+
+// Update DOMContentLoaded in app.js
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthentication();
+    initAutoSyncCheckbox();
+    
+    // Add event listener for auto-sync checkbox
+    const autoSyncCheckbox = document.getElementById('auto-sync');
+    if (autoSyncCheckbox) {
+        autoSyncCheckbox.addEventListener('change', toggleAutoSync);
+    }
+    
+    // Set up employee name memory for MAIN FORM
+    setupEmployeeNameMemory();
+});
