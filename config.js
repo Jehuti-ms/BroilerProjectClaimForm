@@ -1,4 +1,6 @@
-// config.js - Firebase Configuration
+// config.js - Traditional Firebase 10.7.1 (compatibility version)
+
+// Firebase configuration
 const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAJhRNUgsrvUvjKXXosS6YZLhbHhpBq0Zg",
     authDomain: "broiler-project-e1f62.firebaseapp.com",
@@ -8,38 +10,60 @@ const FIREBASE_CONFIG = {
     appId: "1:1084373471420:web:f60bf8c5db75b9fe4f90c4"
 };
 
-// Initialize Firebase
-document.addEventListener('DOMContentLoaded', function() {
-    // Check if Firebase is already initialized
-    if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-        // Initialize Firebase
-        firebase.initializeApp(FIREBASE_CONFIG);
+// Initialize Firebase when it's loaded
+function initializeFirebase() {
+    try {
+        // Check if Firebase is available
+        if (typeof firebase === 'undefined') {
+            console.error('Firebase not loaded yet');
+            return false;
+        }
         
-        // Make Firebase available globally
-        window.firebaseApp = firebase.app();
-        window.firestore = firebase.firestore();
-        window.firebaseAuth = firebase.auth();
+        // Initialize Firebase app
+        const app = firebase.initializeApp(FIREBASE_CONFIG);
         
-        console.log('Firebase initialized successfully');
+        // Get Firestore and Auth instances
+        const db = firebase.firestore(app);
+        const auth = firebase.auth(app);
+        
+        // Make available globally (matching your architecture)
+        window.firebaseApp = app;
+        window.firestore = db;
+        window.firebaseAuth = auth;
+        
+        console.log('✅ Firebase initialized successfully');
         
         // Test connection
         testFirebaseConnection();
-    } else if (firebase.apps.length > 0) {
-        console.log('Firebase already initialized');
-        window.firestore = firebase.firestore();
-        window.firebaseAuth = firebase.auth();
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Firebase initialization error:', error);
+        
+        // Check if already initialized
+        if (error.code === 'app/duplicate-app') {
+            console.log('Firebase already initialized, getting references...');
+            window.firestore = firebase.firestore();
+            window.firebaseAuth = firebase.auth();
+            return true;
+        }
+        
+        return false;
     }
-});
+}
 
 // Test Firebase connection
 async function testFirebaseConnection() {
+    if (!window.firestore) {
+        console.log('Firestore not available for testing');
+        return false;
+    }
+    
     try {
-        const db = firebase.firestore();
-        const testRef = db.collection('_connection_tests').doc('firebase_init_test');
-        
+        const testRef = firestore.collection('_connection_tests').doc('test');
         await testRef.set({
-            timestamp: new Date().toISOString(),
-            status: 'connected'
+            test: 'connection_test',
+            timestamp: new Date().toISOString()
         }, { merge: true });
         
         console.log('✅ Firebase connection test passed');
@@ -49,3 +73,34 @@ async function testFirebaseConnection() {
         return false;
     }
 }
+
+// Wait for DOM and Firebase to load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing Firebase...');
+    
+    // Check if Firebase scripts are loaded
+    if (typeof firebase !== 'undefined') {
+        // Firebase already loaded, initialize immediately
+        initializeFirebase();
+    } else {
+        // Wait for Firebase to load
+        const firebaseCheckInterval = setInterval(() => {
+            if (typeof firebase !== 'undefined') {
+                clearInterval(firebaseCheckInterval);
+                initializeFirebase();
+            }
+        }, 100);
+        
+        // Timeout after 10 seconds
+        setTimeout(() => {
+            clearInterval(firebaseCheckInterval);
+            if (!window.firestore) {
+                console.warn('⚠️ Firebase not loaded after 10 seconds');
+            }
+        }, 10000);
+    }
+});
+
+// Make functions available globally
+window.initializeFirebase = initializeFirebase;
+window.testFirebaseConnection = testFirebaseConnection;
