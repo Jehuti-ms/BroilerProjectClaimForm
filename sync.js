@@ -1,18 +1,40 @@
-// sync.js - Firebase version
+// sync.js - Complete Firebase Synchronization
+
+// Cloud Sync Configuration
 const SYNC_CONFIG = {
     autoSyncInterval: 5 * 60 * 1000, // 5 minutes
-    retryAttempts: 3
+    retryAttempts: 3,
+    maxSyncSize: 1048576 // 1MB max sync size
 };
+
+// Sync status tracking
+let isSyncing = false;
+let lastSyncAttempt = null;
+let syncRetryCount = 0;
+let autoSyncInterval = null;
 
 // Initialize cloud sync
 function initCloudSync() {
+    console.log('Initializing Firebase cloud sync...');
     updateLastSyncDisplay();
-    startAutoSync();
-    console.log('Firebase cloud sync initialized');
+    
+    // Start auto-sync if enabled
+    const firebaseAutoSync = document.getElementById('firebase-auto-sync');
+    if (firebaseAutoSync && firebaseAutoSync.checked) {
+        startAutoSync();
+    }
+    
+    // Check for pending syncs
+    checkPendingSyncs();
 }
 
 // Main sync function - Push to Firebase
 async function syncToCloud() {
+    if (isSyncing) {
+        showNotification('Sync already in progress', 'info');
+        return;
+    }
+    
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
         showNotification('Please sign in first', 'error');
@@ -20,38 +42,96 @@ async function syncToCloud() {
     }
     
     const user = JSON.parse(currentUser);
-    const userData = localStorage.getItem(`userData_${user.username}`);
+    const userId = user.username || user.email;
+    const userData = localStorage.getItem(`userData_${userId}`);
     
     if (!userData) {
-        showNotification('No data to sync', 'error');
+        showNotification('No data to sync', 'info');
         return;
     }
     
-    showSyncStatus('🔄 Syncing to Firebase...', 'loading');
+    // Check Firebase availability
+    if (!window.firestore || !window.auth) {
+        showNotification('Firebase not available. Check connection.', 'error');
+        return;
+    }
+    
+    // Check if user is authenticated with Firebase
+    const firebaseUser = await getCurrentFirebaseUser();
+    if (!firebaseUser) {
+        showNotification('Please sign in with Firebase to sync', 'error');
+        return;
+    }
+    
+    isSyncing = true;
+    lastSyncAttempt = new Date();
+    showNotification('🔄 Syncing to Firebase...', 'loading');
+    updateSyncStatus('🔄 Syncing to Firebase...', 'loading');
     
     try {
-        // Try Firebase Firestore
-        const firebaseSuccess = await syncToFirebase(user.username, JSON.parse(userData));
+        const data = JSON.parse(userData);
         
-        if (firebaseSuccess) {
-            showSyncStatus('✅ Data synced to Firebase!', 'success');
-        } else {
-            // Fallback to localStorage backup
-            await syncToLocalBackup(user.username, JSON.parse(userData));
-            showSyncStatus('✅ Data backed up locally', 'success');
+        // Check data size
+        const dataSize = new Blob([userData]).size;
+        if (dataSize > SYNC_CONFIG.maxSyncSize) {
+            throw new Error(`Data too large (${(dataSize / 1024).toFixed(2)}KB). Max: 1MB`);
         }
         
-        localStorage.setItem('lastCloudSync', new Date().toISOString());
+        // Try Firebase Firestore sync
+        const firebaseSuccess = await syncToFirebase(userId, data);
+        
+        if (firebaseSuccess) {
+            showNotification('✅ Data synced to Firebase!', 'success');
+            updateSyncStatus('✅ Data synced to Firebase!', 'success');
+            localStorage.setItem('lastCloudSync', new Date().toISOString());
+            syncRetryCount = 0;
+        } else {
+            // Fallback to localStorage backup
+            await syncToLocalBackup(userId, data);
+            showNotification('⚠️ Synced to local backup (Firebase failed)', 'warning');
+            updateSyncStatus('⚠️ Synced to local backup', 'warning');
+        }
+        
         updateLastSyncDisplay();
         
     } catch (error) {
-        console.error('Firebase sync failed:', error);
-        showSyncStatus('❌ Sync failed', 'error');
+        console.error('Cloud sync failed:', error);
+        
+        let errorMessage = 'Sync failed: ';
+        if (error.message.includes('permission-denied')) {
+            errorMessage += 'Permission denied. Check Firebase security rules.';
+        } else if (error.message.includes('unavailable')) {
+            errorMessage += 'Firebase unavailable. You may be offline.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        showNotification(errorMessage, 'error');
+        updateSyncStatus('❌ Sync failed', 'error');
+        
+        // Increment retry count
+        syncRetryCount++;
+        
+        // Schedule retry if needed
+        if (syncRetryCount < SYNC_CONFIG.retryAttempts) {
+            setTimeout(() => {
+                showNotification(`Retrying sync (${syncRetryCount}/${SYNC_CONFIG.retryAttempts})...`, 'info');
+                syncToCloud();
+            }, 5000);
+        }
+        
+    } finally {
+        isSyncing = false;
     }
 }
 
 // Pull from Firebase
 async function syncFromCloud() {
+    if (isSyncing) {
+        showNotification('Sync already in progress', 'info');
+        return;
+    }
+    
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
         showNotification('Please sign in first', 'error');
@@ -59,42 +139,82 @@ async function syncFromCloud() {
     }
     
     const user = JSON.parse(currentUser);
-    showSyncStatus('🔄 Loading from Firebase...', 'loading');
+    const userId = user.username || user.email;
+    
+    // Check Firebase availability
+    if (!window.firestore || !window.auth) {
+        showNotification('Firebase not available. Check connection.', 'error');
+        return;
+    }
+    
+    // Check if user is authenticated with Firebase
+    const firebaseUser = await getCurrentFirebaseUser();
+    if (!firebaseUser) {
+        showNotification('Please sign in with Firebase to sync', 'error');
+        return;
+    }
+    
+    isSyncing = true;
+    showNotification('🔄 Loading from Firebase...', 'loading');
+    updateSyncStatus('🔄 Loading from Firebase...', 'loading');
     
     try {
-        let cloudData = await syncFromFirebase(user.username);
+        let cloudData = await syncFromFirebase(userId);
         
         if (!cloudData) {
-            cloudData = await syncFromLocalBackup(user.username);
+            // Try local backup
+            cloudData = await syncFromLocalBackup(userId);
+            if (cloudData) {
+                showNotification('ℹ️ Loaded from local backup (no cloud data)', 'info');
+                updateSyncStatus('ℹ️ Loaded from local backup', 'info');
+            }
         }
         
         if (cloudData && cloudData.data) {
-            localStorage.setItem(`userData_${user.username}`, JSON.stringify(cloudData.data));
+            // Parse data if it's a string
+            const data = typeof cloudData.data === 'string' ? 
+                JSON.parse(cloudData.data) : cloudData.data;
+            
+            localStorage.setItem(`userData_${userId}`, JSON.stringify(data));
             
             // Notify main app to reload data
             if (typeof loadUserData === 'function') {
-                loadUserData(user.username);
+                loadUserData(userId);
             }
             
-            showSyncStatus('✅ Firebase data loaded!', 'success');
+            showNotification('✅ Cloud data loaded!', 'success');
+            updateSyncStatus('✅ Cloud data loaded!', 'success');
             updateLastSyncDisplay();
+            
+            // Update last sync time from cloud data
+            if (cloudData.lastSync) {
+                localStorage.setItem('lastCloudSync', cloudData.lastSync);
+            } else {
+                localStorage.setItem('lastCloudSync', new Date().toISOString());
+            }
+            
         } else {
-            showSyncStatus('ℹ️ No cloud data found', 'info');
+            showNotification('ℹ️ No cloud data found', 'info');
+            updateSyncStatus('ℹ️ No cloud data found', 'info');
         }
         
     } catch (error) {
-        console.error('Firebase retrieval failed:', error);
-        showSyncStatus('❌ Sync failed', 'error');
+        console.error('Cloud retrieval failed:', error);
+        showNotification('❌ Failed to load from cloud', 'error');
+        updateSyncStatus('❌ Failed to load from cloud', 'error');
+    } finally {
+        isSyncing = false;
     }
 }
 
 // Firebase sync functions
 async function syncToFirebase(userId, data) {
+    if (!firestore) {
+        console.warn('Firestore not available');
+        return false;
+    }
+    
     try {
-        if (!firestore) {
-            throw new Error('Firebase not initialized');
-        }
-
         // Convert data to string for storage
         const dataString = JSON.stringify(data);
         
@@ -103,91 +223,121 @@ async function syncToFirebase(userId, data) {
             userId: userId,
             data: dataString,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastSync: new Date().toISOString()
+            lastSync: new Date().toISOString(),
+            device: navigator.userAgent.substring(0, 100),
+            dataSize: new Blob([dataString]).size
         }, { merge: true });
         
+        console.log('✅ Data synced to Firebase for user:', userId);
         return true;
+        
     } catch (error) {
         console.error('Firebase sync error:', error);
+        
+        // Check for common errors
+        if (error.code === 'permission-denied') {
+            console.warn('Permission denied - check Firebase security rules');
+        } else if (error.code === 'unavailable') {
+            console.warn('Firebase unavailable - offline mode');
+        }
+        
         return false;
     }
 }
 
 async function syncFromFirebase(userId) {
+    if (!firestore) {
+        console.warn('Firestore not available');
+        return null;
+    }
+    
     try {
-        if (!firestore) {
-            throw new Error('Firebase not initialized');
-        }
-
         // Get user document
         const docRef = firestore.collection('userData').doc(userId);
         const doc = await docRef.get();
         
         if (!doc.exists) {
-            console.log('No Firebase data found for user:', userId);
+            console.log('No Firebase data found for:', userId);
             return null;
         }
         
         const data = doc.data();
-        
-        // Parse the data string back to object
-        if (data.data) {
-            data.data = JSON.parse(data.data);
-        }
-        
+        console.log('✅ Data loaded from Firebase for user:', userId);
         return data;
+        
     } catch (error) {
         console.error('Firebase retrieval error:', error);
+        
+        if (error.code === 'permission-denied') {
+            console.warn('Permission denied - check Firebase security rules');
+        } else if (error.code === 'unavailable') {
+            console.warn('Firebase unavailable - offline mode');
+        }
+        
         return null;
     }
 }
 
-// Local backup functions (fallback - keep existing)
-async function syncToLocalBackup(username, data) {
+// Local backup functions (fallback)
+async function syncToLocalBackup(userId, data) {
     const syncData = {
-        username: username,
+        userId: userId,
         data: data,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        backupType: 'firebase_fallback'
     };
     
-    localStorage.setItem(`cloud_backup_${username}`, JSON.stringify(syncData));
+    localStorage.setItem(`firebase_backup_${userId}`, JSON.stringify(syncData));
+    console.log('✅ Data backed up locally for user:', userId);
     return true;
 }
 
-async function syncFromLocalBackup(username) {
-    const backupData = localStorage.getItem(`cloud_backup_${username}`);
+async function syncFromLocalBackup(userId) {
+    const backupData = localStorage.getItem(`firebase_backup_${userId}`);
     if (backupData) {
+        console.log('✅ Data loaded from local backup for user:', userId);
         return JSON.parse(backupData);
     }
     return null;
 }
 
-// Auto-sync with Firebase
-let autoSyncInterval = null;
-
+// Auto-sync functionality
 function startAutoSync() {
+    // Stop any existing interval
     if (autoSyncInterval) {
         clearInterval(autoSyncInterval);
     }
     
+    console.log('Starting Firebase auto-sync...');
+    
+    // Auto-sync when online and app is active
     autoSyncInterval = setInterval(() => {
-        if (navigator.onLine && !document.hidden && firestore) {
+        if (navigator.onLine && !document.hidden) {
             const currentUser = localStorage.getItem('currentUser');
             if (currentUser) {
                 const user = JSON.parse(currentUser);
-                const userData = localStorage.getItem(`userData_${user.username}`);
-                if (userData) {
+                const userId = user.username || user.email;
+                const userData = localStorage.getItem(`userData_${userId}`);
+                
+                if (userData && firestore && auth) {
                     console.log('Auto-syncing to Firebase...');
-                    syncToFirebase(user.username, JSON.parse(userData))
-                        .then(success => {
-                            if (success) {
-                                localStorage.setItem('lastCloudSync', new Date().toISOString());
-                                updateLastSyncDisplay();
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Auto-sync error:', error);
-                        });
+                    
+                    // Get Firebase user
+                    getCurrentFirebaseUser().then(firebaseUser => {
+                        if (firebaseUser) {
+                            syncToFirebase(userId, JSON.parse(userData))
+                                .then(success => {
+                                    if (success) {
+                                        localStorage.setItem('lastCloudSync', new Date().toISOString());
+                                        updateLastSyncDisplay();
+                                        console.log('✅ Auto-sync successful');
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Auto-sync error:', error);
+                                });
+                        }
+                    });
                 }
             }
         }
@@ -198,47 +348,10 @@ function stopAutoSync() {
     if (autoSyncInterval) {
         clearInterval(autoSyncInterval);
         autoSyncInterval = null;
+        console.log('Firebase auto-sync stopped');
     }
 }
 
-// Test Firebase connection
-async function testFirebaseConnection() {
-    console.log('=== FIREBASE DEBUG INFO ===');
-    console.log('Firestore exists:', !!firestore);
-    console.log('Auth exists:', !!auth);
-    console.log('Current user:', localStorage.getItem('currentUser'));
-    
-    if (firestore) {
-        try {
-            // Test write and read
-            const testRef = firestore.collection('connectionTests').doc('test');
-            await testRef.set({
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                test: 'connection'
-            });
-            
-            const doc = await testRef.get();
-            console.log('Firebase test write successful:', doc.exists);
-            
-            // Clean up
-            await testRef.delete();
-            
-            console.log('✅ Firebase connection successful!');
-            showNotification('Firebase connected!', 'success');
-            return true;
-        } catch (error) {
-            console.error('Firebase test failed:', error);
-            showNotification('Firebase test failed: ' + error.message, 'error');
-            return false;
-        }
-    } else {
-        console.error('Firebase not initialized');
-        showNotification('Firebase not loaded - check firebase-config.js', 'error');
-        return false;
-    }
-}
-
-// ====================Utility functions (updateLastSyncDisplay, showSyncStatus, showNotification)
 // Sync status display
 function updateLastSyncDisplay() {
     const lastSync = localStorage.getItem('lastCloudSync');
@@ -251,72 +364,116 @@ function updateLastSyncDisplay() {
             const diffMinutes = Math.floor((now - lastSyncDate) / (1000 * 60));
             
             let statusText = `Last synced: ${lastSyncDate.toLocaleString()}`;
+            let statusClass = 'sync-error';
+            
             if (diffMinutes < 5) {
                 statusText += ' 🟢';
+                statusClass = 'sync-success';
             } else if (diffMinutes < 60) {
                 statusText += ' 🟡';
+                statusClass = 'sync-warning';
             } else {
                 statusText += ' 🔴';
+                statusClass = 'sync-error';
             }
             
             lastSyncElement.innerHTML = statusText;
+            lastSyncElement.className = `last-sync ${statusClass}`;
         } else {
             lastSyncElement.innerHTML = 'Never synced 🔴';
+            lastSyncElement.className = 'last-sync sync-error';
         }
         lastSyncElement.style.display = 'block';
     }
 }
 
 function showSyncStatus(message, type) {
-    const lastSyncElement = document.getElementById('last-sync');
-    if (lastSyncElement) {
-        lastSyncElement.innerHTML = message;
-        lastSyncElement.style.display = 'block';
-        lastSyncElement.style.padding = '10px';
-        lastSyncElement.style.margin = '10px 0';
-        lastSyncElement.style.borderRadius = '4px';
-        lastSyncElement.style.textAlign = 'center';
-        
-        const colors = {
-            success: '#4CAF50',
-            error: '#f44336',
-            loading: '#2196F3',
-            info: '#FF9800'
-        };
-        
-        lastSyncElement.style.background = colors[type] || colors.info;
-        lastSyncElement.style.color = 'white';
-    }
-    
-    // Also show notification
+    updateSyncStatus(message, type);
     showNotification(message, type);
 }
 
-// Enhanced notification function for sync
-function showNotification(message, type = 'success') {
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => notification.remove());
+// Check for pending syncs
+function checkPendingSyncs() {
+    const lastSync = localStorage.getItem('lastCloudSync');
+    if (!lastSync) return;
     
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#f44336' : type === 'loading' ? '#2196F3' : '#4CAF50'};
-        color: white;
-        padding: 15px 20px;
-        border-radius: 5px;
-        z-index: 10000;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    `;
+    const lastSyncDate = new Date(lastSync);
+    const now = new Date();
+    const diffHours = Math.floor((now - lastSyncDate) / (1000 * 60 * 60));
     
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.remove();
-        }
-    }, 3000);
+    if (diffHours > 24) {
+        showNotification('Last sync was over 24 hours ago. Consider syncing now.', 'warning');
+    }
 }
+
+// Get current Firebase user
+async function getCurrentFirebaseUser() {
+    if (!auth) return null;
+    
+    return new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+            unsubscribe();
+            resolve(user);
+        });
+    });
+}
+
+// Test Firebase connection
+async function testFirebaseConnection() {
+    if (typeof window.testFirebaseConnection === 'function') {
+        return window.testFirebaseConnection();
+    }
+    return false;
+}
+
+// Debug function
+async function debugFirebaseSync() {
+    console.log('=== FIREBASE SYNC DEBUG ===');
+    console.log('Firestore available:', !!firestore);
+    console.log('Auth available:', !!auth);
+    console.log('Current user:', localStorage.getItem('currentUser'));
+    console.log('Is syncing:', isSyncing);
+    console.log('Last sync attempt:', lastSyncAttempt);
+    console.log('Sync retry count:', syncRetryCount);
+    console.log('Auto-sync interval:', autoSyncInterval ? 'Running' : 'Stopped');
+    
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        const user = JSON.parse(currentUser);
+        const userId = user.username || user.email;
+        console.log('User ID:', userId);
+        
+        const userData = localStorage.getItem(`userData_${userId}`);
+        console.log('Local data size:', userData ? new Blob([userData]).size + ' bytes' : 'No data');
+        
+        // Test Firebase connection
+        if (firestore) {
+            try {
+                const docRef = firestore.collection('userData').doc(userId);
+                const doc = await docRef.get();
+                console.log('Firestore document exists:', doc.exists);
+                
+                if (doc.exists) {
+                    const data = doc.data();
+                    console.log('Cloud data size:', data?.data ? new Blob([data.data]).size + ' bytes' : 'No data');
+                    console.log('Last cloud update:', data?.updatedAt);
+                }
+            } catch (error) {
+                console.error('Firestore debug error:', error);
+            }
+        }
+    }
+}
+
+// Initialize sync when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(initCloudSync, 3000);
+});
+
+// Export functions for use in other files
+window.syncToCloud = syncToCloud;
+window.syncFromCloud = syncFromCloud;
+window.startAutoSync = startAutoSync;
+window.stopAutoSync = stopAutoSync;
+window.testFirebaseConnection = testFirebaseConnection;
+window.debugFirebaseSync = debugFirebaseSync;
