@@ -241,6 +241,33 @@ function initializeFirebase() {
     }, 500);
 }
 
+// Update authentication status display
+function updateAuthStatusDisplay() {
+    const statusElement = document.getElementById('auth-status');
+    const statusText = document.getElementById('auth-status-text');
+    
+    if (!statusElement || !statusText) return;
+    
+    if (!window.auth) {
+        statusText.textContent = '❌ Firebase not loaded';
+        statusElement.style.background = '#f8d7da';
+        statusElement.style.color = '#721c24';
+    } else if (auth.currentUser) {
+        statusText.textContent = `✅ ${auth.currentUser.email}`;
+        statusElement.style.background = '#d4edda';
+        statusElement.style.color = '#155724';
+    } else {
+        statusText.textContent = '⚠️ Using localStorage';
+        statusElement.style.background = '#fff3cd';
+        statusElement.style.color = '#856404';
+    }
+    
+    statusElement.style.display = 'block';
+}
+
+// Call this after authentication check
+setTimeout(updateAuthStatusDisplay, 2000);
+
 // Set up network monitoring
 function setupNetworkMonitoring() {
     window.addEventListener('online', () => {
