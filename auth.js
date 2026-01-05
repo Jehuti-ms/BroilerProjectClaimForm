@@ -1,689 +1,447 @@
-// auth.js - Complete Firebase Authentication with Auto-Creation
+/**
+ * Firebase Authentication System
+ * Handles login, signup, and Firebase user auto-creation
+ */
 
-// Navigation functions
-function showRegister() {
-    document.getElementById('login-form').parentElement.style.display = 'none';
-    document.getElementById('register-card').style.display = 'block';
-    document.getElementById('reset-card').style.display = 'none';
-}
+// Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyAagSPJW2RxyG28Og54ftYd8MGvPPKO_SE",
+  authDomain: "broilerprojectclaimform-d6d51.firebaseapp.com",
+  projectId: "broilerprojectclaimform-d6d51",
+  storageBucket: "broilerprojectclaimform-d6d51.firebasestorage.app",
+  messagingSenderId: "1069004689384",
+  appId: "1:1069004689384:web:ab7e2e4063e2ee864c5e5d",
+};
 
-function showLogin() {
-    document.getElementById('register-card').style.display = 'none';
-    document.getElementById('reset-card').style.display = 'none';
-    document.getElementById('login-form').parentElement.style.display = 'block';
-}
+// Initialize Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-function showReset() {
-    document.getElementById('login-form').parentElement.style.display = 'none';
-    document.getElementById('register-card').style.display = 'none';
-    document.getElementById('reset-card').style.display = 'block';
-}
+// DOM Elements
+const authContainer = document.getElementById('auth-container');
+const dashboard = document.getElementById('dashboard');
+const loginForm = document.getElementById('login-form');
+const signupForm = document.getElementById('signup-form');
+const loginLink = document.getElementById('login-link');
+const signupLink = document.getElementById('signup-link');
+const logoutBtn = document.getElementById('logout-btn');
+const userEmailSpan = document.getElementById('user-email');
+const authError = document.getElementById('auth-error');
 
-// Initialize Firebase auth when DOM loads
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Auth.js loading...');
+// Current user state
+let currentUser = null;
+
+// Initialize authentication system
+function initAuth() {
+    console.log('Initializing authentication system...');
     
-    // Check if user is already logged in
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        console.log('User already logged in via localStorage, redirecting...');
-        window.location.href = 'index.html';
-        return;
-    }
+    // Check for existing session
+    checkExistingSession();
     
-    // Wait for Firebase to load
-    setTimeout(() => {
-        if (window.auth) {
-            console.log('Firebase Auth loaded in auth.js');
+    // Setup event listeners
+    setupEventListeners();
+    
+    // Check Firebase auth state
+    auth.onAuthStateChanged(handleAuthStateChange);
+}
+
+// Check for existing session in localStorage
+function checkExistingSession() {
+    const savedUser = localStorage.getItem('currentUser');
+    const savedPassword = localStorage.getItem('userPassword');
+    
+    if (savedUser && savedPassword) {
+        try {
+            currentUser = JSON.parse(savedUser);
+            console.log('Found saved user:', currentUser.email);
             
-            // Check if user is already signed in with Firebase
-            auth.onAuthStateChanged((user) => {
-                if (user) {
-                    console.log('Firebase user already signed in:', user.email);
-                    
-                    // Store user info
-                    const currentUser = {
-                        username: user.email,
-                        employeeName: user.displayName || user.email.split('@')[0],
-                        uid: user.uid,
-                        firebaseAuthenticated: true
-                    };
-                    
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    
-                    // Also save to localStorage users for fallback
-                    const users = JSON.parse(localStorage.getItem('users') || '{}');
-                    users[user.email] = {
-                        email: user.email,
-                        employeeName: user.displayName || user.email.split('@')[0],
-                        uid: user.uid,
-                        firebase: true
-                    };
-                    localStorage.setItem('users', JSON.stringify(users));
-                    
-                    // Redirect to main app
-                    window.location.href = 'index.html';
-                }
-            });
-        } else {
-            console.warn('Firebase Auth not loaded - using fallback authentication');
+            // Try to re-authenticate with Firebase
+            if (!currentUser.firebaseAuth) {
+                console.log('User needs Firebase authentication');
+                reauthenticateWithFirebase(currentUser.email, savedPassword);
+            }
+        } catch (error) {
+            console.error('Error parsing saved user:', error);
+            clearAuthData();
         }
-        
-        // Add emergency reset button for development
-        addEmergencyReset();
-    }, 1000);
-});
-
-// ============ NEW: AUTO-CREATE FIREBASE ACCOUNT FUNCTION ============
-async function ensureFirebaseAccount(email, password, employeeName) {
-    console.log(`Ensuring Firebase account for: ${email}`);
-    
-    if (!window.auth) {
-        console.warn('Firebase Auth not available');
-        return null;
     }
-    
+}
+
+// Re-authenticate with Firebase using saved credentials
+async function reauthenticateWithFirebase(email, password) {
     try {
-        // First, try to sign in (in case account already exists)
-        console.log('Attempting sign in...');
+        console.log('Re-authenticating with Firebase:', email);
+        
+        // Sign in with Firebase
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        console.log('✅ Firebase sign in successful');
-        return userCredential.user;
+        const firebaseUser = userCredential.user;
         
-    } catch (signInError) {
-        console.log('Sign in failed:', signInError.code);
+        console.log('Firebase re-authentication successful');
         
-        // If user not found, create account
-        if (signInError.code === 'auth/user-not-found') {
-            console.log('Creating new Firebase account...');
-            try {
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                const user = userCredential.user;
-                
-                // Set display name
-                if (employeeName) {
-                    await user.updateProfile({
-                        displayName: employeeName
-                    });
-                    console.log('✅ Display name set');
-                }
-                
-                console.log('✅ Firebase account created:', user.email);
-                return user;
-                
-            } catch (createError) {
-                console.error('Account creation failed:', createError.code, createError.message);
-                
-                // If email already in use (race condition), try sign in again
-                if (createError.code === 'auth/email-already-in-use') {
-                    console.log('Email already in use, retrying sign in...');
-                    try {
-                        const retryCredential = await auth.signInWithEmailAndPassword(email, password);
-                        return retryCredential.user;
-                    } catch (retryError) {
-                        console.error('Retry failed:', retryError.message);
-                    }
-                }
-                
-                return null;
-            }
+        // Update user object with Firebase auth info
+        currentUser = {
+            ...currentUser,
+            uid: firebaseUser.uid,
+            firebaseAuth: true,
+            password: password // Store password for future use
+        };
+        
+        // Save updated user
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        localStorage.setItem('userPassword', password);
+        
+        // Update UI
+        showDashboard();
+        
+    } catch (error) {
+        console.error('Firebase re-authentication failed:', error);
+        
+        // If user doesn't exist in Firebase, create account
+        if (error.code === 'auth/user-not-found') {
+            console.log('Creating Firebase account for existing user');
+            await createFirebaseAccount(email, password);
+        } else {
+            // For other errors, show login page
+            showLogin();
         }
-        
-        // Other errors (wrong password, etc.)
-        console.error('Sign in error:', signInError.message);
-        return null;
     }
 }
-// ============ END OF NEW FUNCTION ============
 
-// Handle login form submission with Firebase
-document.getElementById('login-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const email = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
-    const employeeName = document.getElementById('employee-name-auth').value.trim();
-    
-    if (!email || !password) {
-        showAuthNotification('Please enter both email and password', 'error');
-        return;
+// Setup event listeners
+function setupEventListeners() {
+    // Login form submission
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            await handleLogin(email, password);
+        });
     }
     
-    // Show loading state
-    const submitBtn = this.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.textContent = 'Signing in...';
-    submitBtn.disabled = true;
+    // Signup form submission
+    if (signupForm) {
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            await handleSignup(email, password);
+        });
+    }
     
+    // Navigation links
+    if (loginLink) {
+        loginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            showLogin();
+        });
+    }
+    
+    if (signupLink) {
+        signupLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            showSignup();
+        });
+    }
+    
+    // Logout button
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
+    }
+}
+
+// Handle login
+async function handleLogin(email, password) {
     try {
-        if (window.auth) {
-            // ============ UPDATED: Use ensureFirebaseAccount ============
-            const firebaseUser = await ensureFirebaseAccount(email, password, employeeName);
+        clearError();
+        console.log('Attempting login for:', email);
+        
+        // First, try Firebase authentication
+        let firebaseUser = null;
+        try {
+            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            firebaseUser = userCredential.user;
+            console.log('Firebase login successful');
+        } catch (firebaseError) {
+            console.log('Firebase login failed, checking local auth...');
             
-            if (!firebaseUser) {
-                throw new Error('Firebase authentication failed');
-            }
-            
-            console.log('Firebase login/creation successful:', firebaseUser.email);
-            // ============ END OF UPDATE ============
-            
-            // Store user info WITH PASSWORD
-            const currentUser = {
-                username: firebaseUser.email,
-                employeeName: employeeName || firebaseUser.displayName || firebaseUser.email.split('@')[0],
-                password: password,  // CRITICAL: Store the password
-                uid: firebaseUser.uid,
-                firebaseAuthenticated: true
-            };
-            
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            
-            // Also save to localStorage users for fallback
-            const users = JSON.parse(localStorage.getItem('users') || '{}');
-            users[email] = {
-                email: email,
-                password: password,  // Store password here too
-                employeeName: employeeName || firebaseUser.displayName || email.split('@')[0],
-                uid: firebaseUser.uid,
-                firebase: true,
-                lastLogin: new Date().toISOString()
-            };
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            // Create initial Firestore document if needed
-            if (window.firestore) {
-                try {
-                    const userDoc = await firestore.collection('userData').doc(email).get();
-                    if (!userDoc.exists) {
-                        await firestore.collection('userData').doc(email).set({
-                            userId: email,
-                            data: '{}',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            displayName: employeeName || firebaseUser.displayName || email.split('@')[0],
-                            lastUpdated: new Date().toISOString()
-                        });
-                        console.log('Initial Firestore document created');
-                    }
-                } catch (firestoreError) {
-                    console.warn('Could not create/check Firestore document:', firestoreError);
+            // Check if this is a known local user
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                const localUser = JSON.parse(savedUser);
+                if (localUser.email === email) {
+                    // This is a local user without Firebase account
+                    console.log('Found local user, creating Firebase account...');
+                    await createFirebaseAccount(email, password);
+                } else {
+                    throw new Error('Invalid credentials');
                 }
+            } else {
+                throw new Error('Invalid credentials');
             }
-            
-            showAuthNotification('Login successful! Redirecting...', 'success');
-            
-            // Redirect after delay
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 1500);
-            
-        } else {
-            // Firebase not available - fallback to localStorage
-            console.warn('Firebase not available, using localStorage fallback');
-            fallbackLocalStorageLogin(email, password, employeeName);
         }
+        
+        // Create or update user object
+        currentUser = {
+            email: email,
+            password: password, // Store password
+            uid: firebaseUser ? firebaseUser.uid : await getFirebaseUid(email),
+            firebaseAuth: true,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Save user data
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userPassword', password); // CRITICAL: Save password
+        
+        console.log('Login successful:', currentUser);
+        showDashboard();
         
     } catch (error) {
         console.error('Login error:', error);
-        
-        let errorMessage = 'Login failed';
-        
-        switch (error.code) {
-            case 'auth/user-not-found':
-                errorMessage = 'No account found with this email';
-                break;
-            case 'auth/wrong-password':
-                errorMessage = 'Incorrect password';
-                break;
-            case 'auth/invalid-email':
-                errorMessage = 'Invalid email address';
-                break;
-            case 'auth/user-disabled':
-                errorMessage = 'Account disabled';
-                break;
-            case 'auth/too-many-requests':
-                errorMessage = 'Too many failed attempts. Try again later';
-                break;
-            default:
-                errorMessage = error.message || 'Login failed';
-        }
-        
-        // Try fallback
-        const fallbackSuccess = fallbackLocalStorageLogin(email, password, employeeName);
-        if (!fallbackSuccess) {
-            showAuthNotification(errorMessage, 'error');
-        }
-        
-    } finally {
-        // Reset button
-        submitBtn.textContent = originalText;
-        submitBtn.disabled = false;
+        showError(error.message);
     }
-});
+}
 
-// Fallback localStorage login
-function fallbackLocalStorageLogin(email, password, employeeName) {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    
-    if (users[email] && users[email].password === password) {
-        // Successful login
-        const currentUser = {
-            username: email,
-            employeeName: employeeName || users[email].employeeName || email.split('@')[0],
-            password: password,  // Store the password
-            uid: users[email].uid || 'local_' + Date.now()
+// Handle signup
+async function handleSignup(email, password) {
+    try {
+        clearError();
+        console.log('Attempting signup for:', email);
+        
+        // Create Firebase account
+        await createFirebaseAccount(email, password);
+        
+        // Create user object
+        currentUser = {
+            email: email,
+            password: password, // Store password
+            uid: await getFirebaseUid(email),
+            firebaseAuth: true,
+            timestamp: new Date().toISOString()
         };
         
+        // Save user data
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        showAuthNotification('Login successful! (Local storage)', 'success');
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userPassword', password); // CRITICAL: Save password
         
-        setTimeout(() => {
-            window.location.href = 'index.html';
-        }, 1500);
+        console.log('Signup successful:', currentUser);
+        showDashboard();
         
-        return true;
+    } catch (error) {
+        console.error('Signup error:', error);
+        showError(error.message);
     }
-    
-    showAuthNotification('Invalid credentials', 'error');
-    return false;
 }
 
-// Handle registration with Firebase
-document.getElementById('register-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const email = document.getElementById('new-username').value.trim();
-    const password = document.getElementById('new-password').value;
-    const confirmPassword = document.getElementById('confirm-password').value;
-    const employeeName = document.getElementById('new-employee-name').value.trim();
-    
-    // Validation
-    if (!email || !email.includes('@')) {
-        showAuthNotification('Please enter a valid email address', 'error');
-        return;
-    }
-    
-    if (password !== confirmPassword) {
-        showAuthNotification('Passwords do not match', 'error');
-        return;
-    }
-    
-    if (password.length < 6) {
-        showAuthNotification('Password must be at least 6 characters long', 'error');
-        return;
-    }
-    
-    if (!employeeName) {
-        showAuthNotification('Please enter your name', 'error');
-        return;
-    }
-    
-    // Show loading state
-    const submitBtn = this.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.textContent = 'Creating account...';
-    submitBtn.disabled = true;
-    
+// Create Firebase account
+async function createFirebaseAccount(email, password) {
     try {
-        if (window.auth) {
-            // ============ UPDATED: Use ensureFirebaseAccount ============
-            const firebaseUser = await ensureFirebaseAccount(email, password, employeeName);
-            
-            if (!firebaseUser) {
-                throw new Error('Firebase account creation failed');
-            }
-            // ============ END OF UPDATE ============
-            
-            // Also save to localStorage for fallback
-            const users = JSON.parse(localStorage.getItem('users') || '{}');
-            users[email] = {
-                email: email,
-                password: password,
-                employeeName: employeeName,
-                createdAt: new Date().toISOString(),
+        console.log('Creating Firebase account for:', email);
+        
+        // Create user in Firebase Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        console.log('Firebase account created successfully');
+        
+        // Create user document in Firestore
+        await db.collection('users').doc(userCredential.user.uid).set({
+            email: email,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            localDataMigrated: false
+        });
+        
+        console.log('Firestore user document created');
+        
+    } catch (error) {
+        console.error('Firebase account creation error:', error);
+        
+        // If user already exists, just sign in
+        if (error.code === 'auth/email-already-in-use') {
+            console.log('User already exists, signing in...');
+            await auth.signInWithEmailAndPassword(email, password);
+        } else {
+            throw error;
+        }
+    }
+}
+
+// Get Firebase UID for email
+async function getFirebaseUid(email) {
+    try {
+        // Try to get current user's UID
+        const user = auth.currentUser;
+        if (user && user.email === email) {
+            return user.uid;
+        }
+        
+        // If not available, we need to sign in
+        console.log('Getting UID for email:', email);
+        const password = localStorage.getItem('userPassword');
+        if (password) {
+            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            return userCredential.user.uid;
+        }
+        
+        throw new Error('Cannot retrieve UID');
+        
+    } catch (error) {
+        console.error('Error getting UID:', error);
+        return null;
+    }
+}
+
+// Handle Firebase auth state changes
+function handleAuthStateChange(firebaseUser) {
+    if (firebaseUser) {
+        console.log('Firebase user state changed:', firebaseUser.email);
+        
+        // Update current user with Firebase info
+        if (currentUser) {
+            currentUser = {
+                ...currentUser,
                 uid: firebaseUser.uid,
-                firebase: true
+                firebaseAuth: true
             };
             
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            // Store current user info
-            const currentUser = {
-                username: email,
-                employeeName: employeeName,
-                password: password,  // Store the password
-                uid: firebaseUser.uid,
-                firebaseAuthenticated: true
-            };
-            
+            // Save updated user
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            
-            // Create initial user data in Firestore
-            if (window.firestore) {
-                try {
-                    await firestore.collection('userData').doc(email).set({
-                        userId: email,
-                        data: '{}',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        displayName: employeeName,
-                        lastUpdated: new Date().toISOString()
-                    });
-                    console.log('Initial Firestore document created');
-                } catch (firestoreError) {
-                    console.warn('Could not create Firestore document:', firestoreError);
-                }
-            }
-            
-            showAuthNotification('Registration successful!', 'success');
-            
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 1500);
-            
-        } else {
-            // Firebase not available - fallback to localStorage
-            console.warn('Firebase not available, using localStorage fallback');
-            fallbackLocalStorageRegistration(email, password, employeeName);
         }
         
-    } catch (error) {
-        console.error('Registration error:', error);
-        
-        let errorMessage = 'Registration failed';
-        
-        switch (error.code) {
-            case 'auth/email-already-in-use':
-                errorMessage = 'Email already registered';
-                break;
-            case 'auth/invalid-email':
-                errorMessage = 'Invalid email address';
-                break;
-            case 'auth/weak-password':
-                errorMessage = 'Password is too weak';
-                break;
-            case 'auth/operation-not-allowed':
-                errorMessage = 'Registration is currently disabled';
-                break;
-            default:
-                errorMessage = error.message || 'Registration failed';
+        // Ensure password is saved
+        const savedPassword = localStorage.getItem('userPassword');
+        if (!savedPassword && currentUser && currentUser.password) {
+            localStorage.setItem('userPassword', currentUser.password);
         }
         
-        // Try fallback
-        const fallbackSuccess = fallbackLocalStorageRegistration(email, password, employeeName);
-        if (!fallbackSuccess) {
-            showAuthNotification(errorMessage, 'error');
-        }
-        
-    } finally {
-        // Reset button
-        submitBtn.textContent = originalText;
-        submitBtn.disabled = false;
+    } else {
+        console.log('Firebase user signed out');
     }
-});
-
-// Fallback localStorage registration
-function fallbackLocalStorageRegistration(email, password, employeeName) {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    
-    if (users[email]) {
-        showAuthNotification('Email already registered in local storage', 'error');
-        return false;
-    }
-    
-    users[email] = {
-        email: email,
-        password: password,
-        employeeName: employeeName,
-        createdAt: new Date().toISOString(),
-        uid: 'local_' + Date.now()
-    };
-    
-    localStorage.setItem('users', JSON.stringify(users));
-    
-    const currentUser = {
-        username: email,
-        employeeName: employeeName,
-        password: password,
-        uid: users[email].uid
-    };
-    
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-    
-    showAuthNotification('Registration successful! (Local storage)', 'success');
-    
-    setTimeout(() => {
-        window.location.href = 'index.html';
-    }, 1500);
-    
-    return true;
 }
 
-// Handle password reset with Firebase
-document.getElementById('reset-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const email = document.getElementById('reset-username').value.trim();
-    const newPassword = document.getElementById('reset-new-password').value;
-    const confirmNewPassword = document.getElementById('reset-confirm-password').value;
-    
-    if (!email || !email.includes('@')) {
-        showAuthNotification('Please enter a valid email address', 'error');
-        return;
-    }
-    
-    if (newPassword !== confirmNewPassword) {
-        showAuthNotification('Passwords do not match', 'error');
-        return;
-    }
-    
-    if (newPassword.length < 6) {
-        showAuthNotification('Password must be at least 6 characters long', 'error');
-        return;
-    }
-    
-    // Show loading state
-    const submitBtn = this.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.textContent = 'Processing...';
-    submitBtn.disabled = true;
-    
+// Handle logout
+async function handleLogout() {
     try {
-        if (window.auth) {
-            // Firebase requires user to be logged in to change password directly
-            // Instead, we'll send a password reset email
-            await auth.sendPasswordResetEmail(email);
-            
-            showAuthNotification('Password reset email sent! Check your inbox.', 'success');
-            
-            // Clear form
-            this.reset();
-            
-            // Return to login after delay
-            setTimeout(() => {
-                showLogin();
-            }, 3000);
-            
+        // Sign out from Firebase
+        await auth.signOut();
+        
+        // Clear local data (but keep email for convenience)
+        const email = localStorage.getItem('userEmail');
+        localStorage.clear();
+        
+        // Restore email for login form
+        if (email) {
+            localStorage.setItem('userEmail', email);
+        }
+        
+        currentUser = null;
+        
+        console.log('Logout successful');
+        
+        // Redirect to auth page if not already there
+        if (!window.location.pathname.includes('auth.html')) {
+            window.location.href = 'auth.html';
         } else {
-            // Fallback to localStorage reset
-            fallbackLocalStoragePasswordReset(email, newPassword);
+            showLogin();
         }
         
     } catch (error) {
-        console.error('Password reset error:', error);
-        
-        let errorMessage = 'Password reset failed';
-        
-        switch (error.code) {
-            case 'auth/user-not-found':
-                errorMessage = 'No account found with this email';
-                break;
-            case 'auth/invalid-email':
-                errorMessage = 'Invalid email address';
-                break;
-            default:
-                errorMessage = error.message || 'Password reset failed';
-        }
-        
-        // Try fallback
-        const fallbackSuccess = fallbackLocalStoragePasswordReset(email, newPassword);
-        if (!fallbackSuccess) {
-            showAuthNotification(errorMessage, 'error');
-        }
-        
-    } finally {
-        // Reset button
-        submitBtn.textContent = originalText;
-        submitBtn.disabled = false;
+        console.error('Logout error:', error);
     }
-});
-
-// Fallback localStorage password reset
-function fallbackLocalStoragePasswordReset(email, newPassword) {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    
-    if (!users[email]) {
-        showAuthNotification('Email not found in local storage', 'error');
-        return false;
-    }
-    
-    users[email].password = newPassword;
-    users[email].passwordResetAt = new Date().toISOString();
-    
-    localStorage.setItem('users', JSON.stringify(users));
-    
-    showAuthNotification('Password reset successful! (Local storage)', 'success');
-    
-    setTimeout(() => {
-        showLogin();
-    }, 2000);
-    
-    return true;
 }
 
-// Notification function for auth pages
-function showAuthNotification(message, type = 'info') {
-    // Remove any existing notifications
-    const existingNotifications = document.querySelectorAll('.auth-notification');
-    existingNotifications.forEach(notification => notification.remove());
-    
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `auth-notification ${type}`;
-    notification.textContent = message;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#f44336' : 
-                     type === 'success' ? '#4CAF50' : 
-                     type === 'warning' ? '#FF9800' : '#2196F3'};
-        color: white;
-        padding: 15px 20px;
-        border-radius: 5px;
-        z-index: 10000;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        max-width: 400px;
-        animation: slideIn 0.3s ease-out;
-    `;
-    
-    // Add animation
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-    `;
-    document.head.appendChild(style);
-    
-    document.body.appendChild(notification);
-    
-    // Remove after 5 seconds
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.style.animation = 'slideOut 0.3s ease-out';
-            setTimeout(() => notification.remove(), 300);
-        }
-    }, 5000);
+// Clear authentication data
+function clearAuthData() {
+    currentUser = null;
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('userPassword');
+    console.log('Authentication data cleared');
 }
 
-// Emergency reset function for development
-function addEmergencyReset() {
-    // Only add in development (localhost)
-    if (!window.location.hostname.includes('localhost') && 
-        !window.location.hostname.includes('127.0.0.1') &&
-        !window.location.hostname.includes('0.0.0.0')) {
-        return;
+// Show dashboard
+function showDashboard() {
+    if (authContainer) authContainer.style.display = 'none';
+    if (dashboard) {
+        dashboard.style.display = 'block';
+        if (userEmailSpan && currentUser) {
+            userEmailSpan.textContent = currentUser.email;
+        }
     }
     
-    const emergencyReset = document.createElement('button');
-    emergencyReset.textContent = 'Emergency Reset';
-    emergencyReset.title = 'Clear all data (development only)';
-    emergencyReset.style.cssText = `
-        position: fixed;
-        bottom: 10px;
-        right: 10px;
-        background: #ff4444;
-        color: white;
-        border: none;
-        padding: 8px 12px;
-        border-radius: 5px;
-        font-size: 12px;
-        cursor: pointer;
-        z-index: 10000;
-        opacity: 0.7;
-        transition: opacity 0.3s;
-        font-family: Arial, sans-serif;
-    `;
-    
-    emergencyReset.onmouseenter = () => emergencyReset.style.opacity = '1';
-    emergencyReset.onmouseleave = () => emergencyReset.style.opacity = '0.7';
-    
-    emergencyReset.onclick = async function() {
-        if (confirm('WARNING: This will clear ALL local data including forms, users, and settings. Continue?')) {
-            try {
-                // Sign out from Firebase if signed in
-                if (window.auth) {
-                    await auth.signOut();
-                }
-                
-                // Clear localStorage (but keep Firebase config)
-                const firebaseConfig = localStorage.getItem('firebaseConfig');
-                localStorage.clear();
-                
-                if (firebaseConfig) {
-                    localStorage.setItem('firebaseConfig', firebaseConfig);
-                }
-                
-                // Clear IndexedDB if exists
-                if (window.indexedDB) {
-                    const databases = await indexedDB.databases();
-                    databases.forEach(db => {
-                        if (db.name) {
-                            indexedDB.deleteDatabase(db.name);
-                        }
-                    });
-                }
-                
-                showAuthNotification('All data cleared. Reloading...', 'success');
-                
-                setTimeout(() => {
-                    location.reload();
-                }, 1500);
-                
-            } catch (error) {
-                console.error('Emergency reset error:', error);
-                showAuthNotification('Reset partially failed', 'error');
-            }
-        }
-    };
-    
-    document.body.appendChild(emergencyReset);
+    // Dispatch auth success event for other modules
+    window.dispatchEvent(new CustomEvent('auth-success', { 
+        detail: { user: currentUser }
+    }));
 }
 
-// Export functions
-window.showAuthNotification = showAuthNotification;
-window.ensureFirebaseAccount = ensureFirebaseAccount;  // Export for debugging
+// Show login form
+function showLogin() {
+    if (authContainer) authContainer.style.display = 'block';
+    if (dashboard) dashboard.style.display = 'none';
+    
+    const loginSection = document.getElementById('login-section');
+    const signupSection = document.getElementById('signup-section');
+    
+    if (loginSection) loginSection.style.display = 'block';
+    if (signupSection) signupSection.style.display = 'none';
+    
+    // Pre-fill email if available
+    const savedEmail = localStorage.getItem('userEmail');
+    const loginEmailInput = document.getElementById('login-email');
+    if (loginEmailInput && savedEmail) {
+        loginEmailInput.value = savedEmail;
+    }
+}
+
+// Show signup form
+function showSignup() {
+    const loginSection = document.getElementById('login-section');
+    const signupSection = document.getElementById('signup-section');
+    
+    if (loginSection) loginSection.style.display = 'none';
+    if (signupSection) signupSection.style.display = 'block';
+}
+
+// Show error message
+function showError(message) {
+    if (authError) {
+        authError.textContent = message;
+        authError.style.display = 'block';
+    }
+}
+
+// Clear error message
+function clearError() {
+    if (authError) {
+        authError.textContent = '';
+        authError.style.display = 'none';
+    }
+}
+
+// Get current user
+function getCurrentUser() {
+    return currentUser;
+}
+
+// Check if user is authenticated
+function isAuthenticated() {
+    return currentUser !== null && currentUser.firebaseAuth === true;
+}
+
+// Initialize on load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAuth);
+} else {
+    initAuth();
+}
+
+// Export functions for use in other files
+window.authModule = {
+    getCurrentUser,
+    isAuthenticated,
+    handleLogout,
+    reauthenticateWithFirebase,
+    getFirebaseUid
+};
