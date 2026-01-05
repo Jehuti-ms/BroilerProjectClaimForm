@@ -1,17 +1,24 @@
 // firebase-config.js - COMPLETE FIREBASE CONFIGURATION
-// At the top of firebase-config.js, add:
-let firebaseInitialized = false;
+// Add at the top of firebase-config.js
+let isFirestoreInitialized = false;
 
-// Then wrap your initialization in:
-if (!firebaseInitialized) {
-    try {
-        // Your existing initialization code...
-        firebaseInitialized = true;
-    } catch (error) {
-        console.error('Firebase init error:', error);
+// In setupOfflinePersistence function, add check:
+function setupOfflinePersistence() {
+    if (isFirestoreInitialized) {
+        console.log('Firestore already initialized, skipping persistence setup');
+        return Promise.resolve();
     }
+    
+    return firestore.enablePersistence()
+        .then(() => {
+            isFirestoreInitialized = true;
+            console.log('📱 Firebase offline persistence enabled');
+        })
+        .catch((err) => {
+            console.warn('⚠️ Offline persistence failed:', err.code);
+            // Continue anyway
+        });
 }
-
 const firebaseConfig = {
     // ⚠️ REPLACE THESE WITH YOUR ACTUAL FIREBASE CONFIG VALUES
      apiKey: "AIzaSyAagSPJW2RxyG28Og54ftYd8MGvPPKO_SE",
