@@ -11,6 +11,7 @@ if (!firebaseInitialized) {
         console.error('Firebase init error:', error);
     }
 }
+
 const firebaseConfig = {
     // ⚠️ REPLACE THESE WITH YOUR ACTUAL FIREBASE CONFIG VALUES
      apiKey: "AIzaSyAagSPJW2RxyG28Og54ftYd8MGvPPKO_SE",
