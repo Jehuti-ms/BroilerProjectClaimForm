@@ -1,4 +1,4 @@
-// sync.js - Complete Firebase Synchronization
+// sync.js - Complete Firebase Synchronization (FIXED VERSION)
 
 // Cloud Sync Configuration
 const SYNC_CONFIG = {
@@ -418,12 +418,56 @@ async function getCurrentFirebaseUser() {
     });
 }
 
-// Test Firebase connection
+// Test Firebase connection - FIXED VERSION (no recursion)
 async function testFirebaseConnection() {
+    console.log('Testing Firebase connection from sync.js...');
+    
+    // Use the testFirebaseConnection from firebase-config.js if available
     if (typeof window.testFirebaseConnection === 'function') {
-        return window.testFirebaseConnection();
+        console.log('Using firebase-config.js test function');
+        return await window.testFirebaseConnection();
     }
-    return false;
+    
+    // Fallback test if firebase-config.js function not available
+    if (!firestore) {
+        console.error('Firestore not available for testing');
+        return false;
+    }
+    
+    try {
+        console.log('Running basic Firebase test...');
+        
+        // Create a unique test document ID
+        const testId = 'test_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const testRef = firestore.collection('connectionTests').doc(testId);
+        
+        // Test write operation
+        await testRef.set({
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            test: 'connection_test_from_syncjs',
+            testId: testId
+        });
+        
+        console.log('✅ Basic Firebase write test successful');
+        
+        // Test read operation
+        const docSnapshot = await testRef.get();
+        if (!docSnapshot.exists) {
+            throw new Error('Test document not found after write');
+        }
+        
+        console.log('✅ Basic Firebase read test successful');
+        
+        // Clean up test document
+        await testRef.delete();
+        console.log('✅ Basic Firebase cleanup successful');
+        
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Basic Firebase connection test failed:', error);
+        return false;
+    }
 }
 
 // Debug function
