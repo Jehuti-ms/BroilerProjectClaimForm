@@ -1,8 +1,9 @@
-// app.js - FIXED VERSION
+// app.js - COMPLETE FIXED VERSION
 
 // Global variables
 let currentEditingRow = null;
 let currentFormData = [];
+let isOnline = navigator.onLine; // Track online status
 const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
@@ -11,6 +12,9 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
     initAutoSyncCheckbox();
+    setupEventListeners();
+    setupEmployeeNameMemory();
+    setupNetworkMonitoring();
     
     // Add event listener for auto-sync checkbox
     const autoSyncCheckbox = document.getElementById('auto-sync');
@@ -34,9 +38,15 @@ function checkAuthentication() {
         const user = JSON.parse(currentUser);
         console.log('User authenticated:', user);
         
+        // Set global currentUser
+        window.currentUser = user;
+        
         // Update user display - handle both old and new formats
         const displayName = user.employeeName || user.email || 'User';
-        document.getElementById('user-display').textContent = `Welcome, ${displayName}`;
+        const userDisplay = document.getElementById('user-display');
+        if (userDisplay) {
+            userDisplay.textContent = `Welcome, ${displayName}`;
+        }
         
         // Set employee name in form
         const employeeNameInput = document.getElementById('employee-name');
@@ -48,7 +58,7 @@ function checkAuthentication() {
         initializeApp();
         
         // Load user data
-        const username = user.username || user.email?.split('@')[0] || 'default';
+        const username = user.username || (user.email ? user.email.split('@')[0] : 'default');
         loadUserData(username);
         
     } catch (error) {
@@ -64,8 +74,11 @@ function initializeApp() {
     const lastYear = localStorage.getItem('lastViewedYear');
     
     if (lastMonth !== null && lastYear !== null) {
-        document.getElementById('month-select').value = lastMonth;
-        document.getElementById('year-input').value = lastYear;
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        
+        if (monthSelect) monthSelect.value = lastMonth;
+        if (yearInput) yearInput.value = lastYear;
     }
     
     // Add event listeners for date controls
@@ -78,10 +91,9 @@ function initializeApp() {
             saveCurrentMonth();
             
             // Load data for the new month
-            const currentUser = localStorage.getItem('currentUser');
-            if (currentUser) {
-                const user = JSON.parse(currentUser);
-                const username = user.username || user.email?.split('@')[0] || 'default';
+            if (window.currentUser) {
+                const username = window.currentUser.username || 
+                               (window.currentUser.email ? window.currentUser.email.split('@')[0] : 'default');
                 loadUserData(username);
             }
         });
@@ -93,31 +105,44 @@ function initializeApp() {
             saveCurrentMonth();
             
             // Load data for the new month/year
-            const currentUser = localStorage.getItem('currentUser');
-            if (currentUser) {
-                const user = JSON.parse(currentUser);
-                const username = user.username || user.email?.split('@')[0] || 'default';
+            if (window.currentUser) {
+                const username = window.currentUser.username || 
+                               (window.currentUser.email ? window.currentUser.email.split('@')[0] : 'default');
                 loadUserData(username);
             }
         });
     }
     
     updateFormDate();
+    calculateTotal(); // Initial calculation
 }
 
 function saveCurrentMonth() {
-    const month = document.getElementById('month-select').value;
-    const year = document.getElementById('year-input').value;
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
     
-    localStorage.setItem('lastViewedMonth', month);
-    localStorage.setItem('lastViewedYear', year);
+    if (monthSelect && yearInput) {
+        const month = monthSelect.value;
+        const year = yearInput.value;
+        
+        localStorage.setItem('lastViewedMonth', month);
+        localStorage.setItem('lastViewedYear', year);
+    }
 }
 
 function updateFormDate() {
-    const month = document.getElementById('month-select').value;
-    const year = document.getElementById('year-input').value;
-    document.getElementById('form-date').textContent = `${monthNames[month]} ${year}`;
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    const formDate = document.getElementById('form-date');
+    
+    if (monthSelect && yearInput && formDate) {
+        const month = monthSelect.value;
+        const year = yearInput.value;
+        formDate.textContent = `${monthNames[month]} ${year}`;
+    }
 }
+
+// ==================== DATA LOADING ====================
 
 function loadUserData(userId) {
     console.log('Loading data for user:', userId);
@@ -131,13 +156,20 @@ function loadCurrentUserData() {
     }
     
     const userId = window.currentUser.email;
-    const month = parseInt(document.getElementById('month-select').value);
-    const year = document.getElementById('year-input').value;
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (!monthSelect || !yearInput) return;
+    
+    const month = parseInt(monthSelect.value);
+    const year = yearInput.value;
     const monthYear = `${month}-${year}`;
     
     const userData = localStorage.getItem(`userData_${userId}`);
     
     const tableBody = document.querySelector('#time-table tbody');
+    if (!tableBody) return;
+    
     tableBody.innerHTML = '';
     currentFormData = [];
     
@@ -164,8 +196,13 @@ function saveUserData() {
     }
     
     const userId = window.currentUser.email;
-    const month = parseInt(document.getElementById('month-select').value);
-    const year = document.getElementById('year-input').value;
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (!monthSelect || !yearInput) return;
+    
+    const month = parseInt(monthSelect.value);
+    const year = yearInput.value;
     const monthYear = `${month}-${year}`;
     
     // Get existing user data
@@ -191,135 +228,12 @@ function saveUserData() {
     showNotification('Form data saved successfully!', 'success');
 }
 
-// ==================== IMPORT/EXPORT INTEGRATION ====================
-
-function importData() {
-    console.log('📁 Import button clicked');
-    
-    if (!window.currentUser) {
-        alert('Please login first!');
-        window.location.href = 'auth.html';
-        return;
-    }
-    
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json,.csv';
-    fileInput.style.display = 'none';
-    
-    fileInput.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        
-        reader.onload = async (event) => {
-            try {
-                const content = event.target.result;
-                const fileName = file.name.toLowerCase();
-                
-                let data;
-                if (fileName.endsWith('.json')) {
-                    data = JSON.parse(content);
-                    console.log('📊 JSON imported:', data.length, 'items');
-                } else if (fileName.endsWith('.csv')) {
-                    data = parseCSV(content);
-                    console.log('📋 CSV imported:', data.length, 'rows');
-                } else {
-                    alert('Please select .json or .csv file');
-                    return;
-                }
-                
-                // Save imported data
-                await saveImportedData(data);
-                
-                alert(`✅ Successfully imported ${data.length} items`);
-                
-                // Refresh display
-                loadCurrentUserData();
-                
-            } catch (error) {
-                console.error('Import error:', error);
-                alert(`❌ Import failed: ${error.message}`);
-            }
-        };
-        
-        reader.readAsText(file);
-    };
-    
-    document.body.appendChild(fileInput);
-    fileInput.click();
-    document.body.removeChild(fileInput);
-}
-
-function parseCSV(csvText) {
-    const lines = csvText.split('\n').filter(line => line.trim());
-    if (lines.length < 2) return [];
-    
-    const headers = lines[0].split(',').map(h => h.trim());
-    const data = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        const row = {};
-        
-        headers.forEach((header, index) => {
-            row[header] = values[index] || '';
-        });
-        
-        data.push(row);
-    }
-    
-    return data;
-}
-
-async function saveImportedData(data) {
-    if (!window.currentUser) return;
-    
-    console.log('💾 Saving imported data for user:', window.currentUser.email);
-    
-    // Add metadata to imported data
-    const dataWithMeta = data.map(item => ({
-        ...item,
-        importedBy: window.currentUser.email,
-        importedAt: new Date().toISOString()
-    }));
-    
-    // Get current data
-    const userId = window.currentUser.email;
-    const existingData = JSON.parse(localStorage.getItem(`userData_${userId}`) || '{}');
-    
-    // Combine data (you might want to merge or replace based on your needs)
-    const month = parseInt(document.getElementById('month-select').value);
-    const year = document.getElementById('year-input').value;
-    const monthYear = `${month}-${year}`;
-    
-    // For now, append to current month's data
-    const currentMonthData = existingData[monthYear] || [];
-    existingData[monthYear] = [...currentMonthData, ...dataWithMeta];
-    
-    // Save to localStorage
-    localStorage.setItem(`userData_${userId}`, JSON.stringify(existingData));
-    
-    console.log('✅ Saved imported data');
-    
-    // Update current form data
-    currentFormData = existingData[monthYear];
-    
-    // Try Firebase sync if available
-    if (window.currentUser.firebaseAuth && typeof syncToCloud === 'function') {
-        try {
-            await syncToCloud();
-        } catch (error) {
-            console.log('Firebase sync optional:', error.message);
-        }
-    }
-}
-
-// ==================== TABLE FUNCTIONS (Keep your existing) ====================
+// ==================== TABLE FUNCTIONS ====================
 
 function addRowToTable(data) {
     const tableBody = document.querySelector('#time-table tbody');
+    if (!tableBody) return;
+    
     const rowIndex = tableBody.children.length;
     
     const newRow = document.createElement('tr');
@@ -338,9 +252,51 @@ function addRowToTable(data) {
     tableBody.appendChild(newRow);
 }
 
+function updateRowInTable(rowIndex, data) {
+    const rows = document.querySelectorAll('#time-table tbody tr');
+    if (rows[rowIndex]) {
+        const row = rows[rowIndex];
+        
+        row.cells[0].textContent = formatDateForDisplay(data.date);
+        row.cells[1].textContent = data.amPm;
+        row.cells[2].textContent = formatTimeDisplay(data.inTime);
+        row.cells[3].textContent = formatTimeDisplay(data.outTime);
+        row.cells[4].textContent = data.hours;
+    }
+}
+
+function deleteRow(rowIndex) {
+    if (confirm('Are you sure you want to delete this entry?')) {
+        const rows = document.querySelectorAll('#time-table tbody tr');
+        if (rows[rowIndex]) {
+            rows[rowIndex].remove();
+            currentFormData.splice(rowIndex, 1);
+            
+            // Update row indices for remaining rows
+            const remainingRows = document.querySelectorAll('#time-table tbody tr');
+            remainingRows.forEach((row, index) => {
+                const buttonsCell = row.cells[5];
+                if (buttonsCell) {
+                    buttonsCell.innerHTML = `
+                        <button class="edit-btn" onclick="openModal(${index})">Edit</button>
+                        <button class="delete-btn" onclick="deleteRow(${index})">Delete</button>
+                    `;
+                }
+            });
+            
+            calculateTotal();
+            saveUserData();
+        }
+    }
+}
+
+// ==================== MODAL FUNCTIONS ====================
+
 function openModal(rowIndex = null) {
     const modal = document.getElementById('entry-modal');
     const modalTitle = document.getElementById('modal-title');
+    
+    if (!modal || !modalTitle) return;
     
     if (rowIndex !== null) {
         modalTitle.textContent = 'Edit Time Entry';
@@ -349,15 +305,17 @@ function openModal(rowIndex = null) {
         const rows = document.querySelectorAll('#time-table tbody tr');
         const row = rows[rowIndex];
         
-        const date = row.cells[0].textContent;
-        const amPm = row.cells[1].textContent;
-        const inTime = convertTo24Hour(row.cells[2].textContent);
-        const outTime = convertTo24Hour(row.cells[3].textContent);
-        
-        document.getElementById('entry-date').value = formatDateForInput(date);
-        document.getElementById('entry-am-pm').value = amPm;
-        document.getElementById('entry-time-in').value = inTime;
-        document.getElementById('entry-time-out').value = outTime;
+        if (row) {
+            const date = row.cells[0].textContent;
+            const amPm = row.cells[1].textContent;
+            const inTime = convertTo24Hour(row.cells[2].textContent);
+            const outTime = convertTo24Hour(row.cells[3].textContent);
+            
+            document.getElementById('entry-date').value = formatDateForInput(date);
+            document.getElementById('entry-am-pm').value = amPm;
+            document.getElementById('entry-time-in').value = inTime;
+            document.getElementById('entry-time-out').value = outTime;
+        }
     } else {
         modalTitle.textContent = 'Add New Time Entry';
         currentEditingRow = null;
@@ -372,15 +330,25 @@ function openModal(rowIndex = null) {
 }
 
 function closeModal() {
-    document.getElementById('entry-modal').style.display = 'none';
-    currentEditingRow = null;
+    const modal = document.getElementById('entry-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        currentEditingRow = null;
+    }
 }
 
 function saveEntry() {
-    const date = document.getElementById('entry-date').value;
-    const amPm = document.getElementById('entry-am-pm').value;
-    const inTime = document.getElementById('entry-time-in').value;
-    const outTime = document.getElementById('entry-time-out').value;
+    const dateInput = document.getElementById('entry-date');
+    const amPmSelect = document.getElementById('entry-am-pm');
+    const inTimeInput = document.getElementById('entry-time-in');
+    const outTimeInput = document.getElementById('entry-time-out');
+    
+    if (!dateInput || !amPmSelect || !inTimeInput || !outTimeInput) return;
+    
+    const date = dateInput.value;
+    const amPm = amPmSelect.value;
+    const inTime = inTimeInput.value;
+    const outTime = outTimeInput.value;
     
     if (!date || !inTime || !outTime) {
         showNotification('Please fill all required fields', 'error');
@@ -423,9 +391,106 @@ function saveEntry() {
     closeModal();
 }
 
-// ... Keep all your existing table helper functions ...
-
 // ==================== UTILITY FUNCTIONS ====================
+
+function calculateTotal() {
+    const rows = document.querySelectorAll('#time-table tbody tr');
+    let totalMinutes = 0;
+    
+    rows.forEach(row => {
+        const hoursText = row.cells[4].textContent;
+        if (hoursText) {
+            const [hours, minutes] = hoursText.split(':').map(Number);
+            totalMinutes += hours * 60 + (minutes || 0);
+        }
+    });
+    
+    const totalHours = Math.floor(totalMinutes / 60);
+    const remainingMinutes = totalMinutes % 60;
+    
+    const totalHoursElement = document.getElementById('total-hours');
+    if (totalHoursElement) {
+        totalHoursElement.textContent = `${totalHours}:${remainingMinutes.toString().padStart(2, '0')}`;
+    }
+}
+
+function formatDateForDisplay(dateString) {
+    if (!dateString) return '';
+    
+    // Handle YYYY-MM-DD format
+    if (dateString.includes('-')) {
+        const [year, month, day] = dateString.split('-');
+        return `${day}/${month}/${year}`;
+    }
+    
+    // Handle DD/MM/YYYY format (already formatted)
+    return dateString;
+}
+
+function formatDateForInput(dateString) {
+    if (!dateString) return '';
+    
+    // Handle DD/MM/YYYY format
+    if (dateString.includes('/')) {
+        const [day, month, year] = dateString.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    
+    // Handle YYYY-MM-DD format (already correct)
+    return dateString;
+}
+
+function formatTimeDisplay(time) {
+    if (!time) return '';
+    
+    // If already formatted (contains AM/PM), return as is
+    if (time.includes('AM') || time.includes('PM')) {
+        return time;
+    }
+    
+    // Convert 24h to 12h format
+    const [hours, minutes] = time.split(':');
+    const hourNum = parseInt(hours);
+    const amPm = hourNum >= 12 ? 'PM' : 'AM';
+    const displayHour = hourNum % 12 || 12;
+    
+    return `${displayHour}:${minutes} ${amPm}`;
+}
+
+function convertTo24Hour(timeString) {
+    if (!timeString) return '';
+    
+    // If already in 24h format (no AM/PM)
+    if (!timeString.includes('AM') && !timeString.includes('PM')) {
+        return timeString;
+    }
+    
+    const [time, modifier] = timeString.split(' ');
+    let [hours, minutes] = time.split(':');
+    
+    if (modifier === 'PM' && hours !== '12') {
+        hours = parseInt(hours, 10) + 12;
+    }
+    if (modifier === 'AM' && hours === '12') {
+        hours = '00';
+    }
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+}
+
+function clearForm() {
+    if (confirm('Are you sure you want to clear all entries for this month?')) {
+        const tableBody = document.querySelector('#time-table tbody');
+        if (tableBody) {
+            tableBody.innerHTML = '';
+            currentFormData = [];
+            calculateTotal();
+            saveUserData();
+        }
+    }
+}
+
+// ==================== SETUP FUNCTIONS ====================
 
 function setupEventListeners() {
     // Employee name input
@@ -434,14 +499,6 @@ function setupEventListeners() {
         employeeNameInput.addEventListener('input', function() {
             localStorage.setItem('mainAppEmployeeName', this.value);
         });
-    }
-    
-    // Auto-sync checkbox
-    const autoSyncCheckbox = document.getElementById('firebase-auto-sync');
-    if (autoSyncCheckbox) {
-        autoSyncCheckbox.addEventListener('change', toggleFirebaseAutoSync);
-        const savedPref = localStorage.getItem('firebaseAutoSyncEnabled');
-        autoSyncCheckbox.checked = savedPref === 'true';
     }
 }
 
@@ -478,25 +535,12 @@ function setupNetworkMonitoring() {
     });
 }
 
-function toggleFirebaseAutoSync() {
-    const checkbox = document.getElementById('firebase-auto-sync');
-    if (checkbox) {
-        const isEnabled = checkbox.checked;
-        localStorage.setItem('firebaseAutoSyncEnabled', isEnabled.toString());
-        
-        if (isEnabled) {
-            showNotification('Firebase auto-sync enabled', 'success');
-        } else {
-            showNotification('Firebase auto-sync disabled', 'info');
-        }
-    }
-}
+// ==================== OTHER FUNCTIONS ====================
 
 function showNotification(message, type = 'info') {
-    // Your existing notification code
     console.log(`${type.toUpperCase()}: ${message}`);
     
-    // Simple alert for now - you can replace with your notification system
+    // Simple notification
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.textContent = message;
@@ -523,24 +567,57 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
+// ==================== AUTO-SYNC FUNCTIONS ====================
+
+function toggleAutoSync() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const isEnabled = checkbox.checked;
+        localStorage.setItem('autoSyncEnabled', isEnabled.toString());
+        
+        if (isEnabled) {
+            showNotification('Auto-sync enabled');
+            if (typeof startAutoSync === 'function') {
+                startAutoSync();
+            }
+        } else {
+            showNotification('Auto-sync disabled');
+            if (typeof stopAutoSync === 'function') {
+                stopAutoSync();
+            }
+        }
+    }
+}
+
+function initAutoSyncCheckbox() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        checkbox.checked = autoSync === 'true';
+    }
+}
+
 // ==================== GLOBAL EXPORTS ====================
 
 // Make functions globally available
-window.importData = importData;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.saveEntry = saveEntry;
 window.deleteRow = deleteRow;
 window.clearForm = clearForm;
 window.saveForm = saveUserData;
-window.generatePDF = generatePDF;
 window.logout = function() {
-    // Use auth.js logout function if available
-    if (window.authModule && window.authModule.handleLogout) {
-        window.authModule.handleLogout();
-    } else {
-        // Fallback logout
-        localStorage.removeItem('currentUser');
-        window.location.href = 'auth.html';
+    // Sign out from Firebase if available
+    if (typeof firebase !== 'undefined' && window.firebaseAuth) {
+        firebaseAuth.signOut();
     }
+    
+    // Clear user data
+    localStorage.removeItem('currentUser');
+    
+    // Redirect to auth page
+    window.location.href = 'auth.html';
 };
+
+// Note: generatePDF and exportData/importData functions would need to be added separately
+// if you want to keep those features
