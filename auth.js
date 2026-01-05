@@ -232,7 +232,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
     }
 });
 
-// Fallback localStorage login
+// Fallback localStorage login - UPDATED
 function fallbackLocalStorageLogin(email, password, employeeName) {
     const users = JSON.parse(localStorage.getItem('users') || '{}');
     
@@ -241,7 +241,9 @@ function fallbackLocalStorageLogin(email, password, employeeName) {
         const currentUser = {
             username: email,
             employeeName: employeeName || users[email].employeeName || email.split('@')[0],
-            uid: users[email].uid || 'local_' + Date.now()
+            password: password,  // ← STORE THE PASSWORD
+            uid: users[email].uid || 'local_' + Date.now(),
+            firebaseAuthenticated: users[email].firebase || false
         };
         
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
@@ -306,6 +308,30 @@ document.getElementById('register-form').addEventListener('submit', async functi
             await user.updateProfile({
                 displayName: employeeName
             });
+
+            // Save to localStorage WITH PASSWORD
+            const users = JSON.parse(localStorage.getItem('users') || '{}');
+            users[email] = {
+                email: email,
+                password: password,  // ← STORE THE PASSWORD
+                employeeName: employeeName,
+                createdAt: new Date().toISOString(),
+                uid: user.uid,
+                firebase: true
+            };
+            
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            // Store current user info WITH PASSWORD
+            const currentUser = {
+                username: email,
+                employeeName: employeeName,
+                password: password,  // ← STORE THE PASSWORD
+                uid: user.uid,
+                firebaseAuthenticated: true
+            };
+            
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
             
             // Also save to localStorage for fallback
             const users = JSON.parse(localStorage.getItem('users') || '{}');
@@ -392,7 +418,7 @@ document.getElementById('register-form').addEventListener('submit', async functi
     }
 });
 
-// Fallback localStorage registration
+// Fallback localStorage registration - UPDATED
 function fallbackLocalStorageRegistration(email, password, employeeName) {
     const users = JSON.parse(localStorage.getItem('users') || '{}');
     
@@ -403,7 +429,7 @@ function fallbackLocalStorageRegistration(email, password, employeeName) {
     
     users[email] = {
         email: email,
-        password: password,
+        password: password,  // ← STORE THE PASSWORD
         employeeName: employeeName,
         createdAt: new Date().toISOString(),
         uid: 'local_' + Date.now()
@@ -414,6 +440,7 @@ function fallbackLocalStorageRegistration(email, password, employeeName) {
     const currentUser = {
         username: email,
         employeeName: employeeName,
+        password: password,  // ← STORE THE PASSWORD
         uid: users[email].uid
     };
     
