@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setupAuthListener();
         
         // Test connection after a brief delay
-        setTimeout(() => {
+       /* setTimeout(() => {
             testFirebaseConnection().then(success => {
                 if (success) {
                     console.log('✅ Firebase fully operational');
@@ -63,14 +63,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateFirebaseStatus('connection_error');
                 }
             });
-        }, 1000);
+        }, 1000); */
         
     } catch (error) {
         console.error('❌ Firebase initialization error:', error);
         isFirebaseInitialized = false;
         updateFirebaseStatus('init_error');
     }
-});
+}); 
 
 // Set up offline persistence
 function setupOfflinePersistence() {
