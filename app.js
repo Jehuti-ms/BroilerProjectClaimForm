@@ -74,12 +74,25 @@ function initializeFirebase() {
                 });
             }
             
-            // Test connection
+          // SAFE connection check - NO RECURSION
             setTimeout(() => {
-                if (typeof testFirebaseConnection === 'function') {
-                    testFirebaseConnection().then(success => {
-                        if (success) {
-                            console.log('Firebase connection verified in app.js');
+                console.log('Performing safe Firebase check...');
+                
+                if (window.firestore && window.auth) {
+                    console.log('✅ Firebase services confirmed available');
+                    
+                    // Use our safe check function
+                    checkFirebaseServices().then(isAvailable => {
+                        if (isAvailable) {
+                            console.log('✅ Firebase fully operational');
+                            if (typeof updateFirebaseStatus === 'function') {
+                                updateFirebaseStatus('connected');
+                            }
+                        } else {
+                            console.warn('⚠️ Firebase check failed');
+                            if (typeof updateFirebaseStatus === 'function') {
+                                updateFirebaseStatus('connection_error');
+                            }
                         }
                     });
                 }
