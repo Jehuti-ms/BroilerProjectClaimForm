@@ -1,8 +1,4 @@
-// app.js - Main Application with Firebase Integration
-// Add at the top of app.js
-console.log('=== APP.JS LOADED ===');
-console.log('Current page:', window.location.pathname);
-console.log('User in localStorage:', JSON.parse(localStorage.getItem('currentUser') || '{}'));
+// app.js - FIXED VERSION
 
 // Global variables
 let currentEditingRow = null;
@@ -11,154 +7,58 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
 
-// Firebase state (will be populated from auth.js)
-let firebaseUser = null;
-let isOnline = navigator.onLine;
-
-// ==================== AUTHENTICATION INTEGRATION ====================
-
-// Listen for auth success event from auth.js
-window.addEventListener('auth-success', function(event) {
-    console.log('Auth success event received from auth.js:', event.detail.user.email);
+// Check authentication on page load
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthentication();
+    initAutoSyncCheckbox();
     
-    const userData = event.detail.user;
-    
-    // Set current user
-    window.currentUser = userData;
-    
-    // Store in localStorage for app.js access
-    localStorage.setItem('currentUser', JSON.stringify(userData));
-    
-    // Initialize the app for this user
-    initializeAppForUser(userData);
+    // Add event listener for auto-sync checkbox
+    const autoSyncCheckbox = document.getElementById('auto-sync');
+    if (autoSyncCheckbox) {
+        autoSyncCheckbox.addEventListener('change', toggleAutoSync);
+    }
 });
 
-// Initialize app for authenticated user
-function initializeAppForUser(userData) {
-    console.log('Initializing app for user:', userData.email);
+// Check if user is authenticated - FIXED VERSION
+function checkAuthentication() {
+    const currentUser = localStorage.getItem('currentUser');
     
-    // Update UI
-    updateUserDisplay(userData);
-    
-    // Setup employee name
-    setupEmployeeNameMemory();
-    
-    // Initialize date controls
-    initializeDateControls();
-    
-    // Load user data
-    loadUserData(userData.email);
-    
-    // Setup event listeners
-    setupEventListeners();
-    
-    // Setup network monitoring
-    setupNetworkMonitoring();
-    
-    // Check if we're on auth page and should redirect
-    if (window.location.pathname.includes('auth.html')) {
-        setTimeout(() => {
-            window.location.href = 'index.html';
-        }, 1000);
-    }
-}
-
-// Update user display in UI
-function updateUserDisplay(userData) {
-    const userDisplay = document.getElementById('user-display');
-    const userEmailSpan = document.getElementById('user-email');
-    
-    if (userDisplay) {
-        const displayName = userData.employeeName || userData.email;
-        userDisplay.textContent = `Welcome, ${displayName}`;
-        
-        if (userData.firebaseAuth) {
-            userDisplay.innerHTML += ' <span style="color: #4CAF50; font-size: 0.8em;">(Firebase)</span>';
-        }
-    }
-    
-    if (userEmailSpan) {
-        userEmailSpan.textContent = userData.email;
-    }
-}
-
-// Check if user is authenticated on page load
-// In app.js on index.html, replace the auth check with:
-function checkAuthOnIndexPage() {
-    console.log('Checking auth on index page...');
-    
-    const savedUser = localStorage.getItem('currentUser');
-    
-    if (!savedUser) {
+    // If no user, redirect to auth page
+    if (!currentUser) {
         console.log('No user found, redirecting to auth.html');
         window.location.href = 'auth.html';
-        return false;
+        return; // Exit function
     }
     
     try {
-        const user = JSON.parse(savedUser);
-        console.log('User found:', user.email);
+        const user = JSON.parse(currentUser);
+        console.log('User authenticated:', user);
         
-        // Check if we have basic user data
-        if (!user.email) {
-            console.log('User missing email, redirecting...');
-            window.location.href = 'auth.html';
-            return false;
+        // Update user display - handle both old and new formats
+        const displayName = user.employeeName || user.email || 'User';
+        document.getElementById('user-display').textContent = `Welcome, ${displayName}`;
+        
+        // Set employee name in form
+        const employeeNameInput = document.getElementById('employee-name');
+        if (employeeNameInput) {
+            employeeNameInput.value = user.employeeName || displayName;
         }
         
-        // User is valid - show the app
-        console.log('✅ User authenticated, showing app');
-        return true;
+        // Initialize the app
+        initializeApp();
+        
+        // Load user data
+        const username = user.username || user.email?.split('@')[0] || 'default';
+        loadUserData(username);
         
     } catch (error) {
-        console.error('Error parsing user:', error);
+        console.error('Error parsing user data:', error);
         window.location.href = 'auth.html';
-        return false;
     }
 }
 
-// Call this when index.html loads
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Index page loaded, checking auth...');
-    
-    // Give auth.js time to save user data
-    setTimeout(() => {
-        if (checkAuthOnIndexPage()) {
-            // Initialize your app here
-            console.log('Initializing app...');
-            // Your app initialization code...
-        }
-    }, 500);
-});
-    
-    // No user found - check if we're on auth page
-    if (!window.location.pathname.includes('auth.html')) {
-        console.log('No authenticated user, redirecting to auth page');
-        window.location.href = 'auth.html';
-    }
-    
-    return false;
-}
-
-// ==================== MAIN APP INITIALIZATION ====================
-
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('App.js loading...');
-    
-    // Check authentication first
-    const isAuthenticated = checkAuthOnLoad();
-    
-    if (isAuthenticated) {
-        // App will be initialized by initializeAppForUser
-        console.log('App initialization in progress...');
-    } else {
-        console.log('Waiting for authentication...');
-    }
-});
-
-// ==================== DATA MANAGEMENT ====================
-
-function initializeDateControls() {
+// Initialize the application
+function initializeApp() {
     // Load last viewed month from localStorage
     const lastMonth = localStorage.getItem('lastViewedMonth');
     const lastYear = localStorage.getItem('lastViewedYear');
@@ -169,17 +69,38 @@ function initializeDateControls() {
     }
     
     // Add event listeners for date controls
-    document.getElementById('month-select').addEventListener('change', function() {
-        updateFormDate();
-        saveCurrentMonth();
-        loadCurrentUserData();
-    });
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
     
-    document.getElementById('year-input').addEventListener('change', function() {
-        updateFormDate();
-        saveCurrentMonth();
-        loadCurrentUserData();
-    });
+    if (monthSelect) {
+        monthSelect.addEventListener('change', function() {
+            updateFormDate();
+            saveCurrentMonth();
+            
+            // Load data for the new month
+            const currentUser = localStorage.getItem('currentUser');
+            if (currentUser) {
+                const user = JSON.parse(currentUser);
+                const username = user.username || user.email?.split('@')[0] || 'default';
+                loadUserData(username);
+            }
+        });
+    }
+    
+    if (yearInput) {
+        yearInput.addEventListener('change', function() {
+            updateFormDate();
+            saveCurrentMonth();
+            
+            // Load data for the new month/year
+            const currentUser = localStorage.getItem('currentUser');
+            if (currentUser) {
+                const user = JSON.parse(currentUser);
+                const username = user.username || user.email?.split('@')[0] || 'default';
+                loadUserData(username);
+            }
+        });
+    }
     
     updateFormDate();
 }
