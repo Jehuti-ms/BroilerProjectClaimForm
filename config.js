@@ -1,5 +1,4 @@
-// config.js - SIMPLIFIED VERSION FOR COMPATIBILITY
-
+// config.js - FOR INDEX.HTML ONLY (with Firestore)
 const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAJhRNUgsrvUvjKXXosS6YZLhbHhpBq0Zg",
     authDomain: "broiler-project-e1f62.firebaseapp.com",
@@ -9,36 +8,32 @@ const FIREBASE_CONFIG = {
     appId: "1:1084373471420:web:f60bf8c5db75b9fe4f90c4"
 };
 
-// Simple initialization that waits for Firebase to load
-function initFirebase() {
+// Initialize Firebase with all services
+function initializeFirebase() {
     if (typeof firebase === 'undefined') {
-        console.error('Firebase not loaded yet');
+        console.error('Firebase not loaded');
         return false;
     }
     
     try {
-        // Initialize with compatibility API
         const app = firebase.initializeApp(FIREBASE_CONFIG);
-        
-        // Get services (compatibility API)
         const db = firebase.firestore(app);
         const auth = firebase.auth(app);
         
-        // Make available globally
         window.firebaseApp = app;
         window.firestore = db;
         window.firebaseAuth = auth;
         
-        console.log('✅ Firebase initialized (compat mode)');
+        console.log('✅ Firebase initialized (Firestore + Auth)');
         
-        // Test
-        setTimeout(testFirebaseConnection, 1000);
+        // Test connection
+        testFirebaseConnection();
         
         return true;
     } catch (error) {
         console.error('Firebase init error:', error);
         
-        // If already initialized, just get references
+        // If already initialized, get references
         if (error.code === 'app/duplicate-app') {
             window.firestore = firebase.firestore();
             window.firebaseAuth = firebase.auth();
@@ -50,40 +45,39 @@ function initFirebase() {
     }
 }
 
-// Test connection
+// Test Firestore connection
 async function testFirebaseConnection() {
     if (!window.firestore) {
-        console.log('Firestore not ready');
+        console.log('Firestore not available');
         return;
     }
     
     try {
-        const testRef = firestore.collection('_tests').doc('connection');
+        const testRef = firestore.collection('_connection_tests').doc('firebase_init');
         await testRef.set({
             timestamp: new Date().toISOString(),
-            status: 'connected'
+            status: 'connected',
+            page: 'index.html'
         }, { merge: true });
-        console.log('✅ Firebase connection test passed');
+        console.log('✅ Firestore connection test passed');
     } catch (error) {
-        console.error('❌ Firebase connection test failed:', error);
+        console.error('❌ Firestore test failed:', error);
     }
 }
 
-// Initialize when ready
+// Initialize when DOM loads
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, checking Firebase...');
+    console.log('DOM loaded, initializing Firebase...');
     
-    if (typeof firebase !== 'undefined') {
-        initFirebase();
-    } else {
-        // Wait for Firebase to load
-        const checkInterval = setInterval(() => {
-            if (typeof firebase !== 'undefined') {
-                clearInterval(checkInterval);
-                initFirebase();
-            }
-        }, 100);
+    // Wait a bit for Firebase to load
+    setTimeout(() => {
+        initializeFirebase();
         
-        setTimeout(() => clearInterval(checkInterval), 5000);
-    }
+        // Initialize cloud sync after Firebase is ready
+        setTimeout(() => {
+            if (typeof initCloudSync === 'function') {
+                initCloudSync();
+            }
+        }, 1000);
+    }, 500);
 });
