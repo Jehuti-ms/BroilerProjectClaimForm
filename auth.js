@@ -1,6 +1,6 @@
-// auth.js - Firebase Authentication Version
+// auth.js - Complete Firebase Authentication
 
-// Navigation functions (keep these)
+// Navigation functions
 function showRegister() {
     document.getElementById('login-form').parentElement.style.display = 'none';
     document.getElementById('register-card').style.display = 'block';
@@ -21,29 +21,51 @@ function showReset() {
 
 // Initialize Firebase auth when DOM loads
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Auth.js loading...');
+    
+    // Check if user is already logged in
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        console.log('User already logged in via localStorage, redirecting...');
+        window.location.href = 'index.html';
+        return;
+    }
+    
     // Wait for Firebase to load
     setTimeout(() => {
         if (window.auth) {
-            console.log('Firebase Auth loaded');
+            console.log('Firebase Auth loaded in auth.js');
             
-            // Check if user is already signed in
+            // Check if user is already signed in with Firebase
             auth.onAuthStateChanged((user) => {
                 if (user) {
-                    console.log('User already signed in:', user.email);
-                    // User is signed in, redirect to main app
+                    console.log('Firebase user already signed in:', user.email);
+                    
+                    // Store user info
                     const currentUser = {
                         username: user.email,
                         employeeName: user.displayName || user.email.split('@')[0],
                         uid: user.uid
                     };
+                    
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    
+                    // Also save to localStorage users for fallback
+                    const users = JSON.parse(localStorage.getItem('users') || '{}');
+                    users[user.email] = {
+                        email: user.email,
+                        employeeName: user.displayName || user.email.split('@')[0],
+                        uid: user.uid,
+                        firebase: true
+                    };
+                    localStorage.setItem('users', JSON.stringify(users));
+                    
+                    // Redirect to main app
                     window.location.href = 'index.html';
-                } else {
-                    console.log('No user signed in');
                 }
             });
         } else {
-            console.warn('Firebase Auth not loaded - using fallback');
+            console.warn('Firebase Auth not loaded - using fallback authentication');
         }
         
         // Add emergency reset button for development
@@ -60,7 +82,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
     const employeeName = document.getElementById('employee-name-auth').value.trim();
     
     if (!email || !password) {
-        alert('Please enter both email and password');
+        showAuthNotification('Please enter both email and password', 'error');
         return;
     }
     
@@ -87,15 +109,51 @@ document.getElementById('login-form').addEventListener('submit', async function(
             
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
             
-            // Update display name if provided
+            // Update display name if provided and different
             if (employeeName && (!user.displayName || user.displayName !== employeeName)) {
-                await user.updateProfile({
-                    displayName: employeeName
-                });
+                try {
+                    await user.updateProfile({
+                        displayName: employeeName
+                    });
+                    console.log('Display name updated');
+                } catch (updateError) {
+                    console.warn('Could not update display name:', updateError);
+                }
             }
+            
+            // Also save to localStorage users for fallback
+            const users = JSON.parse(localStorage.getItem('users') || '{}');
+            users[email] = {
+                email: email,
+                password: password, // Note: Storing password in localStorage is insecure
+                employeeName: employeeName || user.displayName || email.split('@')[0],
+                uid: user.uid,
+                firebase: true,
+                lastLogin: new Date().toISOString()
+            };
+            localStorage.setItem('users', JSON.stringify(users));
             
             // Show success message
             showAuthNotification('Login successful! Redirecting...', 'success');
+            
+            // Create initial Firestore document if needed
+            if (window.firestore) {
+                try {
+                    const userDoc = await firestore.collection('userData').doc(email).get();
+                    if (!userDoc.exists) {
+                        await firestore.collection('userData').doc(email).set({
+                            userId: email,
+                            data: '{}',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            displayName: employeeName || user.displayName || email.split('@')[0],
+                            lastUpdated: new Date().toISOString()
+                        });
+                        console.log('Initial Firestore document created');
+                    }
+                } catch (firestoreError) {
+                    console.warn('Could not create/check Firestore document:', firestoreError);
+                }
+            }
             
             // Redirect after delay
             setTimeout(() => {
@@ -169,6 +227,7 @@ function fallbackLocalStorageLogin(email, password, employeeName) {
         return true;
     }
     
+    showAuthNotification('Invalid credentials', 'error');
     return false;
 }
 
@@ -183,22 +242,22 @@ document.getElementById('register-form').addEventListener('submit', async functi
     
     // Validation
     if (!email || !email.includes('@')) {
-        alert('Please enter a valid email address');
+        showAuthNotification('Please enter a valid email address', 'error');
         return;
     }
     
     if (password !== confirmPassword) {
-        alert('Passwords do not match');
+        showAuthNotification('Passwords do not match', 'error');
         return;
     }
     
     if (password.length < 6) {
-        alert('Password must be at least 6 characters long');
+        showAuthNotification('Password must be at least 6 characters long', 'error');
         return;
     }
     
     if (!employeeName) {
-        alert('Please enter your name');
+        showAuthNotification('Please enter your name', 'error');
         return;
     }
     
@@ -224,10 +283,12 @@ document.getElementById('register-form').addEventListener('submit', async functi
             // Also save to localStorage for fallback
             const users = JSON.parse(localStorage.getItem('users') || '{}');
             users[email] = {
+                email: email,
                 password: password,
                 employeeName: employeeName,
                 createdAt: new Date().toISOString(),
-                firebaseUID: user.uid
+                uid: user.uid,
+                firebase: true
             };
             
             localStorage.setItem('users', JSON.stringify(users));
@@ -314,6 +375,7 @@ function fallbackLocalStorageRegistration(email, password, employeeName) {
     }
     
     users[email] = {
+        email: email,
         password: password,
         employeeName: employeeName,
         createdAt: new Date().toISOString(),
@@ -348,17 +410,17 @@ document.getElementById('reset-form').addEventListener('submit', async function(
     const confirmNewPassword = document.getElementById('reset-confirm-password').value;
     
     if (!email || !email.includes('@')) {
-        alert('Please enter a valid email address');
+        showAuthNotification('Please enter a valid email address', 'error');
         return;
     }
     
     if (newPassword !== confirmNewPassword) {
-        alert('Passwords do not match');
+        showAuthNotification('Passwords do not match', 'error');
         return;
     }
     
     if (newPassword.length < 6) {
-        alert('Password must be at least 6 characters long');
+        showAuthNotification('Password must be at least 6 characters long', 'error');
         return;
     }
     
@@ -442,7 +504,7 @@ function fallbackLocalStoragePasswordReset(email, newPassword) {
 }
 
 // Notification function for auth pages
-function showAuthNotification(message, type) {
+function showAuthNotification(message, type = 'info') {
     // Remove any existing notifications
     const existingNotifications = document.querySelectorAll('.auth-notification');
     existingNotifications.forEach(notification => notification.remove());
@@ -455,7 +517,9 @@ function showAuthNotification(message, type) {
         position: fixed;
         top: 20px;
         right: 20px;
-        background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4CAF50' : '#2196F3'};
+        background: ${type === 'error' ? '#f44336' : 
+                     type === 'success' ? '#4CAF50' : 
+                     type === 'warning' ? '#FF9800' : '#2196F3'};
         color: white;
         padding: 15px 20px;
         border-radius: 5px;
@@ -471,6 +535,10 @@ function showAuthNotification(message, type) {
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
         }
     `;
     document.head.appendChild(style);
@@ -490,12 +558,14 @@ function showAuthNotification(message, type) {
 function addEmergencyReset() {
     // Only add in development (localhost)
     if (!window.location.hostname.includes('localhost') && 
-        !window.location.hostname.includes('127.0.0.1')) {
+        !window.location.hostname.includes('127.0.0.1') &&
+        !window.location.hostname.includes('0.0.0.0')) {
         return;
     }
     
     const emergencyReset = document.createElement('button');
     emergencyReset.textContent = 'Emergency Reset';
+    emergencyReset.title = 'Clear all data (development only)';
     emergencyReset.style.cssText = `
         position: fixed;
         bottom: 10px;
@@ -510,21 +580,27 @@ function addEmergencyReset() {
         z-index: 10000;
         opacity: 0.7;
         transition: opacity 0.3s;
+        font-family: Arial, sans-serif;
     `;
     
     emergencyReset.onmouseenter = () => emergencyReset.style.opacity = '1';
     emergencyReset.onmouseleave = () => emergencyReset.style.opacity = '0.7';
     
     emergencyReset.onclick = async function() {
-        if (confirm('WARNING: This will clear ALL local data. Continue?')) {
+        if (confirm('WARNING: This will clear ALL local data including forms, users, and settings. Continue?')) {
             try {
                 // Sign out from Firebase if signed in
                 if (window.auth) {
                     await auth.signOut();
                 }
                 
-                // Clear localStorage
+                // Clear localStorage (but keep Firebase config)
+                const firebaseConfig = localStorage.getItem('firebaseConfig');
                 localStorage.clear();
+                
+                if (firebaseConfig) {
+                    localStorage.setItem('firebaseConfig', firebaseConfig);
+                }
                 
                 // Clear IndexedDB if exists
                 if (window.indexedDB) {
@@ -571,7 +647,7 @@ window.authHelpers = {
         const users = JSON.parse(localStorage.getItem('users') || '{}');
         console.log('Local Storage Users:');
         Object.keys(users).forEach(email => {
-            console.log(`- ${email}: ${users[email].employeeName}`);
+            console.log(`- ${email}: ${users[email].employeeName} (${users[email].firebase ? 'Firebase' : 'Local'})`);
         });
         return users;
     },
@@ -584,14 +660,53 @@ window.authHelpers = {
     },
     
     // Create test user
-    createTestUser: async function(email = 'test@example.com', password = 'test123') {
+    createTestUser: async function(email = 'test@example.com', password = 'test123', name = 'Test User') {
         try {
+            if (!auth) {
+                console.error('Firebase Auth not available');
+                return null;
+            }
+            
             const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            console.log('Test user created:', userCredential.user);
-            return userCredential.user;
+            const user = userCredential.user;
+            
+            await user.updateProfile({
+                displayName: name
+            });
+            
+            // Save to localStorage
+            const users = JSON.parse(localStorage.getItem('users') || '{}');
+            users[email] = {
+                email: email,
+                password: password,
+                employeeName: name,
+                uid: user.uid,
+                firebase: true
+            };
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            console.log('Test user created:', user);
+            return user;
         } catch (error) {
             console.error('Test user creation failed:', error);
             return null;
         }
+    },
+    
+    // Delete test user (from localStorage)
+    deleteLocalUser: function(email) {
+        const users = JSON.parse(localStorage.getItem('users') || '{}');
+        if (users[email]) {
+            delete users[email];
+            localStorage.setItem('users', JSON.stringify(users));
+            console.log('Local user deleted:', email);
+            return true;
+        }
+        console.log('User not found:', email);
+        return false;
     }
 };
+
+// Export functions
+window.showAuthNotification = showAuthNotification;
+window.getCurrentFirebaseUser = getCurrentFirebaseUser;
