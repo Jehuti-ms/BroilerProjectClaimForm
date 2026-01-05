@@ -11,7 +11,7 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 let firebaseUser = null;
 let isOnline = navigator.onLine;
 
-// Auto-login to Firebase using localStorage credentials
+// In app.js - Update autoLoginToFirebase function
 async function autoLoginToFirebase() {
     console.log('🔄 Attempting Firebase auto-login...');
     
@@ -36,6 +36,7 @@ async function autoLoginToFirebase() {
     const user = JSON.parse(currentUser);
     const email = user.username || user.email;
     const password = user.password;
+    const employeeName = user.employeeName;
     
     if (!email || !password) {
         console.warn('No email/password in localStorage');
@@ -45,45 +46,26 @@ async function autoLoginToFirebase() {
     try {
         console.log(`Signing in to Firebase with: ${email}`);
         
-        // Sign in with email/password
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        const firebaseUser = userCredential.user;
-        
-        console.log('✅ Firebase login successful:', firebaseUser.email);
-        
-        // Update localStorage with Firebase UID
-        user.uid = firebaseUser.uid;
-        user.firebaseAuthenticated = true;
-        localStorage.setItem('currentUser', JSON.stringify(user));
-        
-        // Update display name if needed
-        if (!firebaseUser.displayName && user.employeeName) {
-            await firebaseUser.updateProfile({
-                displayName: user.employeeName
-            });
-            console.log('Updated display name');
+        // Use the same ensureFirebaseAccount function
+        if (typeof ensureFirebaseAccount === 'function') {
+            const firebaseUser = await ensureFirebaseAccount(email, password, employeeName);
+            if (firebaseUser) {
+                console.log('✅ Firebase login successful:', firebaseUser.email);
+                return true;
+            }
+        } else {
+            // Fallback to direct sign in
+            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            console.log('✅ Firebase login successful:', userCredential.user.email);
+            return true;
         }
-        
-        return true;
         
     } catch (error) {
         console.error('❌ Firebase auto-login failed:', error.code, error.message);
-        
-        // Handle specific errors
-        switch (error.code) {
-            case 'auth/user-not-found':
-                console.log('User not found in Firebase. Creating new account...');
-                return await createFirebaseUser(email, password, user.employeeName);
-            case 'auth/wrong-password':
-                console.warn('Wrong password stored in localStorage');
-                break;
-            case 'auth/invalid-email':
-                console.error('Invalid email format:', email);
-                break;
-        }
-        
         return false;
     }
+    
+    return false;
 }
 
 // Create new Firebase user if doesn't exist
