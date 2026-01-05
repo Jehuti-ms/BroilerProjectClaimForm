@@ -1,4 +1,4 @@
-// auth.js - Complete Firebase Authentication
+// auth.js - Complete Firebase Authentication with Auto-Creation
 
 // Navigation functions
 function showRegister() {
@@ -45,7 +45,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     const currentUser = {
                         username: user.email,
                         employeeName: user.displayName || user.email.split('@')[0],
-                        uid: user.uid
+                        uid: user.uid,
+                        firebaseAuthenticated: true
                     };
                     
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
@@ -73,6 +74,68 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 1000);
 });
 
+// ============ NEW: AUTO-CREATE FIREBASE ACCOUNT FUNCTION ============
+async function ensureFirebaseAccount(email, password, employeeName) {
+    console.log(`Ensuring Firebase account for: ${email}`);
+    
+    if (!window.auth) {
+        console.warn('Firebase Auth not available');
+        return null;
+    }
+    
+    try {
+        // First, try to sign in (in case account already exists)
+        console.log('Attempting sign in...');
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        console.log('✅ Firebase sign in successful');
+        return userCredential.user;
+        
+    } catch (signInError) {
+        console.log('Sign in failed:', signInError.code);
+        
+        // If user not found, create account
+        if (signInError.code === 'auth/user-not-found') {
+            console.log('Creating new Firebase account...');
+            try {
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                
+                // Set display name
+                if (employeeName) {
+                    await user.updateProfile({
+                        displayName: employeeName
+                    });
+                    console.log('✅ Display name set');
+                }
+                
+                console.log('✅ Firebase account created:', user.email);
+                return user;
+                
+            } catch (createError) {
+                console.error('Account creation failed:', createError.code, createError.message);
+                
+                // If email already in use (race condition), try sign in again
+                if (createError.code === 'auth/email-already-in-use') {
+                    console.log('Email already in use, retrying sign in...');
+                    try {
+                        const retryCredential = await auth.signInWithEmailAndPassword(email, password);
+                        return retryCredential.user;
+                    } catch (retryError) {
+                        console.error('Retry failed:', retryError.message);
+                    }
+                }
+                
+                return null;
+            }
+        }
+        
+        // Other errors (wrong password, etc.)
+        console.error('Sign in error:', signInError.message);
+        return null;
+    }
+}
+// ============ END OF NEW FUNCTION ============
+
 // Handle login form submission with Firebase
 document.getElementById('login-form').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -94,18 +157,22 @@ document.getElementById('login-form').addEventListener('submit', async function(
     
     try {
         if (window.auth) {
-            // Try Firebase authentication
-            const userCredential = await auth.signInWithEmailAndPassword(email, password);
-            const user = userCredential.user;
+            // ============ UPDATED: Use ensureFirebaseAccount ============
+            const firebaseUser = await ensureFirebaseAccount(email, password, employeeName);
             
-            console.log('Firebase login successful:', user.email);
-
-            // Store user info WITH PASSWORD in localStorage
+            if (!firebaseUser) {
+                throw new Error('Firebase authentication failed');
+            }
+            
+            console.log('Firebase login/creation successful:', firebaseUser.email);
+            // ============ END OF UPDATE ============
+            
+            // Store user info WITH PASSWORD
             const currentUser = {
-                username: user.email,
-                employeeName: employeeName || user.displayName || user.email.split('@')[0],
-                password: password,  // ← THIS IS CRITICAL - STORE THE PASSWORD!
-                uid: user.uid,
+                username: firebaseUser.email,
+                employeeName: employeeName || firebaseUser.displayName || firebaseUser.email.split('@')[0],
+                password: password,  // CRITICAL: Store the password
+                uid: firebaseUser.uid,
                 firebaseAuthenticated: true
             };
             
@@ -115,53 +182,13 @@ document.getElementById('login-form').addEventListener('submit', async function(
             const users = JSON.parse(localStorage.getItem('users') || '{}');
             users[email] = {
                 email: email,
-                password: password,  // ← ALSO STORE HERE
-                employeeName: employeeName || user.displayName || email.split('@')[0],
-                uid: user.uid,
+                password: password,  // Store password here too
+                employeeName: employeeName || firebaseUser.displayName || email.split('@')[0],
+                uid: firebaseUser.uid,
                 firebase: true,
                 lastLogin: new Date().toISOString()
             };
             localStorage.setItem('users', JSON.stringify(users));
-            // ============ END OF ADDED CODE ============
-            
-            // Show success message
-            showAuthNotification('Login successful! Redirecting...', 'success');
-            
-            // Store user info
-            const currentUser = {
-                username: user.email,
-                employeeName: employeeName || user.displayName || user.email.split('@')[0],
-                uid: user.uid
-            };
-            
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            
-            // Update display name if provided and different
-            if (employeeName && (!user.displayName || user.displayName !== employeeName)) {
-                try {
-                    await user.updateProfile({
-                        displayName: employeeName
-                    });
-                    console.log('Display name updated');
-                } catch (updateError) {
-                    console.warn('Could not update display name:', updateError);
-                }
-            }
-            
-            // Also save to localStorage users for fallback
-            const users = JSON.parse(localStorage.getItem('users') || '{}');
-            users[email] = {
-                email: email,
-                password: password, // Note: Storing password in localStorage is insecure
-                employeeName: employeeName || user.displayName || email.split('@')[0],
-                uid: user.uid,
-                firebase: true,
-                lastLogin: new Date().toISOString()
-            };
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            // Show success message
-            showAuthNotification('Login successful! Redirecting...', 'success');
             
             // Create initial Firestore document if needed
             if (window.firestore) {
@@ -172,7 +199,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
                             userId: email,
                             data: '{}',
                             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            displayName: employeeName || user.displayName || email.split('@')[0],
+                            displayName: employeeName || firebaseUser.displayName || email.split('@')[0],
                             lastUpdated: new Date().toISOString()
                         });
                         console.log('Initial Firestore document created');
@@ -181,6 +208,8 @@ document.getElementById('login-form').addEventListener('submit', async function(
                     console.warn('Could not create/check Firestore document:', firestoreError);
                 }
             }
+            
+            showAuthNotification('Login successful! Redirecting...', 'success');
             
             // Redirect after delay
             setTimeout(() => {
@@ -196,7 +225,6 @@ document.getElementById('login-form').addEventListener('submit', async function(
     } catch (error) {
         console.error('Login error:', error);
         
-        // Handle specific Firebase errors
         let errorMessage = 'Login failed';
         
         switch (error.code) {
@@ -232,7 +260,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
     }
 });
 
-// Fallback localStorage login - UPDATED
+// Fallback localStorage login
 function fallbackLocalStorageLogin(email, password, employeeName) {
     const users = JSON.parse(localStorage.getItem('users') || '{}');
     
@@ -241,9 +269,8 @@ function fallbackLocalStorageLogin(email, password, employeeName) {
         const currentUser = {
             username: email,
             employeeName: employeeName || users[email].employeeName || email.split('@')[0],
-            password: password,  // ← STORE THE PASSWORD
-            uid: users[email].uid || 'local_' + Date.now(),
-            firebaseAuthenticated: users[email].firebase || false
+            password: password,  // Store the password
+            uid: users[email].uid || 'local_' + Date.now()
         };
         
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
@@ -298,40 +325,13 @@ document.getElementById('register-form').addEventListener('submit', async functi
     
     try {
         if (window.auth) {
-            // Create user with Firebase Auth
-            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            const user = userCredential.user;
+            // ============ UPDATED: Use ensureFirebaseAccount ============
+            const firebaseUser = await ensureFirebaseAccount(email, password, employeeName);
             
-            console.log('Firebase registration successful:', user.email);
-            
-            // Update profile with display name
-            await user.updateProfile({
-                displayName: employeeName
-            });
-
-            // Save to localStorage WITH PASSWORD
-            const users = JSON.parse(localStorage.getItem('users') || '{}');
-            users[email] = {
-                email: email,
-                password: password,  // ← STORE THE PASSWORD
-                employeeName: employeeName,
-                createdAt: new Date().toISOString(),
-                uid: user.uid,
-                firebase: true
-            };
-            
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            // Store current user info WITH PASSWORD
-            const currentUser = {
-                username: email,
-                employeeName: employeeName,
-                password: password,  // ← STORE THE PASSWORD
-                uid: user.uid,
-                firebaseAuthenticated: true
-            };
-            
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            if (!firebaseUser) {
+                throw new Error('Firebase account creation failed');
+            }
+            // ============ END OF UPDATE ============
             
             // Also save to localStorage for fallback
             const users = JSON.parse(localStorage.getItem('users') || '{}');
@@ -340,7 +340,7 @@ document.getElementById('register-form').addEventListener('submit', async functi
                 password: password,
                 employeeName: employeeName,
                 createdAt: new Date().toISOString(),
-                uid: user.uid,
+                uid: firebaseUser.uid,
                 firebase: true
             };
             
@@ -350,7 +350,9 @@ document.getElementById('register-form').addEventListener('submit', async functi
             const currentUser = {
                 username: email,
                 employeeName: employeeName,
-                uid: user.uid
+                password: password,  // Store the password
+                uid: firebaseUser.uid,
+                firebaseAuthenticated: true
             };
             
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
@@ -418,7 +420,7 @@ document.getElementById('register-form').addEventListener('submit', async functi
     }
 });
 
-// Fallback localStorage registration - UPDATED
+// Fallback localStorage registration
 function fallbackLocalStorageRegistration(email, password, employeeName) {
     const users = JSON.parse(localStorage.getItem('users') || '{}');
     
@@ -429,7 +431,7 @@ function fallbackLocalStorageRegistration(email, password, employeeName) {
     
     users[email] = {
         email: email,
-        password: password,  // ← STORE THE PASSWORD
+        password: password,
         employeeName: employeeName,
         createdAt: new Date().toISOString(),
         uid: 'local_' + Date.now()
@@ -440,7 +442,7 @@ function fallbackLocalStorageRegistration(email, password, employeeName) {
     const currentUser = {
         username: email,
         employeeName: employeeName,
-        password: password,  // ← STORE THE PASSWORD
+        password: password,
         uid: users[email].uid
     };
     
@@ -682,85 +684,6 @@ function addEmergencyReset() {
     document.body.appendChild(emergencyReset);
 }
 
-// Firebase helper functions
-async function getCurrentFirebaseUser() {
-    if (!window.auth) return null;
-    
-    return new Promise((resolve) => {
-        const unsubscribe = auth.onAuthStateChanged((user) => {
-            unsubscribe();
-            resolve(user);
-        });
-    });
-}
-
-// Manual admin functions (for browser console)
-window.authHelpers = {
-    // List all users from localStorage
-    listLocalUsers: function() {
-        const users = JSON.parse(localStorage.getItem('users') || '{}');
-        console.log('Local Storage Users:');
-        Object.keys(users).forEach(email => {
-            console.log(`- ${email}: ${users[email].employeeName} (${users[email].firebase ? 'Firebase' : 'Local'})`);
-        });
-        return users;
-    },
-    
-    // Get current Firebase user
-    getCurrentUser: async function() {
-        const user = await getCurrentFirebaseUser();
-        console.log('Current Firebase user:', user);
-        return user;
-    },
-    
-    // Create test user
-    createTestUser: async function(email = 'test@example.com', password = 'test123', name = 'Test User') {
-        try {
-            if (!auth) {
-                console.error('Firebase Auth not available');
-                return null;
-            }
-            
-            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            const user = userCredential.user;
-            
-            await user.updateProfile({
-                displayName: name
-            });
-            
-            // Save to localStorage
-            const users = JSON.parse(localStorage.getItem('users') || '{}');
-            users[email] = {
-                email: email,
-                password: password,
-                employeeName: name,
-                uid: user.uid,
-                firebase: true
-            };
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            console.log('Test user created:', user);
-            return user;
-        } catch (error) {
-            console.error('Test user creation failed:', error);
-            return null;
-        }
-    },
-    
-    // Delete test user (from localStorage)
-    deleteLocalUser: function(email) {
-        const users = JSON.parse(localStorage.getItem('users') || '{}');
-        if (users[email]) {
-            delete users[email];
-            localStorage.setItem('users', JSON.stringify(users));
-            console.log('Local user deleted:', email);
-            return true;
-        }
-        console.log('User not found:', email);
-        return false;
-    }
-};
-
 // Export functions
 window.showAuthNotification = showAuthNotification;
-window.getCurrentFirebaseUser = getCurrentFirebaseUser;
+window.ensureFirebaseAccount = ensureFirebaseAccount;  // Export for debugging
