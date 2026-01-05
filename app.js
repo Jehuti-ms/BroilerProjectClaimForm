@@ -79,31 +79,53 @@ function updateUserDisplay(userData) {
 }
 
 // Check if user is authenticated on page load
-function checkAuthOnLoad() {
+// In app.js on index.html, replace the auth check with:
+function checkAuthOnIndexPage() {
+    console.log('Checking auth on index page...');
+    
     const savedUser = localStorage.getItem('currentUser');
     
-    if (savedUser) {
-        try {
-            const userData = JSON.parse(savedUser);
-            console.log('Found saved user:', userData.email);
-            
-            // Check if auth.js is loaded and user is authenticated there
-            if (window.authModule && window.authModule.isAuthenticated()) {
-                console.log('User authenticated via auth.js');
-                initializeAppForUser(userData);
-                return true;
-            } else {
-                // User saved but not authenticated - redirect to auth page
-                if (!window.location.pathname.includes('auth.html')) {
-                    console.log('User saved but not authenticated, redirecting...');
-                    window.location.href = 'auth.html';
-                    return false;
-                }
-            }
-        } catch (error) {
-            console.error('Error parsing saved user:', error);
-        }
+    if (!savedUser) {
+        console.log('No user found, redirecting to auth.html');
+        window.location.href = 'auth.html';
+        return false;
     }
+    
+    try {
+        const user = JSON.parse(savedUser);
+        console.log('User found:', user.email);
+        
+        // Check if we have basic user data
+        if (!user.email) {
+            console.log('User missing email, redirecting...');
+            window.location.href = 'auth.html';
+            return false;
+        }
+        
+        // User is valid - show the app
+        console.log('✅ User authenticated, showing app');
+        return true;
+        
+    } catch (error) {
+        console.error('Error parsing user:', error);
+        window.location.href = 'auth.html';
+        return false;
+    }
+}
+
+// Call this when index.html loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Index page loaded, checking auth...');
+    
+    // Give auth.js time to save user data
+    setTimeout(() => {
+        if (checkAuthOnIndexPage()) {
+            // Initialize your app here
+            console.log('Initializing app...');
+            // Your app initialization code...
+        }
+    }, 500);
+});
     
     // No user found - check if we're on auth page
     if (!window.location.pathname.includes('auth.html')) {
