@@ -1,4 +1,16 @@
 // firebase-config.js - COMPLETE FIREBASE CONFIGURATION
+// At the top of firebase-config.js, add:
+let firebaseInitialized = false;
+
+// Then wrap your initialization in:
+if (!firebaseInitialized) {
+    try {
+        // Your existing initialization code...
+        firebaseInitialized = true;
+    } catch (error) {
+        console.error('Firebase init error:', error);
+    }
+}
 const firebaseConfig = {
     // ⚠️ REPLACE THESE WITH YOUR ACTUAL FIREBASE CONFIG VALUES
      apiKey: "AIzaSyAagSPJW2RxyG28Og54ftYd8MGvPPKO_SE",
