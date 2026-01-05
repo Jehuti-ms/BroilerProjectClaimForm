@@ -1,9 +1,7 @@
-// app.js - COMPLETE FIXED VERSION
-
+// app.js - COMPLETE VERSION WITH ALL FUNCTIONALITY
 // Global variables
 let currentEditingRow = null;
 let currentFormData = [];
-let isOnline = navigator.onLine; // Track online status
 const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
@@ -12,53 +10,63 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
     initAutoSyncCheckbox();
-    setupEventListeners();
-    setupEmployeeNameMemory();
-    setupNetworkMonitoring();
     
     // Add event listener for auto-sync checkbox
     const autoSyncCheckbox = document.getElementById('auto-sync');
     if (autoSyncCheckbox) {
         autoSyncCheckbox.addEventListener('change', toggleAutoSync);
     }
+    
+    // Set up employee name memory for MAIN FORM
+    setupEmployeeNameMemory();
 });
 
-// Check if user is authenticated - FIXED VERSION
+// Check if user is authenticated - UPDATED for Firebase compatibility
 function checkAuthentication() {
     const currentUser = localStorage.getItem('currentUser');
-    
-    // If no user, redirect to auth page
     if (!currentUser) {
-        console.log('No user found, redirecting to auth.html');
         window.location.href = 'auth.html';
-        return; // Exit function
+        return;
     }
     
     try {
         const user = JSON.parse(currentUser);
-        console.log('User authenticated:', user);
         
-        // Set global currentUser
-        window.currentUser = user;
+        // Handle both old (username-based) and new (email/Firebase-based) user formats
+        let displayName, username;
         
-        // Update user display - handle both old and new formats
-        const displayName = user.employeeName || user.email || 'User';
+        if (user.employeeName) {
+            // Old format or Firebase with employeeName
+            displayName = user.employeeName;
+            username = user.username || (user.email ? user.email.split('@')[0] : 'user');
+        } else if (user.email) {
+            // Firebase email format
+            displayName = user.email.split('@')[0];
+            username = displayName;
+            
+            // Update user object to include employeeName if missing
+            user.employeeName = displayName;
+            user.username = username;
+            localStorage.setItem('currentUser', JSON.stringify(user));
+        } else {
+            // Fallback
+            displayName = 'User';
+            username = 'user';
+        }
+        
+        // Update UI
         const userDisplay = document.getElementById('user-display');
         if (userDisplay) {
             userDisplay.textContent = `Welcome, ${displayName}`;
         }
         
-        // Set employee name in form
         const employeeNameInput = document.getElementById('employee-name');
         if (employeeNameInput) {
-            employeeNameInput.value = user.employeeName || displayName;
+            employeeNameInput.value = displayName;
         }
         
         // Initialize the app
         initializeApp();
-        
-        // Load user data
-        const username = user.username || (user.email ? user.email.split('@')[0] : 'default');
         loadUserData(username);
         
     } catch (error) {
@@ -91,9 +99,10 @@ function initializeApp() {
             saveCurrentMonth();
             
             // Load data for the new month
-            if (window.currentUser) {
-                const username = window.currentUser.username || 
-                               (window.currentUser.email ? window.currentUser.email.split('@')[0] : 'default');
+            const currentUser = localStorage.getItem('currentUser');
+            if (currentUser) {
+                const user = JSON.parse(currentUser);
+                const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
                 loadUserData(username);
             }
         });
@@ -105,18 +114,50 @@ function initializeApp() {
             saveCurrentMonth();
             
             // Load data for the new month/year
-            if (window.currentUser) {
-                const username = window.currentUser.username || 
-                               (window.currentUser.email ? window.currentUser.email.split('@')[0] : 'default');
+            const currentUser = localStorage.getItem('currentUser');
+            if (currentUser) {
+                const user = JSON.parse(currentUser);
+                const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
                 loadUserData(username);
             }
         });
     }
     
     updateFormDate();
-    calculateTotal(); // Initial calculation
 }
 
+// Auto-sync functions
+function toggleAutoSync() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const isEnabled = checkbox.checked;
+        localStorage.setItem('autoSyncEnabled', isEnabled.toString());
+        
+        if (isEnabled) {
+            showNotification('Auto-sync enabled');
+            // Start auto-sync if the function exists
+            if (typeof startAutoSync === 'function') {
+                startAutoSync();
+            }
+        } else {
+            showNotification('Auto-sync disabled');
+            // Stop auto-sync if the function exists
+            if (typeof stopAutoSync === 'function') {
+                stopAutoSync();
+            }
+        }
+    }
+}
+
+function initAutoSyncCheckbox() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        checkbox.checked = autoSync === 'true';
+    }
+}
+
+// Save current month/year to localStorage
 function saveCurrentMonth() {
     const monthSelect = document.getElementById('month-select');
     const yearInput = document.getElementById('year-input');
@@ -130,6 +171,151 @@ function saveCurrentMonth() {
     }
 }
 
+// Load user data for current month - UPDATED for Firebase compatibility
+function loadUserData(username) {
+    // Try to get data using username (old format) or email (new format)
+    let userData = null;
+    
+    // First try old format: userData_username
+    userData = localStorage.getItem(`userData_${username}`);
+    
+    // If not found and user has email, try email-based key
+    if (!userData) {
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser) {
+            try {
+                const user = JSON.parse(currentUser);
+                if (user.email) {
+                    userData = localStorage.getItem(`userData_${user.email}`);
+                }
+            } catch (e) {
+                console.log('Could not parse user data');
+            }
+        }
+    }
+    
+    if (userData) {
+        const allData = JSON.parse(userData);
+        loadCurrentMonthData(allData);
+    } else {
+        loadCurrentMonthData();
+    }
+}
+
+// Load data for current month
+function loadCurrentMonthData(allData = null) {
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (!monthSelect || !yearInput) return;
+    
+    const month = parseInt(monthSelect.value);
+    const year = yearInput.value;
+    const monthYear = `${month}-${year}`;
+    
+    const tableBody = document.querySelector('#time-table tbody');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = '';
+    currentFormData = [];
+    
+    if (allData && allData[monthYear]) {
+        // Load saved data for this month
+        allData[monthYear].forEach(entry => {
+            addRowToTable(entry);
+            currentFormData.push(entry);
+        });
+    }
+    
+    calculateTotal();
+}
+
+// Save user data - UPDATED for Firebase compatibility
+function saveUserData() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        return;
+    }
+    
+    try {
+        const user = JSON.parse(currentUser);
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        
+        if (!monthSelect || !yearInput) return;
+        
+        const month = parseInt(monthSelect.value);
+        const year = yearInput.value;
+        const monthYear = `${month}-${year}`;
+        
+        // Determine the key to use (username or email)
+        let userKey = user.username;
+        if (!userKey && user.email) {
+            userKey = user.email;
+        } else if (!userKey) {
+            userKey = 'user';
+        }
+        
+        // Get existing user data
+        const existingData = localStorage.getItem(`userData_${userKey}`);
+        let allData = existingData ? JSON.parse(existingData) : {};
+        
+        // Update data for current month
+        allData[monthYear] = currentFormData;
+        
+        // Save back to localStorage
+        localStorage.setItem(`userData_${userKey}`, JSON.stringify(allData));
+        
+        // Show save confirmation
+        showNotification('Form data saved successfully!');
+        
+        // Auto-sync to Firebase if available
+        setTimeout(() => {
+            if (typeof syncToCloud === 'function') {
+                syncToCloud();
+            }
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error saving user data:', error);
+        showNotification('Error saving data', 'error');
+    }
+}
+
+// Show notification - ENHANCED with types
+function showNotification(message, type = 'success') {
+    // Remove any existing notifications
+    const existingNotifications = document.querySelectorAll('.notification');
+    existingNotifications.forEach(notification => notification.remove());
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#f44336' : 
+                     type === 'warning' ? '#FF9800' : '#4CAF50'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 5px;
+        z-index: 10000;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
+// Update the form date display
 function updateFormDate() {
     const monthSelect = document.getElementById('month-select');
     const yearInput = document.getElementById('year-input');
@@ -142,101 +328,135 @@ function updateFormDate() {
     }
 }
 
-// ==================== DATA LOADING ====================
-
-function loadUserData(userId) {
-    console.log('Loading data for user:', userId);
-    loadCurrentUserData();
+// Clear the form
+function clearForm() {
+    if (confirm('Are you sure you want to clear all entries for this month?')) {
+        const tableBody = document.querySelector('#time-table tbody');
+        if (tableBody) {
+            tableBody.innerHTML = '';
+            currentFormData = [];
+            document.getElementById('total-hours').textContent = '0:00';
+            saveUserData(); // Save empty data
+        }
+    }
 }
 
-function loadCurrentUserData() {
-    if (!window.currentUser) {
-        console.log('No current user for data loading');
+// Open the modal for adding/editing entries
+function openModal(rowIndex = null) {
+    const modal = document.getElementById('entry-modal');
+    const modalTitle = document.getElementById('modal-title');
+    
+    if (!modal || !modalTitle) return;
+    
+    if (rowIndex !== null) {
+        // Editing existing row
+        modalTitle.textContent = 'Edit Time Entry';
+        currentEditingRow = rowIndex;
+        
+        const rows = document.querySelectorAll('#time-table tbody tr');
+        if (rows[rowIndex]) {
+            const row = rows[rowIndex];
+            
+            // Extract current values
+            const date = row.cells[0].textContent;
+            const amPm = row.cells[1].textContent;
+            const inTime = convertTo24Hour(row.cells[2].textContent);
+            const outTime = convertTo24Hour(row.cells[3].textContent);
+            
+            // Set values in modal
+            document.getElementById('entry-date').value = formatDateForInput(date);
+            document.getElementById('entry-am-pm').value = amPm;
+            document.getElementById('entry-time-in').value = inTime;
+            document.getElementById('entry-time-out').value = outTime;
+        }
+    } else {
+        // Adding new row
+        modalTitle.textContent = 'Add New Time Entry';
+        currentEditingRow = null;
+        
+        // Clear modal fields
+        document.getElementById('entry-date').value = '';
+        document.getElementById('entry-am-pm').value = 'AM';
+        document.getElementById('entry-time-in').value = '';
+        document.getElementById('entry-time-out').value = '';
+    }
+    
+    modal.style.display = 'block';
+}
+
+// Close the modal
+function closeModal() {
+    const modal = document.getElementById('entry-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        currentEditingRow = null;
+    }
+}
+
+// Save entry from modal
+function saveEntry() {
+    const date = document.getElementById('entry-date').value;
+    const amPm = document.getElementById('entry-am-pm').value;
+    const inTime = document.getElementById('entry-time-in').value;
+    const outTime = document.getElementById('entry-time-out').value;
+    
+    if (!date) {
+        alert('Please select a date');
         return;
     }
     
-    const userId = window.currentUser.email;
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
+    if (!inTime || !outTime) {
+        alert('Please enter both IN and OUT times');
+        return;
+    }
     
-    if (!monthSelect || !yearInput) return;
+    // Calculate hours
+    const inDate = new Date(`2000-01-01T${inTime}`);
+    const outDate = new Date(`2000-01-01T${outTime}`);
     
-    const month = parseInt(monthSelect.value);
-    const year = yearInput.value;
-    const monthYear = `${month}-${year}`;
+    // Handle PM times that might cross midnight
+    if (outDate < inDate) {
+        outDate.setDate(outDate.getDate() + 1);
+    }
     
-    const userData = localStorage.getItem(`userData_${userId}`);
+    const diffMs = outDate - inDate;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     
-    const tableBody = document.querySelector('#time-table tbody');
-    if (!tableBody) return;
+    const hours = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
     
-    tableBody.innerHTML = '';
-    currentFormData = [];
+    // Use the date exactly as the user entered it
+    const entryData = {
+        date: date,
+        amPm: amPm,
+        inTime: inTime,
+        outTime: outTime,
+        hours: hours
+    };
     
-    if (userData) {
-        const allData = JSON.parse(userData);
-        if (allData[monthYear]) {
-            allData[monthYear].forEach(entry => {
-                addRowToTable(entry);
-                currentFormData.push(entry);
-            });
-            console.log(`Loaded ${currentFormData.length} entries for ${monthYear}`);
-        } else {
-            console.log(`No data found for ${monthYear}`);
-        }
+    if (currentEditingRow !== null) {
+        // Update existing row
+        updateRowInTable(currentEditingRow, entryData);
+        currentFormData[currentEditingRow] = entryData;
+    } else {
+        // Add new row
+        addRowToTable(entryData);
+        currentFormData.push(entryData);
     }
     
     calculateTotal();
+    saveUserData(); // Auto-save after changes
+    closeModal();
 }
 
-function saveUserData() {
-    if (!window.currentUser) {
-        showNotification('Please sign in first', 'error');
-        return;
-    }
-    
-    const userId = window.currentUser.email;
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    
-    if (!monthSelect || !yearInput) return;
-    
-    const month = parseInt(monthSelect.value);
-    const year = yearInput.value;
-    const monthYear = `${month}-${year}`;
-    
-    // Get existing user data
-    const existingData = localStorage.getItem(`userData_${userId}`);
-    let allData = existingData ? JSON.parse(existingData) : {};
-    
-    // Update data for current month
-    allData[monthYear] = currentFormData;
-    
-    // Save back to localStorage
-    localStorage.setItem(`userData_${userId}`, JSON.stringify(allData));
-    
-    // Try to sync with Firebase if user has Firebase auth
-    if (window.currentUser.firebaseAuth && isOnline) {
-        // Check if sync.js is available
-        if (typeof syncToCloud === 'function') {
-            setTimeout(() => {
-                syncToCloud();
-            }, 1000);
-        }
-    }
-    
-    showNotification('Form data saved successfully!', 'success');
-}
-
-// ==================== TABLE FUNCTIONS ====================
-
+// Add a row to the table
 function addRowToTable(data) {
     const tableBody = document.querySelector('#time-table tbody');
     if (!tableBody) return;
     
+    const newRow = document.createElement('tr');
     const rowIndex = tableBody.children.length;
     
-    const newRow = document.createElement('tr');
     newRow.innerHTML = `
         <td>${formatDateForDisplay(data.date)}</td>
         <td>${data.amPm}</td>
@@ -252,6 +472,7 @@ function addRowToTable(data) {
     tableBody.appendChild(newRow);
 }
 
+// Update an existing row in the table
 function updateRowInTable(rowIndex, data) {
     const rows = document.querySelectorAll('#time-table tbody tr');
     if (rows[rowIndex]) {
@@ -265,6 +486,86 @@ function updateRowInTable(rowIndex, data) {
     }
 }
 
+// Format date for display (DD/MM/YYYY format)
+function formatDateForDisplay(dateString) {
+    if (!dateString) return '';
+    
+    // Check if already in DD/MM/YYYY format
+    if (dateString.includes('/')) {
+        return dateString;
+    }
+    
+    // Assume YYYY-MM-DD format
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(year, month - 1, day);
+    
+    const displayDay = date.getDate().toString().padStart(2, '0');
+    const displayMonth = (date.getMonth() + 1).toString().padStart(2, '0');
+    const displayYear = date.getFullYear();
+    
+    return `${displayDay}/${displayMonth}/${displayYear}`;
+}
+
+// Format date for input (YYYY-MM-DD format)
+function formatDateForInput(dateString) {
+    if (!dateString) return '';
+    
+    // Check if already in YYYY-MM-DD format
+    if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+        return dateString;
+    }
+    
+    // Assume DD/MM/YYYY format
+    const [day, month, year] = dateString.split('/');
+    
+    const date = new Date(year, month - 1, day);
+    const inputYear = date.getFullYear();
+    const inputMonth = (date.getMonth() + 1).toString().padStart(2, '0');
+    const inputDay = date.getDate().toString().padStart(2, '0');
+    
+    return `${inputYear}-${inputMonth}-${inputDay}`;
+}
+
+// Format time for display (convert 24h to 12h format)
+function formatTimeDisplay(time) {
+    if (!time) return '';
+    
+    // Check if already formatted
+    if (time.includes('AM') || time.includes('PM')) {
+        return time;
+    }
+    
+    const [hours, minutes] = time.split(':');
+    const hourNum = parseInt(hours);
+    const amPm = hourNum >= 12 ? 'PM' : 'AM';
+    const displayHour = hourNum % 12 || 12;
+    
+    return `${displayHour}:${minutes} ${amPm}`;
+}
+
+// Convert 12h time to 24h time
+function convertTo24Hour(timeString) {
+    if (!timeString) return '';
+    
+    // Check if already in 24h format
+    if (!timeString.includes('AM') && !timeString.includes('PM')) {
+        return timeString;
+    }
+    
+    const [time, modifier] = timeString.split(' ');
+    let [hours, minutes] = time.split(':');
+    
+    if (modifier === 'PM' && hours !== '12') {
+        hours = parseInt(hours, 10) + 12;
+    }
+    if (modifier === 'AM' && hours === '12') {
+        hours = '00';
+    }
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+}
+
+// Delete a row from the table
 function deleteRow(rowIndex) {
     if (confirm('Are you sure you want to delete this entry?')) {
         const rows = document.querySelectorAll('#time-table tbody tr');
@@ -285,124 +586,20 @@ function deleteRow(rowIndex) {
             });
             
             calculateTotal();
-            saveUserData();
+            saveUserData(); // Auto-save after changes
         }
     }
 }
 
-// ==================== MODAL FUNCTIONS ====================
-
-function openModal(rowIndex = null) {
-    const modal = document.getElementById('entry-modal');
-    const modalTitle = document.getElementById('modal-title');
-    
-    if (!modal || !modalTitle) return;
-    
-    if (rowIndex !== null) {
-        modalTitle.textContent = 'Edit Time Entry';
-        currentEditingRow = rowIndex;
-        
-        const rows = document.querySelectorAll('#time-table tbody tr');
-        const row = rows[rowIndex];
-        
-        if (row) {
-            const date = row.cells[0].textContent;
-            const amPm = row.cells[1].textContent;
-            const inTime = convertTo24Hour(row.cells[2].textContent);
-            const outTime = convertTo24Hour(row.cells[3].textContent);
-            
-            document.getElementById('entry-date').value = formatDateForInput(date);
-            document.getElementById('entry-am-pm').value = amPm;
-            document.getElementById('entry-time-in').value = inTime;
-            document.getElementById('entry-time-out').value = outTime;
-        }
-    } else {
-        modalTitle.textContent = 'Add New Time Entry';
-        currentEditingRow = null;
-        
-        document.getElementById('entry-date').value = '';
-        document.getElementById('entry-am-pm').value = 'AM';
-        document.getElementById('entry-time-in').value = '';
-        document.getElementById('entry-time-out').value = '';
-    }
-    
-    modal.style.display = 'block';
-}
-
-function closeModal() {
-    const modal = document.getElementById('entry-modal');
-    if (modal) {
-        modal.style.display = 'none';
-        currentEditingRow = null;
-    }
-}
-
-function saveEntry() {
-    const dateInput = document.getElementById('entry-date');
-    const amPmSelect = document.getElementById('entry-am-pm');
-    const inTimeInput = document.getElementById('entry-time-in');
-    const outTimeInput = document.getElementById('entry-time-out');
-    
-    if (!dateInput || !amPmSelect || !inTimeInput || !outTimeInput) return;
-    
-    const date = dateInput.value;
-    const amPm = amPmSelect.value;
-    const inTime = inTimeInput.value;
-    const outTime = outTimeInput.value;
-    
-    if (!date || !inTime || !outTime) {
-        showNotification('Please fill all required fields', 'error');
-        return;
-    }
-    
-    // Calculate hours
-    const inDate = new Date(`2000-01-01T${inTime}`);
-    const outDate = new Date(`2000-01-01T${outTime}`);
-    
-    if (outDate < inDate) {
-        outDate.setDate(outDate.getDate() + 1);
-    }
-    
-    const diffMs = outDate - inDate;
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const hours = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
-    
-    const entryData = {
-        date: date,
-        amPm: amPm,
-        inTime: inTime,
-        outTime: outTime,
-        hours: hours
-    };
-    
-    if (currentEditingRow !== null) {
-        updateRowInTable(currentEditingRow, entryData);
-        currentFormData[currentEditingRow] = entryData;
-        showNotification('Entry updated successfully', 'success');
-    } else {
-        addRowToTable(entryData);
-        currentFormData.push(entryData);
-        showNotification('Entry added successfully', 'success');
-    }
-    
-    calculateTotal();
-    saveUserData();
-    closeModal();
-}
-
-// ==================== UTILITY FUNCTIONS ====================
-
+// Calculate total hours
 function calculateTotal() {
     const rows = document.querySelectorAll('#time-table tbody tr');
     let totalMinutes = 0;
     
     rows.forEach(row => {
         const hoursText = row.cells[4].textContent;
-        if (hoursText) {
-            const [hours, minutes] = hoursText.split(':').map(Number);
-            totalMinutes += hours * 60 + (minutes || 0);
-        }
+        const [hours, minutes] = hoursText.split(':').map(Number);
+        totalMinutes += hours * 60 + (minutes || 0);
     });
     
     const totalHours = Math.floor(totalMinutes / 60);
@@ -410,214 +607,285 @@ function calculateTotal() {
     
     const totalHoursElement = document.getElementById('total-hours');
     if (totalHoursElement) {
-        totalHoursElement.textContent = `${totalHours}:${remainingMinutes.toString().padStart(2, '0')}`;
+        totalHoursElement.textContent = 
+            `${totalHours}:${remainingMinutes.toString().padStart(2, '0')}`;
     }
 }
 
-function formatDateForDisplay(dateString) {
-    if (!dateString) return '';
-    
-    // Handle YYYY-MM-DD format
-    if (dateString.includes('-')) {
-        const [year, month, day] = dateString.split('-');
-        return `${day}/${month}/${year}`;
+// Generate PDF
+function generatePDF() {
+    // Check if jsPDF is loaded
+    if (typeof jsPDF === 'undefined' || typeof window.jspdf === 'undefined') {
+        showNotification('PDF library not loaded. Please refresh the page.', 'error');
+        return;
     }
     
-    // Handle DD/MM/YYYY format (already formatted)
-    return dateString;
-}
-
-function formatDateForInput(dateString) {
-    if (!dateString) return '';
-    
-    // Handle DD/MM/YYYY format
-    if (dateString.includes('/')) {
-        const [day, month, year] = dateString.split('/');
-        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    }
-    
-    // Handle YYYY-MM-DD format (already correct)
-    return dateString;
-}
-
-function formatTimeDisplay(time) {
-    if (!time) return '';
-    
-    // If already formatted (contains AM/PM), return as is
-    if (time.includes('AM') || time.includes('PM')) {
-        return time;
-    }
-    
-    // Convert 24h to 12h format
-    const [hours, minutes] = time.split(':');
-    const hourNum = parseInt(hours);
-    const amPm = hourNum >= 12 ? 'PM' : 'AM';
-    const displayHour = hourNum % 12 || 12;
-    
-    return `${displayHour}:${minutes} ${amPm}`;
-}
-
-function convertTo24Hour(timeString) {
-    if (!timeString) return '';
-    
-    // If already in 24h format (no AM/PM)
-    if (!timeString.includes('AM') && !timeString.includes('PM')) {
-        return timeString;
-    }
-    
-    const [time, modifier] = timeString.split(' ');
-    let [hours, minutes] = time.split(':');
-    
-    if (modifier === 'PM' && hours !== '12') {
-        hours = parseInt(hours, 10) + 12;
-    }
-    if (modifier === 'AM' && hours === '12') {
-        hours = '00';
-    }
-    
-    return `${hours.toString().padStart(2, '0')}:${minutes}`;
-}
-
-function clearForm() {
-    if (confirm('Are you sure you want to clear all entries for this month?')) {
-        const tableBody = document.querySelector('#time-table tbody');
-        if (tableBody) {
-            tableBody.innerHTML = '';
-            currentFormData = [];
-            calculateTotal();
-            saveUserData();
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // Set document properties
+        doc.setProperties({
+            title: 'Broiler Production Project - Claim Form',
+            subject: 'Employee Time Claim',
+            author: 'Grantley Adams Memorial School'
+        });
+        
+        // Add header with better visibility
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.text('Grantley Adams Memorial School', 105, 20, { align: 'center' });
+        doc.setFontSize(14);
+        doc.text('Broiler Production Project', 105, 28, { align: 'center' });
+        doc.setFontSize(12);
+        doc.text('Claim Form', 105, 36, { align: 'center' });
+        
+        const month = document.getElementById('month-select').value;
+        const year = document.getElementById('year-input').value;
+        doc.text(`${monthNames[month]} ${year}`, 105, 44, { align: 'center' });
+        
+        // Add employee name
+        doc.setFont(undefined, 'normal');
+        doc.text(`Employee Name: ${document.getElementById('employee-name').value}`, 20, 60);
+        
+        // Create table data
+        const tableData = [];
+        
+        currentFormData.forEach(entry => {
+            const date = formatDateForDisplay(entry.date);
+            const amPm = entry.amPm;
+            const timeIn = formatTimeDisplay(entry.inTime);
+            const timeOut = formatTimeDisplay(entry.outTime);
+            const hours = entry.hours;
+            
+            tableData.push([date, amPm, timeIn, timeOut, hours]);
+        });
+        
+        // Check if autoTable plugin is available
+        if (typeof doc.autoTable === 'undefined') {
+            showNotification('PDF table plugin not available', 'error');
+            return;
         }
+        
+        // Add table using autoTable plugin - centered on page
+        const tableOptions = {
+            startY: 70,
+            head: [['Date', 'Am/Pm', 'Time IN', 'Time OUT', 'Hours']],
+            body: tableData,
+            theme: 'grid',
+            styles: { 
+                fontSize: 10, 
+                cellPadding: 4,
+                textColor: [0, 0, 0]
+            },
+            headStyles: { 
+                fillColor: [220, 220, 220],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold'
+            },
+            margin: { left: 25, right: 25 },
+            tableWidth: 'auto'
+        };
+        
+        doc.autoTable(tableOptions);
+        
+        // Add total hours
+        const finalY = doc.lastAutoTable.finalY + 10;
+        const totalHours = document.getElementById('total-hours').textContent;
+        doc.text(`Total Hours: ${totalHours}`, 160, finalY);
+        
+        // Add signature areas with proper spacing
+        const signatureY = finalY + 25;
+        
+        // Signature Claimant
+        doc.text('Signature Claimant:', 25, signatureY);
+        doc.line(25, signatureY + 10, 65, signatureY + 10);
+        
+        // Signature HOD
+        doc.text('Signature HOD:', 85, signatureY);
+        doc.line(85, signatureY + 10, 125, signatureY + 10);
+        
+        // Signature Principal
+        doc.text('Signature Principal:', 145, signatureY);
+        doc.line(145, signatureY + 10, 185, signatureY + 10);
+        
+        // Save the PDF
+        doc.save(`Broiler_Claim_Form_${monthNames[month]}_${year}.pdf`);
+        
+        showNotification('PDF generated successfully!');
+        
+    } catch (error) {
+        console.error('PDF generation error:', error);
+        showNotification('Error generating PDF: ' + error.message, 'error');
     }
 }
 
-// ==================== SETUP FUNCTIONS ====================
+// Export Data - UPDATED for Firebase compatibility
+function exportData() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showNotification('Please sign in first', 'error');
+        return;
+    }
+    
+    try {
+        const user = JSON.parse(currentUser);
+        
+        // Determine the key to use (username or email)
+        let userKey = user.username;
+        if (!userKey && user.email) {
+            userKey = user.email;
+        } else if (!userKey) {
+            userKey = 'user';
+        }
+        
+        const userData = localStorage.getItem(`userData_${userKey}`);
+        
+        if (!userData) {
+            alert('No data to export');
+            return;
+        }
+        
+        const exportData = {
+            userData: JSON.parse(userData),
+            exportDate: new Date().toISOString(),
+            employeeName: user.employeeName || user.email || 'User',
+            username: userKey // Include username for backward compatibility
+        };
+        
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `broiler_data_${userKey}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+        
+        showNotification('Data exported successfully!');
+        
+    } catch (error) {
+        console.error('Export error:', error);
+        showNotification('Error exporting data: ' + error.message, 'error');
+    }
+}
 
-function setupEventListeners() {
-    // Employee name input
+// Import Data Function - UPDATED for Firebase compatibility
+function importData() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    
+    fileInput.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const importData = JSON.parse(event.target.result);
+                
+                // Validate the import file structure
+                if (!importData.userData) {
+                    throw new Error('Invalid backup file format');
+                }
+                
+                // Check if the imported user matches current user
+                const currentUser = localStorage.getItem('currentUser');
+                let usernameToUse = importData.username;
+                
+                if (currentUser) {
+                    const user = JSON.parse(currentUser);
+                    
+                    // If imported data has different username, ask for confirmation
+                    if (importData.username && importData.username !== user.username) {
+                        if (!confirm(`This backup is for user "${importData.username}". Import anyway?`)) {
+                            return;
+                        }
+                        usernameToUse = importData.username;
+                    } else {
+                        // Use current user's identifier
+                        usernameToUse = user.username || (user.email ? user.email.split('@')[0] : 'user');
+                    }
+                }
+                
+                // Apply the imported data
+                localStorage.setItem(`userData_${usernameToUse}`, JSON.stringify(importData.userData));
+                
+                // Reload the current view
+                if (currentUser) {
+                    const user = JSON.parse(currentUser);
+                    const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
+                    loadUserData(username);
+                }
+                
+                showNotification('Data imported successfully!');
+                
+                // Auto-sync the imported data to cloud
+                setTimeout(() => {
+                    if (typeof syncToCloud === 'function') {
+                        syncToCloud();
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Import error:', error);
+                showNotification('Error importing file: ' + error.message, 'error');
+            }
+        };
+        
+        reader.readAsText(file);
+    };
+    
+    fileInput.click();
+}
+
+// Utility Functions
+function saveForm() {
+    saveUserData();
+}
+
+function logout() {
+    // Sign out from Firebase if available
+    if (typeof firebase !== 'undefined' && window.firebaseAuth) {
+        firebaseAuth.signOut();
+    }
+    
+    localStorage.removeItem('currentUser');
+    window.location.href = 'auth.html';
+}
+
+// Save employee name when it's typed in the main form
+function setupEmployeeNameMemory() {
     const employeeNameInput = document.getElementById('employee-name');
+    
     if (employeeNameInput) {
+        // Load saved employee name on page load
+        const savedName = localStorage.getItem('mainAppEmployeeName');
+        if (savedName) {
+            employeeNameInput.value = savedName;
+        }
+        
+        // Save employee name whenever it changes
         employeeNameInput.addEventListener('input', function() {
+            localStorage.setItem('mainAppEmployeeName', this.value);
+        });
+        
+        // Also save when user leaves the field
+        employeeNameInput.addEventListener('blur', function() {
             localStorage.setItem('mainAppEmployeeName', this.value);
         });
     }
 }
 
-function setupEmployeeNameMemory() {
-    const employeeNameInput = document.getElementById('employee-name');
-    if (employeeNameInput) {
-        const savedName = localStorage.getItem('mainAppEmployeeName');
-        if (savedName) {
-            employeeNameInput.value = savedName;
-        }
-    }
-}
-
-function setupNetworkMonitoring() {
-    window.addEventListener('online', () => {
-        isOnline = true;
-        console.log('App is online');
-        showNotification('Back online - syncing data...', 'success');
-        
-        // Auto-sync when coming back online
-        if (window.currentUser && window.currentUser.firebaseAuth) {
-            setTimeout(() => {
-                if (typeof syncToCloud === 'function') {
-                    syncToCloud();
-                }
-            }, 3000);
-        }
-    });
-    
-    window.addEventListener('offline', () => {
-        isOnline = false;
-        console.log('App is offline');
-        showNotification('You are offline - changes saved locally', 'info');
-    });
-}
-
-// ==================== OTHER FUNCTIONS ====================
-
-function showNotification(message, type = 'info') {
-    console.log(`${type.toUpperCase()}: ${message}`);
-    
-    // Simple notification
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#f44336' : 
-                     type === 'success' ? '#4CAF50' : 
-                     type === 'warning' ? '#FF9800' : '#2196F3'};
-        color: white;
-        padding: 15px 20px;
-        border-radius: 5px;
-        z-index: 10000;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    `;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.remove();
-        }
-    }, 3000);
-}
-
-// ==================== AUTO-SYNC FUNCTIONS ====================
-
-function toggleAutoSync() {
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        const isEnabled = checkbox.checked;
-        localStorage.setItem('autoSyncEnabled', isEnabled.toString());
-        
-        if (isEnabled) {
-            showNotification('Auto-sync enabled');
-            if (typeof startAutoSync === 'function') {
-                startAutoSync();
-            }
-        } else {
-            showNotification('Auto-sync disabled');
-            if (typeof stopAutoSync === 'function') {
-                stopAutoSync();
-            }
-        }
-    }
-}
-
-function initAutoSyncCheckbox() {
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        const autoSync = localStorage.getItem('autoSyncEnabled');
-        checkbox.checked = autoSync === 'true';
-    }
-}
-
-// ==================== GLOBAL EXPORTS ====================
-
-// Make functions globally available
+// Make all functions globally available
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.saveEntry = saveEntry;
 window.deleteRow = deleteRow;
 window.clearForm = clearForm;
 window.saveForm = saveUserData;
-window.logout = function() {
-    // Sign out from Firebase if available
-    if (typeof firebase !== 'undefined' && window.firebaseAuth) {
-        firebaseAuth.signOut();
-    }
-    
-    // Clear user data
-    localStorage.removeItem('currentUser');
-    
-    // Redirect to auth page
-    window.location.href = 'auth.html';
-};
-
-// Note: generatePDF and exportData/importData functions would need to be added separately
-// if you want to keep those features
+window.generatePDF = generatePDF;
+window.exportData = exportData;
+window.importData = importData;
+window.calculateTotal = calculateTotal;
+window.logout = logout;
