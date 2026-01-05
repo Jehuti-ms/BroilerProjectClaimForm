@@ -1085,69 +1085,43 @@ function exportData() {
 }
 
 // Import Data Function
-function importData() {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json';
+function parseCSV(csvText) {
+    const lines = csvText.split('\n');
+    const headers = lines[0].split(',').map(h => h.trim());
     
-    fileInput.onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            try {
-                const importData = JSON.parse(event.target.result);
-                
-                // Validate the import file structure
-                if (!importData.userData) {
-                    throw new Error('Invalid backup file format');
-                }
-                
-                const currentUser = localStorage.getItem('currentUser');
-                let userId;
-                
-                if (currentUser) {
-                    const user = JSON.parse(currentUser);
-                    userId = user.username || user.email;
-                    
-                    // Check if the imported user matches current user
-                    if (importData.userId && importData.userId !== userId) {
-                        if (!confirm(`This backup is for user "${importData.userId}". Import anyway?`)) {
-                            return;
-                        }
-                        userId = importData.userId;
-                    }
-                } else {
-                    userId = importData.userId || prompt('Please enter your user ID/email:');
-                    if (!userId) return;
-                }
-                
-                // Apply the imported data
-                localStorage.setItem(`userData_${userId}`, JSON.stringify(importData.userData));
-                
-                // Reload the current view
-                loadUserData(userId);
-                
-                showNotification('Data imported successfully!', 'success');
-                
-                // Auto-sync the imported data to Firebase
-                setTimeout(() => {
-                    if (typeof syncToCloud === 'function' && isOnline) {
-                        syncToCloud();
-                    }
-                }, 1000);
-                
-            } catch (error) {
-                console.error('Import error:', error);
-                showNotification('Error importing file: ' + error.message, 'error');
-            }
-        };
-        
-        reader.readAsText(file);
-    };
+    const data = [];
     
-    fileInput.click();
+    for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue; // Skip empty lines
+        
+        const values = lines[i].split(',');
+        const row = {};
+        
+        headers.forEach((header, index) => {
+            row[header] = values[index] ? values[index].trim() : '';
+        });
+        
+        data.push(row);
+    }
+    
+    return data;
+}
+
+async function handleCSVImport(csvData) {
+    // Example: Convert CSV rows to your data structure
+    const convertedData = csvData.map(row => ({
+        id: row.id || generateId(),
+        title: row.title || row.subject || '',
+        description: row.description || row.notes || '',
+        // Map other fields as needed
+    }));
+    
+    // Save to localStorage
+    localStorage.setItem('gradebookData', JSON.stringify(convertedData));
+    
+    // Update UI
+    await loadData();
+    renderTable();
 }
 
 // Backup to Local Storage
