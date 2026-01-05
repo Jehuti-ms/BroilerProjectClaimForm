@@ -1,4 +1,8 @@
 // app.js - Main Application with Firebase Integration
+// Add at the top of app.js
+console.log('=== APP.JS LOADED ===');
+console.log('Current page:', window.location.pathname);
+console.log('User in localStorage:', JSON.parse(localStorage.getItem('currentUser') || '{}'));
 
 // Global variables
 let currentEditingRow = null;
