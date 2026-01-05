@@ -9,6 +9,11 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 </head>
 <body>
     <div class="container">
@@ -30,6 +35,11 @@
                     <input type="checkbox" id="auto-sync">
                     Auto-Sync
                 </label>
+            </div>
+            
+            <!-- Firebase Connection Status -->
+            <div id="firebase-status" style="position: absolute; top: 15px; left: 15px; font-size: 12px; background: #f8f9fa; padding: 4px 8px; border-radius: 4px; display: none;">
+                <span id="firebase-status-text">Firebase: 🔄</span>
             </div>
         </div>
 
@@ -101,34 +111,46 @@
         <!-- Cloud Sync Section -->
         <div class="form-section">
             <div class="cloud-sync-section">
-                <h3>📡 Cloud Sync</h3>
-                <p class="sync-description">Keep your data synchronized across all devices</p>
+                <h3>📡 Firebase Cloud Sync</h3>
+                <p class="sync-description">Securely sync your data to Firebase across all devices</p>
                 
                 <div class="cloud-sync-buttons">
                     <button onclick="syncToCloud()" class="cloud-btn">
                         <span class="btn-icon">📤</span>
-                        Sync to Cloud
+                        Sync to Firebase
                     </button>
                     <button onclick="syncFromCloud()" class="cloud-btn">
                         <span class="btn-icon">📥</span>
-                        Sync from Cloud
+                        Load from Firebase
+                    </button>
+                    <button onclick="testFirebaseConnection()" class="cloud-btn" style="background: #FF9800;">
+                        <span class="btn-icon">🔧</span>
+                        Test Connection
                     </button>
                 </div>
                 
-                <div id="last-sync" class="last-sync" style="display: none;"></div>
+                <div id="last-sync" class="last-sync" style="display: none; margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;"></div>
+                
+                <!-- Auto-Sync Option -->
+                <div class="auto-sync-container" style="margin-top: 15px;">
+                    <label>
+                        <input type="checkbox" id="firebase-auto-sync">
+                        Enable Firebase Auto-Sync (every 5 minutes)
+                    </label>
+                </div>
                 
                 <div class="sync-features">
                     <div class="feature">
-                        <span class="feature-icon">🔄</span>
-                        <span>Auto-sync every 5 minutes</span>
+                        <span class="feature-icon">🔒</span>
+                        <span>Secure Firebase storage</span>
                     </div>
                     <div class="feature">
                         <span class="feature-icon">📱</span>
                         <span>Works across all devices</span>
                     </div>
                     <div class="feature">
-                        <span class="feature-icon">💾</span>
-                        <span>Automatic backups</span>
+                        <span class="feature-icon">⚡</span>
+                        <span>Real-time updates</span>
                     </div>
                 </div>
             </div>
@@ -152,10 +174,14 @@
                         <span class="btn-icon">🗑️</span>
                         Clear Form
                     </button>
+                    <button onclick="backupToLocal()" class="export-btn" style="background: #9C27B0;">
+                        <span class="btn-icon">💾</span>
+                        Local Backup
+                    </button>
                 </div>
                 
                 <p class="data-help">
-                    Export your data for backup or transfer to another device. Import to restore from backup.
+                    Export for backup or transfer. Import to restore. Local backup for offline safety.
                 </p>
             </div>
         </div>
@@ -234,10 +260,13 @@
             </div>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js"></script>
+    
+    <!-- Firebase scripts (REPLACE SUPABASE) -->
+    <script src="firebase-config.js"></script>
     <script src="app.js"></script>
-    <script src="sync.js"></script>  
+    <script src="sync.js"></script>
+    
+    <!-- Remove this line: <script src="config.js"></script> -->
     
 </body>
 </html>
