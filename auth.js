@@ -1,7 +1,10 @@
-// Authentication functions
+// auth.js - Firebase Authentication Version
+
+// Navigation functions (keep these)
 function showRegister() {
     document.getElementById('login-form').parentElement.style.display = 'none';
     document.getElementById('register-card').style.display = 'block';
+    document.getElementById('reset-card').style.display = 'none';
 }
 
 function showLogin() {
@@ -12,139 +15,487 @@ function showLogin() {
 
 function showReset() {
     document.getElementById('login-form').parentElement.style.display = 'none';
+    document.getElementById('register-card').style.display = 'none';
     document.getElementById('reset-card').style.display = 'block';
 }
 
-// Handle login form submission
-document.getElementById('login-form').addEventListener('submit', function(e) {
+// Initialize Firebase auth when DOM loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for Firebase to load
+    setTimeout(() => {
+        if (window.auth) {
+            console.log('Firebase Auth loaded');
+            
+            // Check if user is already signed in
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    console.log('User already signed in:', user.email);
+                    // User is signed in, redirect to main app
+                    const currentUser = {
+                        username: user.email,
+                        employeeName: user.displayName || user.email.split('@')[0],
+                        uid: user.uid
+                    };
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    window.location.href = 'index.html';
+                } else {
+                    console.log('No user signed in');
+                }
+            });
+        } else {
+            console.warn('Firebase Auth not loaded - using fallback');
+        }
+        
+        // Add emergency reset button for development
+        addEmergencyReset();
+    }, 1000);
+});
+
+// Handle login form submission with Firebase
+document.getElementById('login-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const username = document.getElementById('username').value;
+    const email = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
-    const employeeName = document.getElementById('employee-name-auth').value;
+    const employeeName = document.getElementById('employee-name-auth').value.trim();
     
-    // Simple authentication
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    if (!email || !password) {
+        alert('Please enter both email and password');
+        return;
+    }
     
-    if (users[username] && users[username].password === password) {
-        // Successful login
-        const currentUser = {
-            username: username,
-            employeeName: users[username].employeeName
-        };
+    // Show loading state
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Signing in...';
+    submitBtn.disabled = true;
+    
+    try {
+        if (window.auth) {
+            // Try Firebase authentication
+            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            const user = userCredential.user;
+            
+            console.log('Firebase login successful:', user.email);
+            
+            // Store user info
+            const currentUser = {
+                username: user.email,
+                employeeName: employeeName || user.displayName || user.email.split('@')[0],
+                uid: user.uid
+            };
+            
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Update display name if provided
+            if (employeeName && (!user.displayName || user.displayName !== employeeName)) {
+                await user.updateProfile({
+                    displayName: employeeName
+                });
+            }
+            
+            // Show success message
+            showAuthNotification('Login successful! Redirecting...', 'success');
+            
+            // Redirect after delay
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1500);
+            
+        } else {
+            // Firebase not available - fallback to localStorage
+            console.warn('Firebase not available, using localStorage fallback');
+            fallbackLocalStorageLogin(email, password, employeeName);
+        }
         
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        window.location.href = 'index.html';
-    } else {
-        alert('Invalid username or password');
+    } catch (error) {
+        console.error('Login error:', error);
+        
+        // Handle specific Firebase errors
+        let errorMessage = 'Login failed';
+        
+        switch (error.code) {
+            case 'auth/user-not-found':
+                errorMessage = 'No account found with this email';
+                break;
+            case 'auth/wrong-password':
+                errorMessage = 'Incorrect password';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Invalid email address';
+                break;
+            case 'auth/user-disabled':
+                errorMessage = 'Account disabled';
+                break;
+            case 'auth/too-many-requests':
+                errorMessage = 'Too many failed attempts. Try again later';
+                break;
+            default:
+                errorMessage = error.message || 'Login failed';
+        }
+        
+        // Try fallback
+        const fallbackSuccess = fallbackLocalStorageLogin(email, password, employeeName);
+        if (!fallbackSuccess) {
+            showAuthNotification(errorMessage, 'error');
+        }
+        
+    } finally {
+        // Reset button
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
     }
 });
 
-// Handle registration form submission
-document.getElementById('register-form').addEventListener('submit', function(e) {
+// Fallback localStorage login
+function fallbackLocalStorageLogin(email, password, employeeName) {
+    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    
+    if (users[email] && users[email].password === password) {
+        // Successful login
+        const currentUser = {
+            username: email,
+            employeeName: employeeName || users[email].employeeName || email.split('@')[0],
+            uid: users[email].uid || 'local_' + Date.now()
+        };
+        
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        showAuthNotification('Login successful! (Local storage)', 'success');
+        
+        setTimeout(() => {
+            window.location.href = 'index.html';
+        }, 1500);
+        
+        return true;
+    }
+    
+    return false;
+}
+
+// Handle registration with Firebase
+document.getElementById('register-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const username = document.getElementById('new-username').value;
+    const email = document.getElementById('new-username').value.trim();
     const password = document.getElementById('new-password').value;
     const confirmPassword = document.getElementById('confirm-password').value;
-    const employeeName = document.getElementById('new-employee-name').value;
+    const employeeName = document.getElementById('new-employee-name').value.trim();
     
     // Validation
+    if (!email || !email.includes('@')) {
+        alert('Please enter a valid email address');
+        return;
+    }
+    
     if (password !== confirmPassword) {
         alert('Passwords do not match');
         return;
     }
     
-    if (password.length < 4) {
-        alert('Password must be at least 4 characters long');
+    if (password.length < 6) {
+        alert('Password must be at least 6 characters long');
         return;
     }
     
-    // Get existing users
+    if (!employeeName) {
+        alert('Please enter your name');
+        return;
+    }
+    
+    // Show loading state
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Creating account...';
+    submitBtn.disabled = true;
+    
+    try {
+        if (window.auth) {
+            // Create user with Firebase Auth
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            const user = userCredential.user;
+            
+            console.log('Firebase registration successful:', user.email);
+            
+            // Update profile with display name
+            await user.updateProfile({
+                displayName: employeeName
+            });
+            
+            // Also save to localStorage for fallback
+            const users = JSON.parse(localStorage.getItem('users') || '{}');
+            users[email] = {
+                password: password,
+                employeeName: employeeName,
+                createdAt: new Date().toISOString(),
+                firebaseUID: user.uid
+            };
+            
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            // Store current user info
+            const currentUser = {
+                username: email,
+                employeeName: employeeName,
+                uid: user.uid
+            };
+            
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Create initial user data in Firestore
+            if (window.firestore) {
+                try {
+                    await firestore.collection('userData').doc(email).set({
+                        userId: email,
+                        data: '{}',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        displayName: employeeName,
+                        lastUpdated: new Date().toISOString()
+                    });
+                    console.log('Initial Firestore document created');
+                } catch (firestoreError) {
+                    console.warn('Could not create Firestore document:', firestoreError);
+                }
+            }
+            
+            showAuthNotification('Registration successful!', 'success');
+            
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1500);
+            
+        } else {
+            // Firebase not available - fallback to localStorage
+            console.warn('Firebase not available, using localStorage fallback');
+            fallbackLocalStorageRegistration(email, password, employeeName);
+        }
+        
+    } catch (error) {
+        console.error('Registration error:', error);
+        
+        let errorMessage = 'Registration failed';
+        
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                errorMessage = 'Email already registered';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Invalid email address';
+                break;
+            case 'auth/weak-password':
+                errorMessage = 'Password is too weak';
+                break;
+            case 'auth/operation-not-allowed':
+                errorMessage = 'Registration is currently disabled';
+                break;
+            default:
+                errorMessage = error.message || 'Registration failed';
+        }
+        
+        // Try fallback
+        const fallbackSuccess = fallbackLocalStorageRegistration(email, password, employeeName);
+        if (!fallbackSuccess) {
+            showAuthNotification(errorMessage, 'error');
+        }
+        
+    } finally {
+        // Reset button
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    }
+});
+
+// Fallback localStorage registration
+function fallbackLocalStorageRegistration(email, password, employeeName) {
     const users = JSON.parse(localStorage.getItem('users') || '{}');
     
-    // Check if username already exists
-    if (users[username]) {
-        alert('Username already exists');
-        return;
+    if (users[email]) {
+        showAuthNotification('Email already registered in local storage', 'error');
+        return false;
     }
     
-    // Create new user
-    users[username] = {
+    users[email] = {
         password: password,
         employeeName: employeeName,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        uid: 'local_' + Date.now()
     };
     
-    // Save users
     localStorage.setItem('users', JSON.stringify(users));
     
-    // Auto-login after registration
     const currentUser = {
-        username: username,
-        employeeName: employeeName
+        username: email,
+        employeeName: employeeName,
+        uid: users[email].uid
     };
     
     localStorage.setItem('currentUser', JSON.stringify(currentUser));
     
-    alert('Registration successful!');
-    window.location.href = 'index.html';
-});
+    showAuthNotification('Registration successful! (Local storage)', 'success');
+    
+    setTimeout(() => {
+        window.location.href = 'index.html';
+    }, 1500);
+    
+    return true;
+}
 
-// Handle password reset form submission
-document.getElementById('reset-form').addEventListener('submit', function(e) {
+// Handle password reset with Firebase
+document.getElementById('reset-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const username = document.getElementById('reset-username').value;
+    const email = document.getElementById('reset-username').value.trim();
     const newPassword = document.getElementById('reset-new-password').value;
     const confirmNewPassword = document.getElementById('reset-confirm-password').value;
     
-    // Validation
+    if (!email || !email.includes('@')) {
+        alert('Please enter a valid email address');
+        return;
+    }
+    
     if (newPassword !== confirmNewPassword) {
         alert('Passwords do not match');
         return;
     }
     
-    if (newPassword.length < 4) {
-        alert('Password must be at least 4 characters long');
+    if (newPassword.length < 6) {
+        alert('Password must be at least 6 characters long');
         return;
     }
     
-    // Get existing users
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    // Show loading state
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Processing...';
+    submitBtn.disabled = true;
     
-    // Check if username exists
-    if (!users[username]) {
-        alert('Username not found');
-        return;
+    try {
+        if (window.auth) {
+            // Firebase requires user to be logged in to change password directly
+            // Instead, we'll send a password reset email
+            await auth.sendPasswordResetEmail(email);
+            
+            showAuthNotification('Password reset email sent! Check your inbox.', 'success');
+            
+            // Clear form
+            this.reset();
+            
+            // Return to login after delay
+            setTimeout(() => {
+                showLogin();
+            }, 3000);
+            
+        } else {
+            // Fallback to localStorage reset
+            fallbackLocalStoragePasswordReset(email, newPassword);
+        }
+        
+    } catch (error) {
+        console.error('Password reset error:', error);
+        
+        let errorMessage = 'Password reset failed';
+        
+        switch (error.code) {
+            case 'auth/user-not-found':
+                errorMessage = 'No account found with this email';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Invalid email address';
+                break;
+            default:
+                errorMessage = error.message || 'Password reset failed';
+        }
+        
+        // Try fallback
+        const fallbackSuccess = fallbackLocalStoragePasswordReset(email, newPassword);
+        if (!fallbackSuccess) {
+            showAuthNotification(errorMessage, 'error');
+        }
+        
+    } finally {
+        // Reset button
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
     }
-    
-    // Update password
-    users[username].password = newPassword;
-    users[username].passwordResetAt = new Date().toISOString();
-    
-    // Save updated users
-    localStorage.setItem('users', JSON.stringify(users));
-    
-    alert('Password reset successful! You can now login with your new password.');
-    showLogin();
 });
 
-// Check if user is already logged in
-document.addEventListener('DOMContentLoaded', function() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        window.location.href = 'index.html';
+// Fallback localStorage password reset
+function fallbackLocalStoragePasswordReset(email, newPassword) {
+    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    
+    if (!users[email]) {
+        showAuthNotification('Email not found in local storage', 'error');
+        return false;
     }
     
-    // Add emergency reset button for development (remove in production)
-    addEmergencyReset();
-});
+    users[email].password = newPassword;
+    users[email].passwordResetAt = new Date().toISOString();
+    
+    localStorage.setItem('users', JSON.stringify(users));
+    
+    showAuthNotification('Password reset successful! (Local storage)', 'success');
+    
+    setTimeout(() => {
+        showLogin();
+    }, 2000);
+    
+    return true;
+}
+
+// Notification function for auth pages
+function showAuthNotification(message, type) {
+    // Remove any existing notifications
+    const existingNotifications = document.querySelectorAll('.auth-notification');
+    existingNotifications.forEach(notification => notification.remove());
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `auth-notification ${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4CAF50' : '#2196F3'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 5px;
+        z-index: 10000;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        max-width: 400px;
+        animation: slideIn 0.3s ease-out;
+    `;
+    
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(notification);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.animation = 'slideOut 0.3s ease-out';
+            setTimeout(() => notification.remove(), 300);
+        }
+    }, 5000);
+}
 
 // Emergency reset function for development
 function addEmergencyReset() {
+    // Only add in development (localhost)
+    if (!window.location.hostname.includes('localhost') && 
+        !window.location.hostname.includes('127.0.0.1')) {
+        return;
+    }
+    
     const emergencyReset = document.createElement('button');
-    emergencyReset.textContent = 'Emergency Reset (Clear All Data)';
+    emergencyReset.textContent = 'Emergency Reset';
     emergencyReset.style.cssText = `
         position: fixed;
         bottom: 10px;
@@ -152,46 +503,95 @@ function addEmergencyReset() {
         background: #ff4444;
         color: white;
         border: none;
-        padding: 10px;
+        padding: 8px 12px;
         border-radius: 5px;
         font-size: 12px;
         cursor: pointer;
         z-index: 10000;
+        opacity: 0.7;
+        transition: opacity 0.3s;
     `;
-    emergencyReset.onclick = function() {
-        if (confirm('WARNING: This will clear ALL user data including forms and passwords. Continue?')) {
-            localStorage.clear();
-            alert('All data cleared. Page will reload.');
-            location.reload();
+    
+    emergencyReset.onmouseenter = () => emergencyReset.style.opacity = '1';
+    emergencyReset.onmouseleave = () => emergencyReset.style.opacity = '0.7';
+    
+    emergencyReset.onclick = async function() {
+        if (confirm('WARNING: This will clear ALL local data. Continue?')) {
+            try {
+                // Sign out from Firebase if signed in
+                if (window.auth) {
+                    await auth.signOut();
+                }
+                
+                // Clear localStorage
+                localStorage.clear();
+                
+                // Clear IndexedDB if exists
+                if (window.indexedDB) {
+                    const databases = await indexedDB.databases();
+                    databases.forEach(db => {
+                        if (db.name) {
+                            indexedDB.deleteDatabase(db.name);
+                        }
+                    });
+                }
+                
+                showAuthNotification('All data cleared. Reloading...', 'success');
+                
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Emergency reset error:', error);
+                showAuthNotification('Reset partially failed', 'error');
+            }
         }
     };
+    
     document.body.appendChild(emergencyReset);
 }
 
-// Manual password reset function (can be called from browser console)
-function manualPasswordReset(username, newPassword) {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
+// Firebase helper functions
+async function getCurrentFirebaseUser() {
+    if (!window.auth) return null;
     
-    if (!users[username]) {
-        console.error('User not found:', username);
-        return false;
-    }
-    
-    users[username].password = newPassword;
-    users[username].manualResetAt = new Date().toISOString();
-    
-    localStorage.setItem('users', JSON.stringify(users));
-    console.log('Password reset for user:', username);
-    return true;
-}
-
-// List all users (for admin purposes)
-function listAllUsers() {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    console.log('All registered users:');
-    Object.keys(users).forEach(username => {
-        console.log('Username:', username, 'Name:', users[username].employeeName);
+    return new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+            unsubscribe();
+            resolve(user);
+        });
     });
-    return users;
 }
 
+// Manual admin functions (for browser console)
+window.authHelpers = {
+    // List all users from localStorage
+    listLocalUsers: function() {
+        const users = JSON.parse(localStorage.getItem('users') || '{}');
+        console.log('Local Storage Users:');
+        Object.keys(users).forEach(email => {
+            console.log(`- ${email}: ${users[email].employeeName}`);
+        });
+        return users;
+    },
+    
+    // Get current Firebase user
+    getCurrentUser: async function() {
+        const user = await getCurrentFirebaseUser();
+        console.log('Current Firebase user:', user);
+        return user;
+    },
+    
+    // Create test user
+    createTestUser: async function(email = 'test@example.com', password = 'test123') {
+        try {
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            console.log('Test user created:', userCredential.user);
+            return userCredential.user;
+        } catch (error) {
+            console.error('Test user creation failed:', error);
+            return null;
+        }
+    }
+};
