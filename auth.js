@@ -65,46 +65,65 @@ function setupAuthSystem() {
     }
 
     // Handle login
-    async function handleLogin(email, password, employeeName) {
-        try {
-            clearError();
-            console.log('Attempting login:', email);
-            
-            // Sign in with Firebase
-            const userCredential = await auth.signInWithEmailAndPassword(email, password);
-            const firebaseUser = userCredential.user;
-            
-            console.log('Firebase login successful');
-            
-            // Create user object
-            const currentUser = {
-                email: email,
-                password: password,
-                uid: firebaseUser.uid,
-                firebaseAuth: true,
-                employeeName: employeeName,
-                timestamp: new Date().toISOString()
-            };
-            
-            // Save user data
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            localStorage.setItem('userEmail', email);
-            localStorage.setItem('userPassword', password);
-            localStorage.setItem('mainAppEmployeeName', employeeName);
-            
-            console.log('Login successful:', currentUser);
-            
-            // Redirect to main page
-           setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 100);
-            
-        } catch (error) {
-            console.error('Login error:', error);
-            showError(error.message, 'login');
+   // Handle login
+async function handleLogin(email, password, employeeName) {
+    try {
+        clearError();
+        console.log('Attempting login:', email);
+        
+        // Prevent multiple clicks
+        const loginBtn = document.querySelector('#login-form button[type="submit"]');
+        if (loginBtn) {
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing in...';
+        }
+        
+        // Sign in with Firebase
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        const firebaseUser = userCredential.user;
+        
+        console.log('Firebase login successful');
+        
+        // Create user object
+        const currentUser = {
+            email: email,
+            password: password,
+            uid: firebaseUser.uid,
+            firebaseAuth: true,
+            employeeName: employeeName,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Save user data
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userPassword', password);
+        localStorage.setItem('mainAppEmployeeName', employeeName);
+        
+        console.log('Login successful:', currentUser);
+        
+        // Show success message
+        showError('Login successful! Redirecting...', 'login');
+        
+        // Force redirect after short delay
+        setTimeout(() => {
+            console.log('Redirecting to index.html...');
+            window.location.href = 'index.html';
+        }, 1500);
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        showError(error.message, 'login');
+        
+        // Re-enable button
+        const loginBtn = document.querySelector('#login-form button[type="submit"]');
+        if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Sign In';
         }
     }
-
+}
+    
     // Handle register
     async function handleRegister(email, password, employeeName) {
         try {
