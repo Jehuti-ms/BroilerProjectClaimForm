@@ -1,6 +1,10 @@
 /**
  * Firebase Authentication System
  */
+// Add at the top of auth.js
+console.log('=== AUTH.JS LOADED ===');
+console.log('Current page:', window.location.pathname);
+console.log('User in localStorage:', localStorage.getItem('currentUser'));
 
 // Wait for Firebase to load
 function initializeAuth() {
