@@ -1,6 +1,4 @@
-// sync.js - All cloud synchronization logic
-
-// Cloud Sync Configuration
+// sync.js - Firebase version
 const SYNC_CONFIG = {
     autoSyncInterval: 5 * 60 * 1000, // 5 minutes
     retryAttempts: 3
@@ -10,10 +8,10 @@ const SYNC_CONFIG = {
 function initCloudSync() {
     updateLastSyncDisplay();
     startAutoSync();
-    console.log('Cloud sync initialized');
+    console.log('Firebase cloud sync initialized');
 }
 
-// Main sync function - Push to cloud
+// Main sync function - Push to Firebase
 async function syncToCloud() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -29,14 +27,14 @@ async function syncToCloud() {
         return;
     }
     
-    showSyncStatus('🔄 Syncing to cloud...', 'loading');
+    showSyncStatus('🔄 Syncing to Firebase...', 'loading');
     
     try {
-        // Try Supabase first
-        const supabaseSuccess = await syncToSupabase(user.username, JSON.parse(userData));
+        // Try Firebase Firestore
+        const firebaseSuccess = await syncToFirebase(user.username, JSON.parse(userData));
         
-        if (supabaseSuccess) {
-            showSyncStatus('✅ Data synced to cloud!', 'success');
+        if (firebaseSuccess) {
+            showSyncStatus('✅ Data synced to Firebase!', 'success');
         } else {
             // Fallback to localStorage backup
             await syncToLocalBackup(user.username, JSON.parse(userData));
@@ -47,12 +45,12 @@ async function syncToCloud() {
         updateLastSyncDisplay();
         
     } catch (error) {
-        console.error('Cloud sync failed:', error);
+        console.error('Firebase sync failed:', error);
         showSyncStatus('❌ Sync failed', 'error');
     }
 }
 
-// Pull from cloud
+// Pull from Firebase
 async function syncFromCloud() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -61,10 +59,10 @@ async function syncFromCloud() {
     }
     
     const user = JSON.parse(currentUser);
-    showSyncStatus('🔄 Loading from cloud...', 'loading');
+    showSyncStatus('🔄 Loading from Firebase...', 'loading');
     
     try {
-        let cloudData = await syncFromSupabase(user.username);
+        let cloudData = await syncFromFirebase(user.username);
         
         if (!cloudData) {
             cloudData = await syncFromLocalBackup(user.username);
@@ -78,72 +76,73 @@ async function syncFromCloud() {
                 loadUserData(user.username);
             }
             
-            showSyncStatus('✅ Cloud data loaded!', 'success');
+            showSyncStatus('✅ Firebase data loaded!', 'success');
             updateLastSyncDisplay();
         } else {
             showSyncStatus('ℹ️ No cloud data found', 'info');
         }
         
     } catch (error) {
-        console.error('Cloud retrieval failed:', error);
+        console.error('Firebase retrieval failed:', error);
         showSyncStatus('❌ Sync failed', 'error');
     }
 }
 
-// Supabase sync functions
-async function syncToSupabase(username, data) {
+// Firebase sync functions
+async function syncToFirebase(userId, data) {
     try {
-        if (!window.supabase) {
-            throw new Error('Supabase not initialized');
+        if (!firestore) {
+            throw new Error('Firebase not initialized');
         }
 
-        const { error } = await supabase
-            .from('user_data')
-            .upsert({
-                user_id: username,
-                data: data,
-                updated_at: new Date().toISOString()
-            }, {
-                onConflict: 'user_id'
-            });
-
-        if (error) {
-            console.error('Supabase error:', error);
-            return false;
-        }
+        // Convert data to string for storage
+        const dataString = JSON.stringify(data);
+        
+        // Create or update user document
+        await firestore.collection('userData').doc(userId).set({
+            userId: userId,
+            data: dataString,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastSync: new Date().toISOString()
+        }, { merge: true });
         
         return true;
     } catch (error) {
-        console.error('Supabase sync failed:', error);
+        console.error('Firebase sync error:', error);
         return false;
     }
 }
 
-async function syncFromSupabase(username) {
+async function syncFromFirebase(userId) {
     try {
-        if (!window.supabase) {
-            throw new Error('Supabase not initialized');
+        if (!firestore) {
+            throw new Error('Firebase not initialized');
         }
 
-        const { data, error } = await supabase
-            .from('user_data')
-            .select('*')
-            .eq('user_id', username)
-            .single();
-
-        if (error) {
-            console.error('Supabase error:', error);
+        // Get user document
+        const docRef = firestore.collection('userData').doc(userId);
+        const doc = await docRef.get();
+        
+        if (!doc.exists) {
+            console.log('No Firebase data found for user:', userId);
             return null;
+        }
+        
+        const data = doc.data();
+        
+        // Parse the data string back to object
+        if (data.data) {
+            data.data = JSON.parse(data.data);
         }
         
         return data;
     } catch (error) {
-        console.error('Supabase retrieval failed:', error);
+        console.error('Firebase retrieval error:', error);
         return null;
     }
 }
 
-// Local backup functions (fallback)
+// Local backup functions (fallback - keep existing)
 async function syncToLocalBackup(username, data) {
     const syncData = {
         username: username,
@@ -163,30 +162,31 @@ async function syncFromLocalBackup(username) {
     return null;
 }
 
-// Auto-sync functionality
+// Auto-sync with Firebase
 let autoSyncInterval = null;
 
 function startAutoSync() {
-    // Stop any existing interval
     if (autoSyncInterval) {
         clearInterval(autoSyncInterval);
     }
     
-    // Auto-sync when online and app is active
     autoSyncInterval = setInterval(() => {
-        if (navigator.onLine && !document.hidden) {
+        if (navigator.onLine && !document.hidden && firestore) {
             const currentUser = localStorage.getItem('currentUser');
             if (currentUser) {
                 const user = JSON.parse(currentUser);
                 const userData = localStorage.getItem(`userData_${user.username}`);
                 if (userData) {
-                    console.log('Auto-syncing data...');
-                    syncToSupabase(user.username, JSON.parse(userData))
+                    console.log('Auto-syncing to Firebase...');
+                    syncToFirebase(user.username, JSON.parse(userData))
                         .then(success => {
                             if (success) {
                                 localStorage.setItem('lastCloudSync', new Date().toISOString());
                                 updateLastSyncDisplay();
                             }
+                        })
+                        .catch(error => {
+                            console.error('Auto-sync error:', error);
                         });
                 }
             }
@@ -201,153 +201,42 @@ function stopAutoSync() {
     }
 }
 
-// Sync status display
-function updateLastSyncDisplay() {
-    const lastSync = localStorage.getItem('lastCloudSync');
-    const lastSyncElement = document.getElementById('last-sync');
+// Test Firebase connection
+async function testFirebaseConnection() {
+    console.log('=== FIREBASE DEBUG INFO ===');
+    console.log('Firestore exists:', !!firestore);
+    console.log('Auth exists:', !!auth);
+    console.log('Current user:', localStorage.getItem('currentUser'));
     
-    if (lastSyncElement) {
-        if (lastSync) {
-            const lastSyncDate = new Date(lastSync);
-            const now = new Date();
-            const diffMinutes = Math.floor((now - lastSyncDate) / (1000 * 60));
+    if (firestore) {
+        try {
+            // Test write and read
+            const testRef = firestore.collection('connectionTests').doc('test');
+            await testRef.set({
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                test: 'connection'
+            });
             
-            let statusText = `Last synced: ${lastSyncDate.toLocaleString()}`;
-            if (diffMinutes < 5) {
-                statusText += ' 🟢';
-            } else if (diffMinutes < 60) {
-                statusText += ' 🟡';
-            } else {
-                statusText += ' 🔴';
-            }
+            const doc = await testRef.get();
+            console.log('Firebase test write successful:', doc.exists);
             
-            lastSyncElement.innerHTML = statusText;
-        } else {
-            lastSyncElement.innerHTML = 'Never synced 🔴';
-        }
-        lastSyncElement.style.display = 'block';
-    }
-}
-
-function showSyncStatus(message, type) {
-    const lastSyncElement = document.getElementById('last-sync');
-    if (lastSyncElement) {
-        lastSyncElement.innerHTML = message;
-        lastSyncElement.style.display = 'block';
-        lastSyncElement.style.padding = '10px';
-        lastSyncElement.style.margin = '10px 0';
-        lastSyncElement.style.borderRadius = '4px';
-        lastSyncElement.style.textAlign = 'center';
-        
-        const colors = {
-            success: '#4CAF50',
-            error: '#f44336',
-            loading: '#2196F3',
-            info: '#FF9800'
-        };
-        
-        lastSyncElement.style.background = colors[type] || colors.info;
-        lastSyncElement.style.color = 'white';
-    }
-    
-    // Also show notification
-    showNotification(message, type);
-}
-
-// Enhanced notification function for sync
-function showNotification(message, type = 'success') {
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => notification.remove());
-    
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#f44336' : type === 'loading' ? '#2196F3' : '#4CAF50'};
-        color: white;
-        padding: 15px 20px;
-        border-radius: 5px;
-        z-index: 10000;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    `;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.remove();
-        }
-    }, 3000);
-}
-
-// Test Supabase connection
-async function testSupabaseConnection() {
-    try {
-        if (!window.supabase) {
+            // Clean up
+            await testRef.delete();
+            
+            console.log('✅ Firebase connection successful!');
+            showNotification('Firebase connected!', 'success');
+            return true;
+        } catch (error) {
+            console.error('Firebase test failed:', error);
+            showNotification('Firebase test failed: ' + error.message, 'error');
             return false;
         }
-
-        const { data, error } = await supabase
-            .from('user_data')
-            .select('count')
-            .limit(1);
-
-        return !error;
-    } catch (error) {
-        console.error('Supabase test failed:', error);
+    } else {
+        console.error('Firebase not initialized');
+        showNotification('Firebase not loaded - check firebase-config.js', 'error');
         return false;
     }
 }
 
-// Export functions for use in other files (if using modules)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        initCloudSync,
-        syncToCloud,
-        syncFromCloud,
-        startAutoSync,
-        stopAutoSync,
-        testSupabaseConnection
-    };
-}
-
-// Add this to sync.js - Debug function
-async function debugSupabaseConnection() {
-    console.log('=== SUPABASE DEBUG INFO ===');
-    console.log('Supabase client exists:', !!window.supabase);
-    console.log('Supabase URL:', SUPABASE_CONFIG?.url);
-    console.log('Current user:', localStorage.getItem('currentUser'));
-    
-    if (window.supabase) {
-        try {
-            // Test simple query
-            const { data, error } = await supabase
-                .from('user_data')
-                .select('user_id')
-                .limit(1);
-
-            console.log('Supabase test query - Error:', error);
-            console.log('Supabase test query - Data:', data);
-            
-            if (error) {
-                console.error('Supabase error details:', error);
-                showNotification('Supabase error: ' + error.message, 'error');
-            } else {
-                console.log('✅ Supabase connection successful!');
-                showNotification('Supabase connected!', 'success');
-            }
-        } catch (error) {
-            console.error('Supabase test failed:', error);
-            showNotification('Supabase test failed: ' + error.message, 'error');
-        }
-    } else {
-        console.error('Supabase client not loaded');
-        showNotification('Supabase not loaded - check config.js', 'error');
-    }
-}
-
-// Call this to test - add to your console or create a button
-// debugSupabaseConnection();
+// Keep existing utility functions (updateLastSyncDisplay, showSyncStatus, showNotification)
+// These remain the same
