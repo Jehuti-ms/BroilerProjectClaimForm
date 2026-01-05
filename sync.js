@@ -238,5 +238,85 @@ async function testFirebaseConnection() {
     }
 }
 
-// Keep existing utility functions (updateLastSyncDisplay, showSyncStatus, showNotification)
-// These remain the same
+// ====================Utility functions (updateLastSyncDisplay, showSyncStatus, showNotification)
+// Sync status display
+function updateLastSyncDisplay() {
+    const lastSync = localStorage.getItem('lastCloudSync');
+    const lastSyncElement = document.getElementById('last-sync');
+    
+    if (lastSyncElement) {
+        if (lastSync) {
+            const lastSyncDate = new Date(lastSync);
+            const now = new Date();
+            const diffMinutes = Math.floor((now - lastSyncDate) / (1000 * 60));
+            
+            let statusText = `Last synced: ${lastSyncDate.toLocaleString()}`;
+            if (diffMinutes < 5) {
+                statusText += ' 🟢';
+            } else if (diffMinutes < 60) {
+                statusText += ' 🟡';
+            } else {
+                statusText += ' 🔴';
+            }
+            
+            lastSyncElement.innerHTML = statusText;
+        } else {
+            lastSyncElement.innerHTML = 'Never synced 🔴';
+        }
+        lastSyncElement.style.display = 'block';
+    }
+}
+
+function showSyncStatus(message, type) {
+    const lastSyncElement = document.getElementById('last-sync');
+    if (lastSyncElement) {
+        lastSyncElement.innerHTML = message;
+        lastSyncElement.style.display = 'block';
+        lastSyncElement.style.padding = '10px';
+        lastSyncElement.style.margin = '10px 0';
+        lastSyncElement.style.borderRadius = '4px';
+        lastSyncElement.style.textAlign = 'center';
+        
+        const colors = {
+            success: '#4CAF50',
+            error: '#f44336',
+            loading: '#2196F3',
+            info: '#FF9800'
+        };
+        
+        lastSyncElement.style.background = colors[type] || colors.info;
+        lastSyncElement.style.color = 'white';
+    }
+    
+    // Also show notification
+    showNotification(message, type);
+}
+
+// Enhanced notification function for sync
+function showNotification(message, type = 'success') {
+    const existingNotifications = document.querySelectorAll('.notification');
+    existingNotifications.forEach(notification => notification.remove());
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#f44336' : type === 'loading' ? '#2196F3' : '#4CAF50'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 5px;
+        z-index: 10000;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
