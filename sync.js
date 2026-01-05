@@ -1,4 +1,4 @@
-// sync.js - Complete Firebase Synchronization (FIXED VERSION)
+// sync.js - Complete Firebase Synchronization (FIXED - NO RECURSION)
 
 // Cloud Sync Configuration
 const SYNC_CONFIG = {
@@ -12,6 +12,50 @@ let isSyncing = false;
 let lastSyncAttempt = null;
 let syncRetryCount = 0;
 let autoSyncInterval = null;
+
+// Safe Firebase test function (no recursion)
+async function safeFirebaseTest() {
+    console.log('Running safe Firebase test from sync.js...');
+    
+    if (!firestore) {
+        console.warn('Firestore not available for testing');
+        return false;
+    }
+    
+    try {
+        // Create a unique test document ID
+        const testId = 'synctest_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const testRef = firestore.collection('syncTests').doc(testId);
+        
+        // Test write operation
+        await testRef.set({
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            test: 'sync_connection_test',
+            testId: testId,
+            source: 'sync.js'
+        });
+        
+        console.log('✅ Sync test write successful');
+        
+        // Test read operation
+        const docSnapshot = await testRef.get();
+        if (!docSnapshot.exists) {
+            throw new Error('Test document not found after write');
+        }
+        
+        console.log('✅ Sync test read successful');
+        
+        // Clean up test document
+        await testRef.delete();
+        console.log('✅ Sync test cleanup successful');
+        
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Sync Firebase test failed:', error);
+        return false;
+    }
+}
 
 // Initialize cloud sync
 function initCloudSync() {
@@ -418,56 +462,12 @@ async function getCurrentFirebaseUser() {
     });
 }
 
-// Test Firebase connection - FIXED VERSION (no recursion)
+// Test Firebase connection - FIXED (no recursion)
 async function testFirebaseConnection() {
     console.log('Testing Firebase connection from sync.js...');
     
-    // Use the testFirebaseConnection from firebase-config.js if available
-    if (typeof window.testFirebaseConnection === 'function') {
-        console.log('Using firebase-config.js test function');
-        return await window.testFirebaseConnection();
-    }
-    
-    // Fallback test if firebase-config.js function not available
-    if (!firestore) {
-        console.error('Firestore not available for testing');
-        return false;
-    }
-    
-    try {
-        console.log('Running basic Firebase test...');
-        
-        // Create a unique test document ID
-        const testId = 'test_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        const testRef = firestore.collection('connectionTests').doc(testId);
-        
-        // Test write operation
-        await testRef.set({
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            test: 'connection_test_from_syncjs',
-            testId: testId
-        });
-        
-        console.log('✅ Basic Firebase write test successful');
-        
-        // Test read operation
-        const docSnapshot = await testRef.get();
-        if (!docSnapshot.exists) {
-            throw new Error('Test document not found after write');
-        }
-        
-        console.log('✅ Basic Firebase read test successful');
-        
-        // Clean up test document
-        await testRef.delete();
-        console.log('✅ Basic Firebase cleanup successful');
-        
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Basic Firebase connection test failed:', error);
-        return false;
-    }
+    // Use the safe test function
+    return await safeFirebaseTest();
 }
 
 // Debug function
@@ -521,3 +521,4 @@ window.startAutoSync = startAutoSync;
 window.stopAutoSync = stopAutoSync;
 window.testFirebaseConnection = testFirebaseConnection;
 window.debugFirebaseSync = debugFirebaseSync;
+window.safeFirebaseTest = safeFirebaseTest;
