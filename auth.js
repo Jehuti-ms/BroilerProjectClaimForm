@@ -328,34 +328,22 @@ function showReset() {
 }
 
 // Check for existing session on page load
+// Find and update the checkExistingSession function:
 function checkExistingSession() {
     const currentUser = localStorage.getItem('currentUser');
     if (currentUser) {
         const user = JSON.parse(currentUser);
-        console.log('Existing session found for:', user.username);
+        console.log('Existing session found for:', user.email || user.username);
         
-        // Redirect to main app if on auth page
-        if (window.location.pathname.includes('auth.html') && !window.location.pathname.includes('index.html')) {
+        // FORCE REDIRECT if on auth page
+        if (window.location.pathname.includes('auth.html')) {
+            console.log('Redirecting to index.html...');
             setTimeout(() => {
                 window.location.href = 'index.html';
-            }, 1000);
+            }, 100);
         }
     }
 }
-
-// Call on DOMContentLoaded
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing auth...');
-    
-    // Check for existing session
-    checkExistingSession();
-    
-    // Initialize auth system
-    initializeAuth();
-    
-    // Add emergency reset button for development
-    addEmergencyReset();
-});
 
 // Emergency reset function for development (remove in production)
 function addEmergencyReset() {
