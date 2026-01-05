@@ -9,6 +9,12 @@ const firebaseConfig = {
   appId: "1:1069004689384:web:ab7e2e4063e2ee864c5e5d",
 };
 
+// Prevent recursion by checking if function already exists
+if (window.testFirebaseConnection && typeof window.testFirebaseConnection === 'function') {
+    console.log('testFirebaseConnection already exists, renaming to avoid conflict');
+    window._originalTestFirebaseConnection = window.testFirebaseConnection;
+}
+
 // Global Firebase variables
 let firebaseApp;
 let firestore;
