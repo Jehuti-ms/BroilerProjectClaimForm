@@ -5,10 +5,67 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In - Broiler Production Project</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    
+    <!-- Firebase SDK 9+ (Modular version) -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAagSPJW2RxyG28Og54ftYd8MGvPPKO_SE",
+            authDomain: "broilerprojectclaimform-d6d51.firebaseapp.com",
+            projectId: "broilerprojectclaimform-d6d51",
+            storageBucket: "broilerprojectclaimform-d6d51.firebasestorage.app",
+            messagingSenderId: "1069004689384",
+            appId: "1:1069004689384:web:ab7e2e4063e2ee864c5e5d"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // Make available globally for auth.js
+        window.firebaseApp = app;
+        window.firebaseAuth = auth;
+        window.firebaseFirestore = db;
+        window.firebaseLoaded = true;
+        
+        console.log('✅ Firebase SDK loaded successfully');
+        
+        // Hide loading message if exists
+        const loadingDiv = document.getElementById('firebase-loading');
+        if (loadingDiv) loadingDiv.style.display = 'none';
+    </script>
+    
+    <!-- Loading indicator (optional) -->
+    <style>
+        #firebase-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+    </style>
 </head>
 <body>
-    <div class="auth-container">
+    <!-- Loading indicator -->
+    <div id="firebase-loading">
+        <h2>Loading Authentication System...</h2>
+        <p>Please wait while we initialize the system.</p>
+    </div>
+    
+    <div class="auth-container" style="display: none;">
         <div class="auth-card">
             <div class="auth-header">
                 <h1>Grantley Adams Memorial School</h1>
@@ -18,13 +75,13 @@
             
             <form id="login-form" class="auth-form">
                 <div class="form-group">
-                    <label for="username">Username:</label>
-                    <input type="text" id="username" name="username" required>
+                    <label for="username">Email:</label>
+                    <input type="email" id="login-email" name="login-email" required>
                 </div>
                 
                 <div class="form-group">
                     <label for="password">Password:</label>
-                    <input type="password" id="password" name="password" required>
+                    <input type="password" id="login-password" name="login-password" required>
                 </div>
                 
                 <div class="form-group">
@@ -49,13 +106,13 @@
             
             <form id="register-form" class="auth-form">
                 <div class="form-group">
-                    <label for="new-username">Username:</label>
-                    <input type="text" id="new-username" name="new-username" required>
+                    <label for="new-username">Email:</label>
+                    <input type="email" id="signup-email" name="signup-email" required>
                 </div>
                 
                 <div class="form-group">
                     <label for="new-password">Password:</label>
-                    <input type="password" id="new-password" name="new-password" required>
+                    <input type="password" id="signup-password" name="signup-password" required>
                 </div>
                 
                 <div class="form-group">
@@ -79,13 +136,13 @@
         <div class="auth-card" id="reset-card" style="display: none;">
             <div class="auth-header">
                 <h1>Reset Password</h1>
-                <p>Enter your username and new password</p>
+                <p>Enter your email and new password</p>
             </div>
             
             <form id="reset-form" class="auth-form">
                 <div class="form-group">
-                    <label for="reset-username">Username:</label>
-                    <input type="text" id="reset-username" name="reset-username" required>
+                    <label for="reset-username">Email:</label>
+                    <input type="email" id="reset-email" name="reset-email" required>
                 </div>
                 
                 <div class="form-group">
@@ -108,5 +165,42 @@
     </div>
 
     <script src="auth.js"></script>
+    
+    <script>
+        // Show/hide auth cards
+        function showLogin() {
+            document.querySelector('.auth-card').style.display = 'block';
+            document.getElementById('register-card').style.display = 'none';
+            document.getElementById('reset-card').style.display = 'none';
+            return false;
+        }
+        
+        function showRegister() {
+            document.querySelector('.auth-card').style.display = 'none';
+            document.getElementById('register-card').style.display = 'block';
+            document.getElementById('reset-card').style.display = 'none';
+            return false;
+        }
+        
+        function showReset() {
+            document.querySelector('.auth-card').style.display = 'none';
+            document.getElementById('register-card').style.display = 'none';
+            document.getElementById('reset-card').style.display = 'block';
+            return false;
+        }
+        
+        // Show auth container when Firebase loads
+        function checkAuthContainer() {
+            if (window.firebaseLoaded) {
+                document.getElementById('firebase-loading').style.display = 'none';
+                document.querySelector('.auth-container').style.display = 'block';
+            } else {
+                setTimeout(checkAuthContainer, 100);
+            }
+        }
+        
+        // Start checking
+        setTimeout(checkAuthContainer, 100);
+    </script>
 </body>
 </html>
