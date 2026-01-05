@@ -332,49 +332,82 @@ console.log('Firestore loaded:', typeof firebase?.firestore !== 'undefined');
 console.log('Auth loaded:', typeof firebase?.auth !== 'undefined');
 
 // Force initialization if not done
+// Global flag to track initialization
+let isFirebaseInitialized = false;
+
+// Modified ensureFirebaseInitialized function
 function ensureFirebaseInitialized() {
-    if (!window.firestore && typeof firebase !== 'undefined') {
-        console.log('🔥 Firebase not initialized, initializing now...');
-        try {
-            window.firebaseApp = firebase.initializeApp(firebaseConfig);
+    console.log('ensureFirebaseInitialized called, isFirebaseInitialized:', isFirebaseInitialized);
+    
+    if (isFirebaseInitialized) {
+        console.log('✅ Firebase already initialized, skipping');
+        return Promise.resolve();
+    }
+    
+    if (firebase.apps.length > 0) {
+        console.log('✅ Firebase app already exists, marking as initialized');
+        isFirebaseInitialized = true;
+        return Promise.resolve();
+    }
+    
+    console.log('🔥 Initializing Firebase from ensureFirebaseInitialized...');
+    
+    try {
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        console.log('✅ Firebase manually initialized');
+        console.log('Project ID:', app.options.projectId);
+        
+        // Get services
+        window.firestore = firebase.firestore();
+        window.auth = firebase.auth();
+        window.firebaseApp = app;
+        
+        isFirebaseInitialized = true;
+        
+        // Setup offline persistence without trying to enable it twice
+        return setupOfflinePersistenceSafe();
+        
+    } catch (error) {
+        console.error('❌ Firebase initialization error:', error.message);
+        
+        // If app already exists, use it
+        if (error.code === 'app/duplicate-app') {
+            console.log('Using existing Firebase app');
             window.firestore = firebase.firestore();
             window.auth = firebase.auth();
-            
-            console.log('✅ Firebase manually initialized');
-            console.log('Project ID:', window.firebaseApp.options.projectId);
-            
-            // Enable offline persistence
-            window.firestore.enablePersistence()
-                .then(() => console.log('📱 Offline persistence enabled'))
-                .catch(err => {
-                    if (err.code === 'failed-precondition') {
-                        console.log('Multiple tabs open - persistence limited');
-                    } else if (err.code === 'unimplemented') {
-                        console.log('Browser doesn\'t support persistence');
-                    }
-                });
-                
-            return true;
-        } catch (error) {
-            console.error('❌ Manual init failed:', error);
-            return false;
+            window.firebaseApp = firebase.app();
+            isFirebaseInitialized = true;
+            return Promise.resolve();
         }
+        
+        return Promise.reject(error);
     }
-    return true;
 }
 
-// Run initialization check
-setTimeout(() => {
-    console.log('=== INITIALIZATION CHECK ===');
-    console.log('window.firestore:', !!window.firestore);
-    console.log('window.auth:', !!window.auth);
-    console.log('window.firebaseApp:', !!window.firebaseApp);
-    
-    if (!window.firestore) {
-        console.log('Attempting to initialize Firebase...');
-        ensureFirebaseInitialized();
+// Safe persistence setup that won't fail if already enabled
+function setupOfflinePersistenceSafe() {
+    if (window.firestore._persistenceEnabled) {
+        console.log('📱 Persistence already enabled, skipping');
+        return Promise.resolve();
     }
-}, 1000);
+    
+    return window.firestore.enablePersistence()
+        .then(() => {
+            console.log('📱 Firebase offline persistence enabled');
+        })
+        .catch((err) => {
+            // Don't fail if persistence can't be enabled
+            if (err.code === 'failed-precondition') {
+                console.warn('⚠️ Multiple tabs open, persistence disabled');
+            } else if (err.code === 'unimplemented') {
+                console.warn('⚠️ Persistence not supported in this browser');
+            } else {
+                console.warn('⚠️ Persistence setup failed:', err.code);
+            }
+            // Continue without persistence
+        });
+}
 
 // Make sure functions are available
 window.ensureFirebaseInitialized = ensureFirebaseInitialized;
