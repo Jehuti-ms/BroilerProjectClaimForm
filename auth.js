@@ -99,6 +99,33 @@ document.getElementById('login-form').addEventListener('submit', async function(
             const user = userCredential.user;
             
             console.log('Firebase login successful:', user.email);
+
+            // Store user info WITH PASSWORD in localStorage
+            const currentUser = {
+                username: user.email,
+                employeeName: employeeName || user.displayName || user.email.split('@')[0],
+                password: password,  // ← THIS IS CRITICAL - STORE THE PASSWORD!
+                uid: user.uid,
+                firebaseAuthenticated: true
+            };
+            
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Also save to localStorage users for fallback
+            const users = JSON.parse(localStorage.getItem('users') || '{}');
+            users[email] = {
+                email: email,
+                password: password,  // ← ALSO STORE HERE
+                employeeName: employeeName || user.displayName || email.split('@')[0],
+                uid: user.uid,
+                firebase: true,
+                lastLogin: new Date().toISOString()
+            };
+            localStorage.setItem('users', JSON.stringify(users));
+            // ============ END OF ADDED CODE ============
+            
+            // Show success message
+            showAuthNotification('Login successful! Redirecting...', 'success');
             
             // Store user info
             const currentUser = {
