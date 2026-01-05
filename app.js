@@ -1841,6 +1841,453 @@ async function syncToFirebase(data) {
     console.log('✅ Synced', data.length, 'items to Firebase');
 }
 
+// ===== LOGIN SYSTEM =====
+
+// Initialize login system
+function initLoginSystem() {
+    console.log('🔐 Initializing login system...');
+    
+    // Check if we're on auth.html or main page
+    const isAuthPage = window.location.pathname.includes('auth.html');
+    
+    if (isAuthPage) {
+        setupAuthPage();
+    } else {
+        setupMainPageLogin();
+    }
+}
+
+// Setup auth.html page
+function setupAuthPage() {
+    console.log('Setting up auth page...');
+    
+    const loginForm = document.getElementById('login-form');
+    const signupForm = document.getElementById('signup-form');
+    const loginLink = document.getElementById('login-link');
+    const signupLink = document.getElementById('signup-link');
+    const authError = document.getElementById('auth-error');
+    
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+    
+    if (signupForm) {
+        signupForm.addEventListener('submit', handleSignup);
+    }
+    
+    if (loginLink) {
+        loginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('signup-section').style.display = 'none';
+        });
+    }
+    
+    if (signupLink) {
+        signupLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('signup-section').style.display = 'block';
+        });
+    }
+    
+    // Pre-fill email if available
+    const savedEmail = localStorage.getItem('userEmail');
+    const loginEmailInput = document.getElementById('login-email');
+    if (loginEmailInput && savedEmail) {
+        loginEmailInput.value = savedEmail;
+    }
+}
+
+// Setup main page login
+function setupMainPageLogin() {
+    console.log('Setting up main page login...');
+    
+    // Create login form if it doesn't exist
+    if (!document.getElementById('login-form-container')) {
+        createLoginForm();
+    }
+    
+    // Check if user is already logged in
+    checkExistingLogin();
+}
+
+// Create login form for main page
+function createLoginForm() {
+    const container = document.createElement('div');
+    container.id = 'login-form-container';
+    container.className = 'login-container';
+    container.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    `;
+    
+    container.innerHTML = `
+        <div class="login-box" style="
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        ">
+            <h2 style="margin-top: 0; color: #333;">Login Required</h2>
+            <p style="color: #666; margin-bottom: 20px;">Please login to access the Broiler Project Claim Form</p>
+            
+            <form id="quick-login-form">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #333;">Email</label>
+                    <input type="email" id="quick-email" required 
+                           style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; color: #333;">Password</label>
+                    <input type="password" id="quick-password" required 
+                           style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" style="
+                        flex: 1;
+                        padding: 12px;
+                        background: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-weight: bold;
+                    ">Login</button>
+                    
+                    <button type="button" id="quick-signup-btn" style="
+                        flex: 1;
+                        padding: 12px;
+                        background: #2196F3;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        cursor: pointer;
+                    ">Sign Up</button>
+                </div>
+                
+                <div id="quick-auth-error" style="
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: #ffebee;
+                    color: #c62828;
+                    border-radius: 5px;
+                    display: none;
+                "></div>
+                
+                <p style="margin-top: 20px; font-size: 12px; color: #888;">
+                    <a href="auth.html" style="color: #2196F3; text-decoration: none;">
+                        Go to full authentication page
+                    </a>
+                </p>
+            </form>
+        </div>
+    `;
+    
+    document.body.appendChild(container);
+    
+    // Add event listeners
+    document.getElementById('quick-login-form').addEventListener('submit', handleQuickLogin);
+    document.getElementById('quick-signup-btn').addEventListener('click', handleQuickSignup);
+    
+    // Pre-fill email
+    const savedEmail = localStorage.getItem('userEmail');
+    const emailInput = document.getElementById('quick-email');
+    if (emailInput && savedEmail) {
+        emailInput.value = savedEmail;
+    }
+}
+
+// Handle quick login
+async function handleQuickLogin(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('quick-email').value;
+    const password = document.getElementById('quick-password').value;
+    const errorDiv = document.getElementById('quick-auth-error');
+    
+    errorDiv.style.display = 'none';
+    
+    try {
+        console.log('Quick login attempt:', email);
+        
+        // Try Firebase login
+        let firebaseUser = null;
+        try {
+            const auth = firebase.auth();
+            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            firebaseUser = userCredential.user;
+            console.log('Firebase login successful');
+        } catch (firebaseError) {
+            console.log('Firebase login failed, using local auth');
+        }
+        
+        // Create user object
+        currentUser = {
+            email: email,
+            password: password,
+            uid: firebaseUser ? firebaseUser.uid : `local-${Date.now()}`,
+            firebaseAuth: !!firebaseUser,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Save to localStorage
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userPassword', password);
+        
+        console.log('Login successful:', currentUser);
+        
+        // Hide login form
+        document.getElementById('login-form-container').style.display = 'none';
+        
+        // Show main content
+        showAuthenticatedUI(email);
+        
+        // Refresh data
+        if (typeof loadData === 'function') {
+            loadData();
+        }
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Handle quick signup
+async function handleQuickSignup() {
+    const email = document.getElementById('quick-email').value;
+    const password = document.getElementById('quick-password').value;
+    const errorDiv = document.getElementById('quick-auth-error');
+    
+    if (!email || !password) {
+        errorDiv.textContent = 'Please enter email and password';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    errorDiv.style.display = 'none';
+    
+    try {
+        console.log('Quick signup attempt:', email);
+        
+        // Try Firebase signup
+        let firebaseUser = null;
+        try {
+            const auth = firebase.auth();
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            firebaseUser = userCredential.user;
+            console.log('Firebase signup successful');
+        } catch (firebaseError) {
+            console.log('Firebase signup failed, using local auth:', firebaseError.message);
+        }
+        
+        // Create user object
+        currentUser = {
+            email: email,
+            password: password,
+            uid: firebaseUser ? firebaseUser.uid : `local-${Date.now()}`,
+            firebaseAuth: !!firebaseUser,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Save to localStorage
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userPassword', password);
+        
+        console.log('Signup successful:', currentUser);
+        
+        // Hide login form
+        document.getElementById('login-form-container').style.display = 'none';
+        
+        // Show main content
+        showAuthenticatedUI(email);
+        
+        // Refresh data
+        if (typeof loadData === 'function') {
+            loadData();
+        }
+        
+    } catch (error) {
+        console.error('Signup error:', error);
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Check existing login
+function checkExistingLogin() {
+    const savedUser = localStorage.getItem('currentUser');
+    const savedEmail = localStorage.getItem('userEmail');
+    
+    if (savedUser || savedEmail) {
+        try {
+            const user = savedUser ? JSON.parse(savedUser) : { email: savedEmail };
+            console.log('Found existing user:', user.email);
+            
+            currentUser = {
+                email: user.email,
+                uid: user.uid || `local-${Date.now()}`,
+                firebaseAuth: user.firebaseAuth || false
+            };
+            
+            showAuthenticatedUI(user.email);
+            return true;
+        } catch (error) {
+            console.error('Error parsing saved user:', error);
+        }
+    }
+    
+    return false;
+}
+
+// Handle login form submission (auth.html)
+async function handleLogin(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const errorDiv = document.getElementById('auth-error');
+    
+    errorDiv.style.display = 'none';
+    
+    try {
+        console.log('Login attempt:', email);
+        
+        // Try Firebase login
+        let firebaseUser = null;
+        try {
+            const auth = firebase.auth();
+            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            firebaseUser = userCredential.user;
+            console.log('Firebase login successful');
+        } catch (firebaseError) {
+            console.log('Firebase login failed, using local auth');
+        }
+        
+        // Create user object
+        currentUser = {
+            email: email,
+            password: password,
+            uid: firebaseUser ? firebaseUser.uid : `local-${Date.now()}`,
+            firebaseAuth: !!firebaseUser,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Save to localStorage
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userPassword', password);
+        
+        console.log('Login successful:', currentUser);
+        
+        // Redirect to main page
+        window.location.href = 'index.html';
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Handle signup form submission (auth.html)
+async function handleSignup(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    const errorDiv = document.getElementById('auth-error');
+    
+    errorDiv.style.display = 'none';
+    
+    try {
+        console.log('Signup attempt:', email);
+        
+        // Try Firebase signup
+        let firebaseUser = null;
+        try {
+            const auth = firebase.auth();
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            firebaseUser = userCredential.user;
+            console.log('Firebase signup successful');
+        } catch (firebaseError) {
+            console.log('Firebase signup failed, using local auth:', firebaseError.message);
+        }
+        
+        // Create user object
+        currentUser = {
+            email: email,
+            password: password,
+            uid: firebaseUser ? firebaseUser.uid : `local-${Date.now()}`,
+            firebaseAuth: !!firebaseUser,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Save to localStorage
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userPassword', password);
+        
+        console.log('Signup successful:', currentUser);
+        
+        // Redirect to main page
+        window.location.href = 'index.html';
+        
+    } catch (error) {
+        console.error('Signup error:', error);
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Logout function
+function logout() {
+    console.log('Logging out...');
+    
+    // Sign out from Firebase if available
+    if (firebase.auth) {
+        firebase.auth().signOut().catch(console.error);
+    }
+    
+    // Clear local data
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('userPassword');
+    
+    currentUser = null;
+    
+    // Show login form
+    const loginContainer = document.getElementById('login-form-container');
+    if (loginContainer) {
+        loginContainer.style.display = 'flex';
+    } else {
+        createLoginForm();
+    }
+    
+    // Clear UI
+    showLoginUI();
+    
+    console.log('Logout complete');
+}
+
+// Make logout available globally
+window.logout = logout;
+
 // Make functions globally available
 window.importData = importData;
 window.parseCSV = parseCSV;
