@@ -139,91 +139,36 @@
     </div>
 
     <!-- Initialize Firebase -->
-    <script>
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyAagSPJW2RxyG28Og54ftYd8MGvPPKO_SE",
-            authDomain: "broilerprojectclaimform-d6d51.firebaseapp.com",
-            projectId: "broilerprojectclaimform-d6d51",
-            storageBucket: "broilerprojectclaimform-d6d51.firebasestorage.app",
-            messagingSenderId: "1069004689384",
-            appId: "1:1069004689384:web:ab7e2e4063e2ee864c5e5d"
-        };
+   <script>
+// SIMPLE CONFIG FOR AUTH.HTML ONLY
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAJhRNUgsrvUvjKXXosS6YZLhbHhpBq0Zg",
+    authDomain: "broiler-project-e1f62.firebaseapp.com",
+    projectId: "broiler-project-e1f62",
+    storageBucket: "broiler-project-e1f62.appspot.com",
+    messagingSenderId: "1084373471420",
+    appId: "1:1084373471420:web:f60bf8c5db75b9fe4f90c4"
+};
 
-        // Initialize Firebase
-        let firebaseApp, firebaseAuth, firebaseFirestore;
-        
+// Initialize only auth (no firestore)
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof firebase !== 'undefined') {
         try {
-            if (!firebase.apps.length) {
-                firebaseApp = firebase.initializeApp(firebaseConfig);
-            } else {
-                firebaseApp = firebase.app();
-            }
-            
-            firebaseAuth = firebase.auth();
-            firebaseFirestore = firebase.firestore();
-            
-            console.log('✅ Firebase SDK loaded successfully');
-            
-            // Make available globally
-            window.firebaseApp = firebaseApp;
-            window.firebaseAuth = firebaseAuth;
-            window.firebaseFirestore = firebaseFirestore;
-            window.firebaseLoaded = true;
-            
+            const app = firebase.initializeApp(FIREBASE_CONFIG);
+            const auth = firebase.auth(app);
+            window.firebaseAuth = auth;
+            console.log('✅ Firebase Auth initialized');
         } catch (error) {
-            console.error('❌ Firebase initialization failed:', error);
-            document.getElementById('firebase-loading').innerHTML = 
-                '<h2 style="color: red;">Firebase Error</h2><p>' + error.message + '</p>';
-        }
-    </script>
-    
-    <!-- Load auth.js AFTER Firebase -->
-    <script src="auth.js"></script>
-    
-    <!-- UI helper functions -->
-    <script>
-        // Show/hide auth cards
-        function showLogin() {
-            document.querySelector('.auth-card').style.display = 'block';
-            document.getElementById('register-card').style.display = 'none';
-            document.getElementById('reset-card').style.display = 'none';
-            return false;
-        }
-        
-        function showRegister() {
-            document.querySelector('.auth-card').style.display = 'none';
-            document.getElementById('register-card').style.display = 'block';
-            document.getElementById('reset-card').style.display = 'none';
-            return false;
-        }
-        
-        function showReset() {
-            document.querySelector('.auth-card').style.display = 'none';
-            document.getElementById('register-card').style.display = 'none';
-            document.getElementById('reset-card').style.display = 'block';
-            return false;
-        }
-        
-        // Show auth container when Firebase loads
-        function checkAuthContainer() {
-            if (window.firebaseLoaded) {
-                document.getElementById('firebase-loading').style.display = 'none';
-                document.querySelector('.auth-container').style.display = 'block';
-                
-                // Pre-fill email if in URL
-                const urlParams = new URLSearchParams(window.location.search);
-                const email = urlParams.get('login-email');
-                if (email) {
-                    document.getElementById('login-email').value = decodeURIComponent(email);
-                }
-            } else {
-                setTimeout(checkAuthContainer, 100);
+            if (error.code === 'app/duplicate-app') {
+                // Already initialized
+                window.firebaseAuth = firebase.auth();
+                console.log('Firebase Auth already initialized');
             }
         }
-        
-        // Start checking
-        setTimeout(checkAuthContainer, 100);
-    </script>
+    }
+});
+</script>
+
+<script src="auth.js"></script>
 </body>
 </html>
