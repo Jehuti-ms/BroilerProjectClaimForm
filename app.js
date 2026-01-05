@@ -75,6 +75,57 @@ function checkAuthentication() {
     }
 }
 
+// Add this function to app.js (after checkAuthentication):
+function loadUserPreferences() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) return;
+    
+    try {
+        const user = JSON.parse(currentUser);
+        const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
+        
+        // Load user-specific preferences
+        const userPrefs = localStorage.getItem(`prefs_${username}`);
+        if (userPrefs) {
+            const prefs = JSON.parse(userPrefs);
+            
+            // Apply preferences
+            const autoSyncCheckbox = document.getElementById('auto-sync');
+            if (autoSyncCheckbox && prefs.autoSync !== undefined) {
+                autoSyncCheckbox.checked = prefs.autoSync;
+                localStorage.setItem('autoSyncEnabled', prefs.autoSync.toString());
+            }
+            
+            console.log('Loaded user preferences:', prefs);
+        }
+        
+        // Update last login
+        localStorage.setItem(`prefs_${username}`, JSON.stringify({
+            ...JSON.parse(userPrefs || '{}'),
+            lastLogin: new Date().toISOString()
+        }));
+        
+    } catch (error) {
+        console.error('Error loading preferences:', error);
+    }
+}
+
+// Update DOMContentLoaded in app.js:
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthentication();
+    loadUserPreferences(); // ADD THIS LINE
+    initAutoSyncCheckbox();
+    
+    // Add event listener for auto-sync checkbox
+    const autoSyncCheckbox = document.getElementById('auto-sync');
+    if (autoSyncCheckbox) {
+        autoSyncCheckbox.addEventListener('change', toggleAutoSync);
+    }
+    
+    // Set up employee name memory for MAIN FORM
+    setupEmployeeNameMemory();
+});
+
 // Initialize the application
 function initializeApp() {
     // Load last viewed month from localStorage
@@ -127,21 +178,43 @@ function initializeApp() {
 }
 
 // Auto-sync functions
+// Update toggleAutoSync in app.js:
 function toggleAutoSync() {
     const checkbox = document.getElementById('auto-sync');
     if (checkbox) {
         const isEnabled = checkbox.checked;
+        
+        // Save globally
         localStorage.setItem('autoSyncEnabled', isEnabled.toString());
+        
+        // Save per-user
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser) {
+            try {
+                const user = JSON.parse(currentUser);
+                const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
+                
+                const userPrefs = localStorage.getItem(`prefs_${username}`);
+                const prefs = userPrefs ? JSON.parse(userPrefs) : {};
+                
+                prefs.autoSync = isEnabled;
+                prefs.autoSyncUpdated = new Date().toISOString();
+                
+                localStorage.setItem(`prefs_${username}`, JSON.stringify(prefs));
+                
+                console.log('Saved auto-sync preference for user:', username, isEnabled);
+            } catch (error) {
+                console.error('Error saving user preference:', error);
+            }
+        }
         
         if (isEnabled) {
             showNotification('Auto-sync enabled');
-            // Start auto-sync if the function exists
             if (typeof startAutoSync === 'function') {
                 startAutoSync();
             }
         } else {
             showNotification('Auto-sync disabled');
-            // Stop auto-sync if the function exists
             if (typeof stopAutoSync === 'function') {
                 stopAutoSync();
             }
