@@ -11,6 +11,61 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 let firebaseUser = null;
 let isOnline = navigator.onLine;
 
+// Firebase helper functions
+async function ensureFirebaseAuth() {
+    console.log('🔐 Ensuring Firebase authentication...');
+    
+    if (!window.auth) {
+        console.warn('Firebase Auth not available');
+        return false;
+    }
+    
+    // Check if already authenticated
+    const user = await getCurrentFirebaseUser();
+    if (user) {
+        console.log('✅ Firebase user already authenticated:', user.email);
+        return true;
+    }
+    
+    // Try to sign in with localStorage credentials
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        const userData = JSON.parse(currentUser);
+        if (userData.username && userData.password) {
+            try {
+                console.log('Attempting Firebase sign-in...');
+                const credential = await auth.signInWithEmailAndPassword(
+                    userData.username, 
+                    userData.password
+                );
+                console.log('✅ Firebase sign-in successful:', credential.user.email);
+                return true;
+            } catch (error) {
+                console.warn('Firebase sign-in failed:', error.message);
+            }
+        }
+    }
+    
+    console.log('⚠️ No Firebase authentication available');
+    return false;
+}
+
+// Check Firebase authentication status
+function checkFirebaseAuthStatus() {
+    if (!window.auth) return 'not_loaded';
+    
+    const user = auth.currentUser;
+    if (user) {
+        return {
+            status: 'authenticated',
+            email: user.email,
+            uid: user.uid
+        };
+    }
+    
+    return 'not_authenticated';
+}
+
 // =============== ADD THIS ERROR HANDLER HERE ===============
 // Firebase error handler function
 function handleFirebaseError(error) {
@@ -131,55 +186,57 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEmployeeNameMemory();
 });
 
-// Initialize Firebase
+// Initialize Firebase (with authentication check)
 function initializeFirebase() {
-    console.log('Initializing Firebase in app.js...');
+    console.log('🔥 Initializing Firebase in app.js...');
     
     // Wait for Firebase to load
     const checkFirebase = setInterval(() => {
         if (typeof firestore !== 'undefined' && firestore) {
             clearInterval(checkFirebase);
-            console.log('Firebase services available in app.js');
+            console.log('✅ Firebase services available in app.js');
             
             // Set up auth state listener
             if (auth) {
                 auth.onAuthStateChanged((user) => {
                     firebaseUser = user;
-                    console.log('Firebase auth state changed:', user ? user.email : 'No user');
+                    console.log('🔐 Firebase auth state changed:', user ? user.email : 'No user');
                     
                     if (user) {
                         // Update user display
                         const userDisplay = document.getElementById('user-display');
                         if (userDisplay) {
-                            userDisplay.textContent = `Welcome, ${user.displayName || user.email}`;
+                            userDisplay.textContent = `Welcome, ${user.displayName || user.email} (Firebase)`;
+                        }
+                        
+                        // Store in localStorage for consistency
+                        const currentUser = localStorage.getItem('currentUser');
+                        if (currentUser) {
+                            const userData = JSON.parse(currentUser);
+                            userData.uid = user.uid;
+                            userData.firebaseAuthenticated = true;
+                            localStorage.setItem('currentUser', JSON.stringify(userData));
                         }
                     }
                 });
             }
             
-          // SAFE connection check - NO RECURSION
-            setTimeout(() => {
-                console.log('Performing safe Firebase check...');
+            // Check authentication status
+            setTimeout(async () => {
+                console.log('🔐 Checking Firebase auth status...');
+                const authStatus = checkFirebaseAuthStatus();
+                console.log('Firebase auth status:', authStatus);
                 
-                if (window.firestore && window.auth) {
-                    console.log('✅ Firebase services confirmed available');
-                    
-                    // Use our safe check function
-                    checkFirebaseServices().then(isAvailable => {
-                        if (isAvailable) {
-                            console.log('✅ Firebase fully operational');
-                            if (typeof updateFirebaseStatus === 'function') {
-                                updateFirebaseStatus('connected');
-                            }
-                        } else {
-                            console.warn('⚠️ Firebase check failed');
-                            if (typeof updateFirebaseStatus === 'function') {
-                                updateFirebaseStatus('connection_error');
-                            }
-                        }
-                    });
+                // Update UI based on auth status
+                if (typeof updateFirebaseStatus === 'function') {
+                    if (authStatus === 'authenticated') {
+                        updateFirebaseStatus('authenticated');
+                    } else if (auth && auth.currentUser === null) {
+                        updateFirebaseStatus('not_authenticated');
+                    }
                 }
-            }, 2000);
+            }, 1000);
+            
         }
     }, 500);
 }
@@ -209,37 +266,120 @@ function setupNetworkMonitoring() {
 }
 
 // Check if user is authenticated
-function checkAuthentication() {
-    console.log('Checking authentication...');
+// Check if user is authenticated - UPDATED VERSION
+async function checkAuthentication() {
+    console.log('🔐 Checking authentication...');
     
-    // First check Firebase auth
-    if (auth && firebaseUser) {
-        console.log('User authenticated via Firebase:', firebaseUser.email);
-        handleAuthenticatedUser(firebaseUser);
-        return;
+    // Wait a bit for Firebase to initialize
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // First, try Firebase Authentication
+    if (window.auth) {
+        try {
+            // Get current Firebase user (async)
+            const firebaseUser = await getCurrentFirebaseUser();
+            
+            if (firebaseUser) {
+                console.log('✅ User authenticated via Firebase:', firebaseUser.email);
+                
+                // Store user info in localStorage for fallback
+                const currentUser = {
+                    username: firebaseUser.email,
+                    employeeName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+                    uid: firebaseUser.uid,
+                    firebaseAuthenticated: true
+                };
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                handleAuthenticatedUser(firebaseUser);
+                return;
+            }
+        } catch (firebaseError) {
+            console.warn('Firebase auth check failed:', firebaseError.message);
+            // Continue to localStorage fallback
+        }
     }
     
-    // Fallback to localStorage
+    // Fallback: Check localStorage (existing app authentication)
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
-        console.log('No user found, redirecting to auth page');
+        console.log('❌ No user found, redirecting to auth page');
         window.location.href = 'auth.html';
         return;
     }
     
     const user = JSON.parse(currentUser);
-    console.log('User authenticated via localStorage:', user.username);
+    console.log('⚠️ User authenticated via localStorage (fallback):', user.username);
+    
+    // Try to sign in to Firebase with localStorage credentials
+    if (window.auth && user.username && user.password) {
+        try {
+            console.log('Attempting Firebase sign-in with stored credentials...');
+            const credential = await auth.signInWithEmailAndPassword(user.username, user.password);
+            console.log('✅ Auto-signed into Firebase:', credential.user.email);
+            
+            // Update localStorage with Firebase info
+            user.uid = credential.user.uid;
+            user.firebaseAuthenticated = true;
+            localStorage.setItem('currentUser', JSON.stringify(user));
+            
+            handleAuthenticatedUser(credential.user);
+            return;
+            
+        } catch (signInError) {
+            console.warn('Firebase auto-signin failed:', signInError.message);
+            // Continue with localStorage user
+        }
+    }
+    
     handleAuthenticatedUser(user);
 }
 
+// Helper: Get Firebase user (async)
+async function getCurrentFirebaseUser() {
+    if (!window.auth) return null;
+    
+    return new Promise((resolve) => {
+        // Check current user immediately
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+            resolve(currentUser);
+            return;
+        }
+        
+        // Wait for auth state change (timeout after 2 seconds)
+        const timeout = setTimeout(() => {
+            unsubscribe();
+            resolve(null);
+        }, 2000);
+        
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+            clearTimeout(timeout);
+            unsubscribe();
+            resolve(user);
+        });
+    });
+}
+
 // Handle authenticated user
+// Handle authenticated user - UPDATED VERSION
 function handleAuthenticatedUser(user) {
-    // Update UI
+    console.log('👤 Handling authenticated user:', user.email || user.username);
+    
+    // Update UI with user info
     const userDisplay = document.getElementById('user-display');
     const employeeNameInput = document.getElementById('employee-name');
     
     if (userDisplay) {
-        userDisplay.textContent = `Welcome, ${user.employeeName || user.displayName || user.email || user.username}`;
+        const displayName = user.displayName || user.employeeName || user.email || user.username;
+        userDisplay.textContent = `Welcome, ${displayName}`;
+        
+        // Add Firebase indicator if applicable
+        if (user.uid || user.firebaseAuthenticated) {
+            userDisplay.innerHTML += ' <span style="color: #4CAF50; font-size: 0.8em;">(Firebase)</span>';
+        } else {
+            userDisplay.innerHTML += ' <span style="color: #FF9800; font-size: 0.8em;">(Local)</span>';
+        }
     }
     
     if (employeeNameInput) {
@@ -252,6 +392,11 @@ function handleAuthenticatedUser(user) {
         
         // Save for future
         localStorage.setItem('mainAppEmployeeName', name);
+    }
+    
+    // Update Firebase user variable
+    if (user.uid) {
+        firebaseUser = user;
     }
     
     // Initialize the app
@@ -989,18 +1134,39 @@ function saveForm() {
     saveUserData();
 }
 
+// Logout function - UPDATED
 function logout() {
-    // Sign out from Firebase if available
-    if (auth) {
-        auth.signOut().then(() => {
-            console.log('Signed out from Firebase');
-        }).catch(error => {
-            console.error('Firebase sign out error:', error);
-        });
+    console.log('🚪 Logging out...');
+    
+    // Sign out from Firebase if available and authenticated
+    if (auth && auth.currentUser) {
+        auth.signOut()
+            .then(() => {
+                console.log('✅ Signed out from Firebase');
+            })
+            .catch(error => {
+                console.error('Firebase sign out error:', error);
+            });
     }
     
-    // Clear local storage
-    localStorage.removeItem('currentUser');
+    // Clear local storage (but keep some preferences)
+    const keepItems = ['firebaseAutoSyncEnabled', 'autoSyncEnabled', 'lastViewedMonth', 'lastViewedYear'];
+    const itemsToKeep = {};
+    
+    keepItems.forEach(key => {
+        const value = localStorage.getItem(key);
+        if (value) itemsToKeep[key] = value;
+    });
+    
+    // Clear everything
+    localStorage.clear();
+    
+    // Restore kept items
+    Object.keys(itemsToKeep).forEach(key => {
+        localStorage.setItem(key, itemsToKeep[key]);
+    });
+    
+    console.log('✅ Local storage cleared');
     
     // Redirect to auth page
     window.location.href = 'auth.html';
