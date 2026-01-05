@@ -1,11 +1,11 @@
 // firebase-config.js
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+   apiKey: "AIzaSyAagSPJW2RxyG28Og54ftYd8MGvPPKO_SE",
+  authDomain: "broilerprojectclaimform-d6d51.firebaseapp.com",
+  projectId: "broilerprojectclaimform-d6d51",
+  storageBucket: "broilerprojectclaimform-d6d51.firebasestorage.app",
+  messagingSenderId: "1069004689384",
+  appId: "1:1069004689384:web:ab7e2e4063e2ee864c5e5d",
 };
 
 // Initialize Firebase
