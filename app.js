@@ -7,9 +7,12 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 ];
 
 // Check authentication on page load
+// Check authentication on page load
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthentication();
+    loadUserPreferences();      // ADD THIS LINE
     initAutoSyncCheckbox();
+    setupAutoSyncOnLogin();     // ADD THIS LINE
     
     // Add event listener for auto-sync checkbox
     const autoSyncCheckbox = document.getElementById('auto-sync');
@@ -19,6 +22,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Set up employee name memory for MAIN FORM
     setupEmployeeNameMemory();
+    
+    // Initialize Firebase sync if available (optional)
+    setTimeout(() => {
+        if (typeof initCloudSync === 'function') {
+            initCloudSync();
+        }
+    }, 1000);
 });
 
 // Check if user is authenticated - UPDATED for Firebase compatibility
@@ -125,6 +135,76 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set up employee name memory for MAIN FORM
     setupEmployeeNameMemory();
 });
+
+// Add this function RIGHT AFTER loadUserPreferences() in app.js
+function setupAutoSyncOnLogin() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        console.log('No user logged in, skipping auto-sync setup');
+        return;
+    }
+    
+    try {
+        const user = JSON.parse(currentUser);
+        const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
+        
+        console.log('Setting up auto-sync for user:', username);
+        
+        // Load user preferences
+        const userPrefs = localStorage.getItem(`prefs_${username}`);
+        let autoSyncEnabled = false;
+        
+        if (userPrefs) {
+            const prefs = JSON.parse(userPrefs);
+            autoSyncEnabled = prefs.autoSync || false;
+            console.log('User auto-sync preference:', autoSyncEnabled);
+        } else {
+            // Check global setting as fallback
+            autoSyncEnabled = localStorage.getItem('autoSyncEnabled') === 'true';
+            console.log('Using global auto-sync setting:', autoSyncEnabled);
+        }
+        
+        // Auto-sync on login if preference is set
+        if (autoSyncEnabled) {
+            console.log('Auto-sync on login enabled for:', username);
+            
+            // Check if we have data to sync
+            const userDataKey = `userData_${username}`;
+            const userEmailKey = `userData_${user.email}`;
+            const hasData = localStorage.getItem(userDataKey) || localStorage.getItem(userEmailKey);
+            
+            if (hasData) {
+                console.log('User has data, will auto-sync in 5 seconds...');
+                
+                // Wait 5 seconds for app to fully load, then sync
+                setTimeout(() => {
+                    if (typeof syncToCloud === 'function') {
+                        console.log('Starting auto-sync for user:', username);
+                        syncToCloud();
+                        
+                        // Show notification
+                        showNotification('Auto-syncing your data...', 'info');
+                    } else {
+                        console.log('syncToCloud function not available');
+                    }
+                }, 5000); // 5 second delay
+            } else {
+                console.log('No data to sync for user:', username);
+            }
+        } else {
+            console.log('Auto-sync on login disabled for:', username);
+        }
+        
+        // Update last login timestamp
+        const updatedPrefs = userPrefs ? JSON.parse(userPrefs) : {};
+        updatedPrefs.lastLogin = new Date().toISOString();
+        updatedPrefs.lastAutoSyncCheck = new Date().toISOString();
+        localStorage.setItem(`prefs_${username}`, JSON.stringify(updatedPrefs));
+        
+    } catch (error) {
+        console.error('Error setting up auto-sync on login:', error);
+    }
+}
 
 // Initialize the application
 function initializeApp() {
