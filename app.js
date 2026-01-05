@@ -384,41 +384,122 @@ function setupNetworkMonitoring() {
 async function checkAuthentication() {
     console.log('🔐 Checking authentication...');
     
-    // Wait for Firebase to potentially initialize
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Try Firebase auto-login FIRST
-    const firebaseLoginSuccess = await autoLoginToFirebase();
-    
-    if (firebaseLoginSuccess && auth.currentUser) {
-        console.log('✅ Firebase authentication successful');
-        const firebaseUser = auth.currentUser;
+    try {
+        // Check Firebase auth status with retry logic
+        const firebaseStatus = await getFirebaseAuthStatus();
+        console.log('Firebase auth status:', firebaseStatus);
         
-        // Update localStorage with Firebase info
-        const currentUser = {
-            username: firebaseUser.email,
-            employeeName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-            uid: firebaseUser.uid,
-            firebaseAuthenticated: true
+        if (firebaseStatus.status === 'authenticated') {
+            console.log('✅ Firebase authentication successful');
+            currentUser = {
+                email: firebaseStatus.email,
+                uid: firebaseStatus.uid,
+                firebaseAuth: true
+            };
+            
+            // Ensure user data is loaded
+            await ensureUserDataExists(firebaseStatus.uid, firebaseStatus.email);
+            
+            // Show UI for authenticated user
+            showAuthenticatedUI(firebaseStatus.email);
+            return true;
+        }
+        
+        // Fallback to localStorage auth
+        const localUser = getLocalUser();
+        if (localUser) {
+            console.log('⚠️ Using localStorage authentication (Firebase unavailable):', localUser.email);
+            
+            currentUser = {
+                email: localUser.email,
+                uid: localUser.uid || `local-${Date.now()}`,
+                firebaseAuth: false
+            };
+            
+            showAuthenticatedUI(localUser.email);
+            
+            // Try to re-authenticate with Firebase in background
+            setTimeout(async () => {
+                await autoLoginToFirebase();
+            }, 1000);
+            
+            return true;
+        }
+        
+        // Not authenticated
+        console.log('👤 No user authenticated');
+        showLoginUI();
+        return false;
+        
+    } catch (error) {
+        console.error('Authentication check error:', error);
+        showLoginUI();
+        return false;
+    }
+}
+
+// Improved Firebase auth status check
+async function getFirebaseAuthStatus() {
+    try {
+        // Ensure Firebase is initialized
+        await ensureFirebaseInitialized();
+        
+        // Wait a moment for auth state to settle
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const auth = firebase.auth();
+        const user = auth.currentUser;
+        
+        if (user) {
+            return {
+                status: 'authenticated',
+                email: user.email,
+                uid: user.uid,
+                provider: user.providerId
+            };
+        }
+        
+        // Check if auth state changes might be pending
+        return new Promise((resolve) => {
+            const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+                unsubscribe();
+                
+                if (firebaseUser) {
+                    resolve({
+                        status: 'authenticated',
+                        email: firebaseUser.email,
+                        uid: firebaseUser.uid,
+                        provider: firebaseUser.providerId
+                    });
+                } else {
+                    resolve({
+                        status: 'not_authenticated',
+                        email: null,
+                        uid: null
+                    });
+                }
+            });
+            
+            // Timeout after 2 seconds
+            setTimeout(() => {
+                unsubscribe();
+                resolve({
+                    status: 'not_authenticated',
+                    email: null,
+                    uid: null
+                });
+            }, 2000);
+        });
+        
+    } catch (error) {
+        console.error('getFirebaseAuthStatus error:', error);
+        return {
+            status: 'error',
+            email: null,
+            uid: null,
+            error: error.message
         };
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        
-        handleAuthenticatedUser(firebaseUser);
-        return;
     }
-    
-    // Fallback: Check localStorage
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        console.log('❌ No user found, redirecting to auth page');
-        window.location.href = 'auth.html';
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    console.log('⚠️ Using localStorage authentication (Firebase unavailable):', user.username);
-    
-    handleAuthenticatedUser(user);
 }
     
 // Helper: Get Firebase user (async)
@@ -1349,28 +1430,110 @@ function parseCSVClaims(csvText) {
 
 // Save claims to Firebase
 async function saveClaimsToFirebase(claims) {
-    const user = firebase.auth().currentUser;
-    if (!user) {
-        throw new Error('User not authenticated');
+    console.log('💾 Attempting to save', claims.length, 'claims to Firebase');
+    
+    try {
+        // Ensure user is authenticated with Firebase
+        const auth = firebase.auth();
+        const user = auth.currentUser;
+        
+        if (!user) {
+            console.warn('No Firebase user, checking auth state...');
+            
+            // Try to get current user with retry
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const currentUser = auth.currentUser;
+            
+            if (!currentUser) {
+                throw new Error('User not authenticated with Firebase. Please login again.');
+            }
+        }
+        
+        const currentUser = auth.currentUser;
+        console.log('Using Firebase user:', currentUser.email, currentUser.uid);
+        
+        // Use Firestore with error handling
+        const db = firebase.firestore();
+        const batch = db.batch();
+        const claimsRef = db.collection('claims');
+        
+        // Prepare claims with user data
+        claims.forEach((claim, index) => {
+            const claimId = claim.id || `imported-${Date.now()}-${index}`;
+            const docRef = claimsRef.doc(claimId);
+            
+            // Add metadata
+            const claimData = {
+                ...claim,
+                userId: currentUser.uid,
+                userEmail: currentUser.email,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                importDate: new Date().toISOString(),
+                importSource: 'csv'
+            };
+            
+            batch.set(docRef, claimData);
+        });
+        
+        // Commit batch
+        console.log('Committing batch of', claims.length, 'claims...');
+        await batch.commit();
+        console.log('✅ Successfully saved', claims.length, 'claims to Firebase');
+        
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Firebase save error:', error);
+        
+        // Check error type
+        if (error.code === 'permission-denied') {
+            console.error('Firestore permissions error. Please check:');
+            console.error('1. Firestore security rules');
+            console.error('2. User authentication status');
+            console.error('3. Collection name is correct');
+            
+            // Fallback to localStorage
+            await saveClaimsToLocalStorage(claims);
+            return false;
+        }
+        
+        throw error;
     }
+}
+
+// Fallback localStorage save
+async function saveClaimsToLocalStorage(claims) {
+    console.log('💾 Saving to localStorage as fallback');
     
-    const batch = firebase.firestore().batch();
-    const claimsRef = firebase.firestore().collection('claims');
+    const existing = JSON.parse(localStorage.getItem('broilerClaims') || '[]');
+    const userEmail = localStorage.getItem('userEmail') || 'unknown';
     
-    claims.forEach((claim, index) => {
-        const claimId = claim.id || `imported-${Date.now()}-${index}`;
-        const docRef = claimsRef.doc(claimId);
-        
-        // Add user ID and timestamps
-        claim.userId = user.uid;
-        claim.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-        claim.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-        
-        batch.set(docRef, claim);
-    });
+    // Add metadata
+    const claimsWithMeta = claims.map(claim => ({
+        ...claim,
+        userId: `local-${userEmail}`,
+        userEmail: userEmail,
+        createdAt: new Date().toISOString(),
+        importSource: 'csv-localstorage',
+        needsSync: true
+    }));
     
-    await batch.commit();
-    console.log(`Saved ${claims.length} claims to Firebase`);
+    const updated = [...existing, ...claimsWithMeta];
+    localStorage.setItem('broilerClaims', JSON.stringify(updated));
+    
+    // Store in pending sync
+    const pending = JSON.parse(localStorage.getItem('pendingSync') || '[]');
+    pending.push(...claimsWithMeta);
+    localStorage.setItem('pendingSync', JSON.stringify(pending));
+    
+    console.log('✅ Saved', claims.length, 'claims to localStorage');
+    console.log('📋 Total claims in localStorage:', updated.length);
+    
+    // Notify user
+    alert(`Imported ${claims.length} claims. Saved to local storage (Firebase sync pending).`);
+    
+    return true;
 }
 
 // Make functions globally available
