@@ -131,59 +131,52 @@ function setupAuthForms() {
 }
 
 // Handle login (local + optional Firebase)
+// In auth.js, update the handleLogin function (around line 80-120):
 async function handleLogin(username, password, employeeName) {
     try {
         console.log('Attempting login for:', username);
         
-        // Disable login button to prevent multiple clicks
+        // Disable login button
         const loginBtn = document.querySelector('#login-form button[type="submit"]');
         if (loginBtn) {
             loginBtn.disabled = true;
             loginBtn.textContent = 'Signing in...';
         }
         
-        // First try local authentication
-        const users = JSON.parse(localStorage.getItem('users') || '{}');
+        // Create user object with sync preferences
+        const currentUser = {
+            username: username,
+            employeeName: employeeName,
+            email: `${username}@broiler-project.com`,
+            timestamp: new Date().toISOString(),
+            authType: 'local',
+            preferences: {
+                autoSync: localStorage.getItem('autoSyncEnabled') === 'true',
+                lastSyncMethod: localStorage.getItem('lastSyncMethod') || 'local',
+                syncFrequency: localStorage.getItem('syncFrequency') || '5'
+            }
+        };
         
-        if (users[username] && users[username].password === password) {
-            // Local authentication successful
-            const currentUser = {
-                username: username,
-                employeeName: users[username].employeeName || employeeName,
-                authType: 'local',
-                timestamp: new Date().toISOString()
-            };
-            
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            console.log('Local login successful:', currentUser);
-            
-            // Try Firebase login if available (optional)
-            if (window.firebaseAuth) {
-                await tryFirebaseLogin(username, password, currentUser);
-            } else {
-                // Redirect to main app
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 500);
-            }
-            
-        } else {
-            // Invalid credentials
-            alert('Invalid username or password');
-            
-            // Re-enable button
-            if (loginBtn) {
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'Sign In';
-            }
-        }
+        // Save user
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        
+        // Save user-specific preferences
+        localStorage.setItem(`prefs_${username}`, JSON.stringify({
+            autoSync: currentUser.preferences.autoSync,
+            lastLogin: new Date().toISOString()
+        }));
+        
+        console.log('Login successful:', currentUser);
+        
+        // Redirect
+        setTimeout(() => {
+            window.location.href = 'index.html';
+        }, 500);
         
     } catch (error) {
         console.error('Login error:', error);
         alert('Login error: ' + error.message);
         
-        // Re-enable button
-        const loginBtn = document.querySelector('#login-form button[type="submit"]');
         if (loginBtn) {
             loginBtn.disabled = false;
             loginBtn.textContent = 'Sign In';
