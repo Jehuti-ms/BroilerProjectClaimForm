@@ -7,19 +7,37 @@ console.log('Current page:', window.location.pathname);
 console.log('User in localStorage:', localStorage.getItem('currentUser'));
 
 // Wait for Firebase to load
+// In auth.js, simplify the initialization:
 function initializeAuth() {
-    console.log('Initializing authentication...');
+    console.log('Initializing auth...');
     
-    // Check if Firebase is loaded
-    if (!window.firebaseLoaded || !window.firebaseAuth) {
-        console.log('Waiting for Firebase...');
-        setTimeout(initializeAuth, 100);
-        return;
+    // Check if user is already logged in via localStorage
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        console.log('User already logged in:', JSON.parse(currentUser));
+        // Already logged in, can redirect to index.html
+        // window.location.href = 'index.html';
     }
     
-    console.log('✅ Firebase ready, setting up auth system');
-    setupAuthSystem();
+    // If Firebase is available, use it
+    if (typeof firebase !== 'undefined' && window.firebaseAuth) {
+        console.log('Firebase Auth available');
+        // Set up Firebase auth state listener
+        firebaseAuth.onAuthStateChanged((user) => {
+            if (user) {
+                console.log('Firebase user authenticated:', user.email);
+            }
+        });
+    } else {
+        console.log('Using local authentication only');
+    }
 }
+
+// Call on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing auth...');
+    initializeAuth();
+});
 
 function setupAuthSystem() {
     const auth = window.firebaseAuth;
