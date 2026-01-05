@@ -11,6 +11,112 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 let firebaseUser = null;
 let isOnline = navigator.onLine;
 
+// Auto-login to Firebase using localStorage credentials
+async function autoLoginToFirebase() {
+    console.log('🔄 Attempting Firebase auto-login...');
+    
+    if (!window.auth) {
+        console.warn('Firebase Auth not available');
+        return false;
+    }
+    
+    // Check if already logged in
+    if (auth.currentUser) {
+        console.log('✅ Already logged in to Firebase:', auth.currentUser.email);
+        return true;
+    }
+    
+    // Get credentials from localStorage
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        console.warn('No user in localStorage');
+        return false;
+    }
+    
+    const user = JSON.parse(currentUser);
+    const email = user.username || user.email;
+    const password = user.password;
+    
+    if (!email || !password) {
+        console.warn('No email/password in localStorage');
+        return false;
+    }
+    
+    try {
+        console.log(`Signing in to Firebase with: ${email}`);
+        
+        // Sign in with email/password
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        const firebaseUser = userCredential.user;
+        
+        console.log('✅ Firebase login successful:', firebaseUser.email);
+        
+        // Update localStorage with Firebase UID
+        user.uid = firebaseUser.uid;
+        user.firebaseAuthenticated = true;
+        localStorage.setItem('currentUser', JSON.stringify(user));
+        
+        // Update display name if needed
+        if (!firebaseUser.displayName && user.employeeName) {
+            await firebaseUser.updateProfile({
+                displayName: user.employeeName
+            });
+            console.log('Updated display name');
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Firebase auto-login failed:', error.code, error.message);
+        
+        // Handle specific errors
+        switch (error.code) {
+            case 'auth/user-not-found':
+                console.log('User not found in Firebase. Creating new account...');
+                return await createFirebaseUser(email, password, user.employeeName);
+            case 'auth/wrong-password':
+                console.warn('Wrong password stored in localStorage');
+                break;
+            case 'auth/invalid-email':
+                console.error('Invalid email format:', email);
+                break;
+        }
+        
+        return false;
+    }
+}
+
+// Create new Firebase user if doesn't exist
+async function createFirebaseUser(email, password, displayName) {
+    try {
+        console.log(`Creating new Firebase user: ${email}`);
+        
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const firebaseUser = userCredential.user;
+        
+        // Set display name
+        if (displayName) {
+            await firebaseUser.updateProfile({
+                displayName: displayName
+            });
+        }
+        
+        console.log('✅ New Firebase user created:', firebaseUser.email);
+        
+        // Update localStorage
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        currentUser.uid = firebaseUser.uid;
+        currentUser.firebaseAuthenticated = true;
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Failed to create Firebase user:', error.message);
+        return false;
+    }
+}
+
 // Firebase helper functions
 async function ensureFirebaseAuth() {
     console.log('🔐 Ensuring Firebase authentication...');
@@ -157,9 +263,9 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeFirebase();
     
     // Check authentication after Firebase is ready
-    setTimeout(() => {
-        checkAuthentication();
-    }, 1000);
+    setTimeout(async () => {
+        await checkAuthentication();
+    }, 1500);
     
     // Set up network monitoring
     setupNetworkMonitoring();
@@ -292,42 +398,34 @@ function setupNetworkMonitoring() {
     });
 }
 
-// Check if user is authenticated
-// Check if user is authenticated - UPDATED VERSION
+// Check if user is authenticated - COMPLETE VERSION
 async function checkAuthentication() {
     console.log('🔐 Checking authentication...');
     
-    // Wait a bit for Firebase to initialize
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait for Firebase to potentially initialize
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // First, try Firebase Authentication
-    if (window.auth) {
-        try {
-            // Get current Firebase user (async)
-            const firebaseUser = await getCurrentFirebaseUser();
-            
-            if (firebaseUser) {
-                console.log('✅ User authenticated via Firebase:', firebaseUser.email);
-                
-                // Store user info in localStorage for fallback
-                const currentUser = {
-                    username: firebaseUser.email,
-                    employeeName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-                    uid: firebaseUser.uid,
-                    firebaseAuthenticated: true
-                };
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                
-                handleAuthenticatedUser(firebaseUser);
-                return;
-            }
-        } catch (firebaseError) {
-            console.warn('Firebase auth check failed:', firebaseError.message);
-            // Continue to localStorage fallback
-        }
+    // Try Firebase auto-login FIRST
+    const firebaseLoginSuccess = await autoLoginToFirebase();
+    
+    if (firebaseLoginSuccess && auth.currentUser) {
+        console.log('✅ Firebase authentication successful');
+        const firebaseUser = auth.currentUser;
+        
+        // Update localStorage with Firebase info
+        const currentUser = {
+            username: firebaseUser.email,
+            employeeName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+            uid: firebaseUser.uid,
+            firebaseAuthenticated: true
+        };
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        
+        handleAuthenticatedUser(firebaseUser);
+        return;
     }
     
-    // Fallback: Check localStorage (existing app authentication)
+    // Fallback: Check localStorage
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
         console.log('❌ No user found, redirecting to auth page');
@@ -336,32 +434,11 @@ async function checkAuthentication() {
     }
     
     const user = JSON.parse(currentUser);
-    console.log('⚠️ User authenticated via localStorage (fallback):', user.username);
-    
-    // Try to sign in to Firebase with localStorage credentials
-    if (window.auth && user.username && user.password) {
-        try {
-            console.log('Attempting Firebase sign-in with stored credentials...');
-            const credential = await auth.signInWithEmailAndPassword(user.username, user.password);
-            console.log('✅ Auto-signed into Firebase:', credential.user.email);
-            
-            // Update localStorage with Firebase info
-            user.uid = credential.user.uid;
-            user.firebaseAuthenticated = true;
-            localStorage.setItem('currentUser', JSON.stringify(user));
-            
-            handleAuthenticatedUser(credential.user);
-            return;
-            
-        } catch (signInError) {
-            console.warn('Firebase auto-signin failed:', signInError.message);
-            // Continue with localStorage user
-        }
-    }
+    console.log('⚠️ Using localStorage authentication (Firebase unavailable):', user.username);
     
     handleAuthenticatedUser(user);
 }
-
+    
 // Helper: Get Firebase user (async)
 async function getCurrentFirebaseUser() {
     if (!window.auth) return null;
@@ -388,7 +465,6 @@ async function getCurrentFirebaseUser() {
     });
 }
 
-// Handle authenticated user
 // Handle authenticated user - UPDATED VERSION
 function handleAuthenticatedUser(user) {
     console.log('👤 Handling authenticated user:', user.email || user.username);
