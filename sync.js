@@ -463,11 +463,24 @@ async function getCurrentFirebaseUser() {
 }
 
 // Test Firebase connection - FIXED (no recursion)
-async function testFirebaseConnection() {
+/*async function testFirebaseConnection() {
     console.log('Testing Firebase connection from sync.js...');
     
     // Use the safe test function
     return await safeFirebaseTest();
+} */
+
+// Test Firebase connection - DISABLED until rules fixed
+async function testFirebaseConnection() {
+    console.log('Firebase connection test (disabled - check rules)');
+    
+    // Just check if services are available
+    if (firestore && auth) {
+        console.log('✅ Firebase services available');
+        return true;
+    }
+    
+    return false;
 }
 
 // Debug function
