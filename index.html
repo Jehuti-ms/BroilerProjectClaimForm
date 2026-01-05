@@ -28,6 +28,19 @@
                 <span id="user-display">Welcome, User</span>
                 <button onclick="logout()" class="logout-btn">Logout</button>
             </div>
+
+            <!-- Add this near the user info section -->
+            <div class="auth-status" id="auth-status" style="
+                position: absolute;
+                top: 80px;
+                right: 20px;
+                font-size: 12px;
+                padding: 4px 8px;
+                border-radius: 4px;
+                display: none;
+            ">
+                Auth: <span id="auth-status-text">Checking...</span>
+            </div>
             
             <!-- Auto-Sync Controls -->
             <div class="sync-controls">
