@@ -11,6 +11,89 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 let firebaseUser = null;
 let isOnline = navigator.onLine;
 
+// =============== ADD THIS ERROR HANDLER HERE ===============
+// Firebase error handler function
+function handleFirebaseError(error) {
+    console.error('Firebase error:', error.code, error.message);
+    
+    let userMessage = 'Firebase error occurred';
+    let type = 'error';
+    
+    switch (error.code) {
+        case 'permission-denied':
+            userMessage = '❌ Firebase permission denied. Please check security rules.';
+            type = 'error';
+            break;
+        case 'unavailable':
+            userMessage = '📴 Firebase unavailable. Working in offline mode.';
+            type = 'warning';
+            break;
+        case 'unauthenticated':
+            userMessage = '🔐 Please sign in to use cloud sync features.';
+            type = 'error';
+            break;
+        case 'failed-precondition':
+            userMessage = '⚡ Firebase service not ready. Try again in a moment.';
+            type = 'warning';
+            break;
+        default:
+            userMessage = `⚠️ Firebase: ${error.message || 'Unknown error'}`;
+            type = 'error';
+    }
+    
+    showNotification(userMessage, type);
+    return false;
+}
+
+// Safe Firebase wrapper functions
+async function safeFirebaseOperation(operation, fallbackValue = false) {
+    try {
+        return await operation();
+    } catch (error) {
+        return handleFirebaseError(error);
+    }
+}
+
+// Safe Firebase test function (prevents recursion)
+async function performSafeFirebaseTest() {
+    return await safeFirebaseOperation(async () => {
+        console.log('Running safe Firebase test...');
+        
+        if (!window.firestore) {
+            console.log('Firestore not available for testing');
+            return false;
+        }
+        
+        // Simple ping test - no recursion
+        const testId = 'safetest_' + Date.now();
+        const testRef = firestore.collection('safeTests').doc(testId);
+        
+        // Quick write test
+        await testRef.set({
+            test: 'safe_connection_check',
+            timestamp: new Date().toISOString(),
+            source: 'app.js'
+        });
+        
+        console.log('✅ Safe test write successful');
+        
+        // Quick read test
+        const doc = await testRef.get();
+        if (!doc.exists) {
+            console.warn('Test document not found');
+            return false;
+        }
+        
+        console.log('✅ Safe test read successful');
+        
+        // Clean up
+        await testRef.delete();
+        console.log('✅ Safe test cleanup successful');
+        
+        return true;
+    });
+}
+
 // Check authentication on page load
 document.addEventListener('DOMContentLoaded', function() {
     console.log('App.js loading...');
