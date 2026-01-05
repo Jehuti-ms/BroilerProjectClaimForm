@@ -302,3 +302,59 @@ window.addEventListener('offline', () => {
 });
 
 console.log('🔥 Firebase config loaded');
+
+// ============ ADD THIS TO BOTTOM OF firebase-config.js ============
+
+// Debug: Check what's available
+console.log('=== FIREBASE DEBUG FROM CONFIG ===');
+console.log('Firebase SDK loaded:', typeof firebase !== 'undefined');
+console.log('Firestore loaded:', typeof firebase?.firestore !== 'undefined');
+console.log('Auth loaded:', typeof firebase?.auth !== 'undefined');
+
+// Force initialization if not done
+function ensureFirebaseInitialized() {
+    if (!window.firestore && typeof firebase !== 'undefined') {
+        console.log('🔥 Firebase not initialized, initializing now...');
+        try {
+            window.firebaseApp = firebase.initializeApp(firebaseConfig);
+            window.firestore = firebase.firestore();
+            window.auth = firebase.auth();
+            
+            console.log('✅ Firebase manually initialized');
+            console.log('Project ID:', window.firebaseApp.options.projectId);
+            
+            // Enable offline persistence
+            window.firestore.enablePersistence()
+                .then(() => console.log('📱 Offline persistence enabled'))
+                .catch(err => {
+                    if (err.code === 'failed-precondition') {
+                        console.log('Multiple tabs open - persistence limited');
+                    } else if (err.code === 'unimplemented') {
+                        console.log('Browser doesn\'t support persistence');
+                    }
+                });
+                
+            return true;
+        } catch (error) {
+            console.error('❌ Manual init failed:', error);
+            return false;
+        }
+    }
+    return true;
+}
+
+// Run initialization check
+setTimeout(() => {
+    console.log('=== INITIALIZATION CHECK ===');
+    console.log('window.firestore:', !!window.firestore);
+    console.log('window.auth:', !!window.auth);
+    console.log('window.firebaseApp:', !!window.firebaseApp);
+    
+    if (!window.firestore) {
+        console.log('Attempting to initialize Firebase...');
+        ensureFirebaseInitialized();
+    }
+}, 1000);
+
+// Make sure functions are available
+window.ensureFirebaseInitialized = ensureFirebaseInitialized;
