@@ -95,7 +95,9 @@ function setupAuthSystem() {
             console.log('Login successful:', currentUser);
             
             // Redirect to main page
-            window.location.href = 'index.html';
+           setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 100);
             
         } catch (error) {
             console.error('Login error:', error);
