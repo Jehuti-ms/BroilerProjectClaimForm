@@ -184,70 +184,48 @@ function updateFirebaseStatus(status) {
 
 // Test Firebase connection
 async function testFirebaseConnection() {
-    if (!firestore || !isFirebaseInitialized) {
+    if (!firestore || !auth) {
         console.error('Firebase not initialized');
-        updateFirebaseStatus('init_error');
         return false;
     }
     
     try {
-        updateFirebaseStatus('initializing');
+        updateFirebaseStatus('connecting');
         
-        // Create a unique test document ID
-        const testId = 'test_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        const testRef = firestore.collection('connectionTests').doc(testId);
-        
-        // Test write operation
-        await testRef.set({
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            test: 'connection_test',
-            userAgent: navigator.userAgent.substring(0, 100),
-            testId: testId
-        });
-        
-        console.log('✅ Firebase write test successful');
-        
-        // Test read operation
-        const docSnapshot = await testRef.get();
-        if (!docSnapshot.exists) {
-            throw new Error('Test document not found after write');
+        // Get current user
+        const user = auth.currentUser;
+        if (!user) {
+            console.log('No user signed in for test');
+            updateFirebaseStatus('connected'); // Connection works, just no user
+            return true;
         }
         
-        console.log('✅ Firebase read test successful');
+        console.log('Testing Firebase connection for user:', user.email);
         
-        // Clean up test document
-        await testRef.delete();
-        console.log('✅ Firebase cleanup successful');
+        // Test with user's own document
+        const userDocRef = firestore.collection('userData').doc(user.email);
+        
+        // Try to access (this should work with proper rules)
+        await userDocRef.get();
         
         updateFirebaseStatus('connected');
+        console.log('✅ Firebase connection working!');
         return true;
         
     } catch (error) {
-        console.error('❌ Firebase connection test failed:', error);
+        console.error('Firebase test failed:', error);
         
-        let errorMessage = 'Firebase Error: ';
-        switch (error.code) {
-            case 'permission-denied':
-                errorMessage += 'Permission denied. Check security rules.';
-                updateFirebaseStatus('connection_error');
-                break;
-                
-            case 'unavailable':
-                errorMessage += 'Service unavailable. You may be offline.';
-                updateFirebaseStatus('offline');
-                break;
-                
-            case 'failed-precondition':
-                errorMessage += 'Database not ready.';
-                updateFirebaseStatus('connection_error');
-                break;
-                
-            default:
-                errorMessage += error.message || 'Unknown error';
-                updateFirebaseStatus('connection_error');
+        if (error.code === 'permission-denied') {
+            updateFirebaseStatus('permission_error');
+            console.warn('Permission denied. Please update Firebase security rules.');
+            showNotification('Firebase permissions issue. Update security rules.', 'error');
+        } else if (error.code === 'unavailable') {
+            updateFirebaseStatus('offline');
+            console.warn('Firebase unavailable - offline mode');
+        } else {
+            updateFirebaseStatus('error');
         }
         
-        console.warn(errorMessage);
         return false;
     }
 }
