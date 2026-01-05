@@ -6,42 +6,11 @@
     <title>Sign In - Broiler Production Project</title>
     <link rel="stylesheet" href="styles.css">
     
-    <!-- Firebase SDK 9+ (Modular version) -->
-    <script type="module">
-        // Import the functions you need from the SDKs you need
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-        
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyAagSPJW2RxyG28Og54ftYd8MGvPPKO_SE",
-            authDomain: "broilerprojectclaimform-d6d51.firebaseapp.com",
-            projectId: "broilerprojectclaimform-d6d51",
-            storageBucket: "broilerprojectclaimform-d6d51.firebasestorage.app",
-            messagingSenderId: "1069004689384",
-            appId: "1:1069004689384:web:ab7e2e4063e2ee864c5e5d"
-        };
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        
-        // Make available globally for auth.js
-        window.firebaseApp = app;
-        window.firebaseAuth = auth;
-        window.firebaseFirestore = db;
-        window.firebaseLoaded = true;
-        
-        console.log('✅ Firebase SDK loaded successfully');
-        
-        // Hide loading message if exists
-        const loadingDiv = document.getElementById('firebase-loading');
-        if (loadingDiv) loadingDiv.style.display = 'none';
-    </script>
+    <!-- Firebase SDK (Compatibility version - NOT modular) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     
-    <!-- Loading indicator (optional) -->
     <style>
         #firebase-loading {
             position: fixed;
@@ -75,19 +44,21 @@
             
             <form id="login-form" class="auth-form">
                 <div class="form-group">
-                    <label for="username">Email:</label>
+                    <label for="login-email">Email:</label>
                     <input type="email" id="login-email" name="login-email" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="password">Password:</label>
+                    <label for="login-password">Password:</label>
                     <input type="password" id="login-password" name="login-password" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="employee-name">Your Full Name:</label>
+                    <label for="employee-name-auth">Your Full Name:</label>
                     <input type="text" id="employee-name-auth" name="employee-name" required>
                 </div>
+                
+                <div id="auth-error" class="error-message" style="display: none;"></div>
                 
                 <button type="submit" class="auth-btn">Sign In</button>
             </form>
@@ -106,12 +77,12 @@
             
             <form id="register-form" class="auth-form">
                 <div class="form-group">
-                    <label for="new-username">Email:</label>
+                    <label for="signup-email">Email:</label>
                     <input type="email" id="signup-email" name="signup-email" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="new-password">Password:</label>
+                    <label for="signup-password">Password:</label>
                     <input type="password" id="signup-password" name="signup-password" required>
                 </div>
                 
@@ -124,6 +95,8 @@
                     <label for="new-employee-name">Your Full Name:</label>
                     <input type="text" id="new-employee-name" name="new-employee-name" required>
                 </div>
+                
+                <div id="auth-error-register" class="error-message" style="display: none;"></div>
                 
                 <button type="submit" class="auth-btn">Register</button>
             </form>
@@ -141,7 +114,7 @@
             
             <form id="reset-form" class="auth-form">
                 <div class="form-group">
-                    <label for="reset-username">Email:</label>
+                    <label for="reset-email">Email:</label>
                     <input type="email" id="reset-email" name="reset-email" required>
                 </div>
                 
@@ -155,6 +128,8 @@
                     <input type="password" id="reset-confirm-password" name="reset-confirm-password" required>
                 </div>
                 
+                <div id="auth-error-reset" class="error-message" style="display: none;"></div>
+                
                 <button type="submit" class="auth-btn">Reset Password</button>
             </form>
             
@@ -164,8 +139,50 @@
         </div>
     </div>
 
+    <!-- Initialize Firebase -->
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAagSPJW2RxyG28Og54ftYd8MGvPPKO_SE",
+            authDomain: "broilerprojectclaimform-d6d51.firebaseapp.com",
+            projectId: "broilerprojectclaimform-d6d51",
+            storageBucket: "broilerprojectclaimform-d6d51.firebasestorage.app",
+            messagingSenderId: "1069004689384",
+            appId: "1:1069004689384:web:ab7e2e4063e2ee864c5e5d"
+        };
+
+        // Initialize Firebase
+        let firebaseApp, firebaseAuth, firebaseFirestore;
+        
+        try {
+            if (!firebase.apps.length) {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+            } else {
+                firebaseApp = firebase.app();
+            }
+            
+            firebaseAuth = firebase.auth();
+            firebaseFirestore = firebase.firestore();
+            
+            console.log('✅ Firebase SDK loaded successfully');
+            
+            // Make available globally
+            window.firebaseApp = firebaseApp;
+            window.firebaseAuth = firebaseAuth;
+            window.firebaseFirestore = firebaseFirestore;
+            window.firebaseLoaded = true;
+            
+        } catch (error) {
+            console.error('❌ Firebase initialization failed:', error);
+            document.getElementById('firebase-loading').innerHTML = 
+                '<h2 style="color: red;">Firebase Error</h2><p>' + error.message + '</p>';
+        }
+    </script>
+    
+    <!-- Load auth.js AFTER Firebase -->
     <script src="auth.js"></script>
     
+    <!-- UI helper functions -->
     <script>
         // Show/hide auth cards
         function showLogin() {
@@ -194,6 +211,13 @@
             if (window.firebaseLoaded) {
                 document.getElementById('firebase-loading').style.display = 'none';
                 document.querySelector('.auth-container').style.display = 'block';
+                
+                // Pre-fill email if in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const email = urlParams.get('login-email');
+                if (email) {
+                    document.getElementById('login-email').value = decodeURIComponent(email);
+                }
             } else {
                 setTimeout(checkAuthContainer, 100);
             }
