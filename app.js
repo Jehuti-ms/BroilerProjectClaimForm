@@ -1268,6 +1268,116 @@ function updateSyncStatus(message, type = 'info') {
     }
 }
 
+function importData() {
+    console.log('Broiler Project Claim Form Import');
+    
+    // Create file input
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json,.csv';
+    fileInput.style.display = 'none';
+    
+    fileInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        
+        reader.onload = async (event) => {
+            try {
+                const content = event.target.result;
+                const fileName = file.name.toLowerCase();
+                
+                if (fileName.endsWith('.json')) {
+                    // Import JSON for Broiler Project
+                    const claims = JSON.parse(content);
+                    await saveClaimsToFirebase(claims);
+                    alert(`Imported ${claims.length} claim records from JSON.`);
+                    
+                } else if (fileName.endsWith('.csv')) {
+                    // Import CSV for Broiler Project
+                    const claims = parseCSVClaims(content);
+                    await saveClaimsToFirebase(claims);
+                    alert(`Imported ${claims.length} claim records from CSV.`);
+                    
+                }
+                
+                // Refresh the table/data display
+                if (typeof loadData === 'function') {
+                    loadData();
+                }
+                
+            } catch (error) {
+                console.error('Import error:', error);
+                alert(`Import failed: ${error.message}`);
+            }
+        };
+        
+        reader.readAsText(file);
+    };
+    
+    document.body.appendChild(fileInput);
+    fileInput.click();
+    document.body.removeChild(fileInput);
+}
+
+// Parse CSV for Broiler Project Claims
+function parseCSVClaims(csvText) {
+    const lines = csvText.split('\n').filter(line => line.trim());
+    if (lines.length < 2) return [];
+    
+    const headers = lines[0].split(',').map(h => h.trim());
+    const claims = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        const claim = {};
+        
+        headers.forEach((header, index) => {
+            claim[header] = values[index] || '';
+        });
+        
+        // Add metadata
+        claim.importDate = new Date().toISOString();
+        claim.importSource = 'csv';
+        
+        claims.push(claim);
+    }
+    
+    return claims;
+}
+
+// Save claims to Firebase
+async function saveClaimsToFirebase(claims) {
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        throw new Error('User not authenticated');
+    }
+    
+    const batch = firebase.firestore().batch();
+    const claimsRef = firebase.firestore().collection('claims');
+    
+    claims.forEach((claim, index) => {
+        const claimId = claim.id || `imported-${Date.now()}-${index}`;
+        const docRef = claimsRef.doc(claimId);
+        
+        // Add user ID and timestamps
+        claim.userId = user.uid;
+        claim.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        claim.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+        
+        batch.set(docRef, claim);
+    });
+    
+    await batch.commit();
+    console.log(`Saved ${claims.length} claims to Firebase`);
+}
+
+// Make functions globally available
+window.importData = importData;
+window.parseCSVClaims = parseCSVClaims;
+window.saveClaimsToFirebase = saveClaimsToFirebase;
+
 // Export functions for sync.js
 window.updateSyncStatus = updateSyncStatus;
 window.showNotification = showNotification;
