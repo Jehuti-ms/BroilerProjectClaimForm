@@ -1,4 +1,4 @@
-// auth.js - UPDATED VERSION
+// auth.js - FIXED VERSION
 
 /**
  * Firebase/Local Authentication System
@@ -9,26 +9,41 @@ console.log('=== AUTH.JS LOADED ===');
 console.log('Current page:', window.location.pathname);
 console.log('User in localStorage:', localStorage.getItem('currentUser'));
 
+// Check for existing session IMMEDIATELY on load
+(function checkExistingSessionOnLoad() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        const user = JSON.parse(currentUser);
+        console.log('Existing session found for:', user.email || user.username);
+        
+        // FORCE REDIRECT if on auth page
+        if (window.location.pathname.includes('auth.html')) {
+            console.log('Redirecting to index.html...');
+            window.location.href = 'index.html';
+            return; // Stop further execution
+        }
+    }
+})();
+
 // Simplified initialization
 function initializeAuth() {
     console.log('Initializing auth...');
     
-    // Check if user is already logged in via localStorage
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        console.log('User already logged in:', JSON.parse(currentUser));
-        
-        // Redirect to main app if on auth page
-        if (window.location.pathname.includes('auth.html')) {
-            console.log('Redirecting to index.html...');
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 1000);
+    // Already handled redirect above, but keep for other pages
+    if (!window.location.pathname.includes('auth.html')) {
+        // We're on a non-auth page, check if user exists
+        const currentUser = localStorage.getItem('currentUser');
+        if (!currentUser) {
+            console.log('No user found, redirecting to auth page');
+            window.location.href = 'auth.html';
+            return;
         }
     }
     
-    // Set up auth forms
-    setupAuthForms();
+    // Set up auth forms only if on auth page
+    if (window.location.pathname.includes('auth.html')) {
+        setupAuthForms();
+    }
     
     // If Firebase Auth is available, use it
     if (typeof firebase !== 'undefined' && window.firebaseAuth) {
@@ -49,6 +64,23 @@ function setupAuthForms() {
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
     const resetForm = document.getElementById('reset-form');
+    
+    // Show/hide buttons setup
+    const showRegisterBtn = document.getElementById('show-register');
+    const showLoginBtn = document.getElementById('show-login');
+    const showResetBtn = document.getElementById('show-reset');
+    
+    if (showRegisterBtn) {
+        showRegisterBtn.addEventListener('click', showRegister);
+    }
+    
+    if (showLoginBtn) {
+        showLoginBtn.addEventListener('click', showLogin);
+    }
+    
+    if (showResetBtn) {
+        showResetBtn.addEventListener('click', showReset);
+    }
     
     if (loginForm) {
         loginForm.addEventListener('submit', async function(e) {
@@ -130,17 +162,40 @@ function setupAuthForms() {
     }
 }
 
-// Handle login (local + optional Firebase)
-// In auth.js, update the handleLogin function (around line 80-120):
+// FIXED handleLogin function
 async function handleLogin(username, password, employeeName) {
+    let loginBtn = null;
+    
     try {
         console.log('Attempting login for:', username);
         
         // Disable login button
-        const loginBtn = document.querySelector('#login-form button[type="submit"]');
+        loginBtn = document.querySelector('#login-form button[type="submit"]');
         if (loginBtn) {
             loginBtn.disabled = true;
             loginBtn.textContent = 'Signing in...';
+        }
+        
+        // Check credentials against stored users
+        const users = JSON.parse(localStorage.getItem('users') || '{}');
+        const userData = users[username];
+        
+        if (!userData) {
+            alert('Username not found. Please register first.');
+            if (loginBtn) {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+            return;
+        }
+        
+        if (userData.password !== password) {
+            alert('Incorrect password');
+            if (loginBtn) {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+            return;
         }
         
         // Create user object with sync preferences
@@ -168,7 +223,21 @@ async function handleLogin(username, password, employeeName) {
         
         console.log('Login successful:', currentUser);
         
-        // Redirect
+        // Optional: Try Firebase login
+        if (window.firebaseAuth) {
+            try {
+                const email = `${username}@broiler-project.com`;
+                const userCredential = await firebaseAuth.signInWithEmailAndPassword(email, password);
+                currentUser.firebaseUid = userCredential.user.uid;
+                currentUser.authType = 'firebase';
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                console.log('Firebase login successful');
+            } catch (firebaseError) {
+                console.log('Firebase login failed, using local only:', firebaseError.message);
+            }
+        }
+        
+        // Redirect after successful login
         setTimeout(() => {
             window.location.href = 'index.html';
         }, 500);
@@ -184,33 +253,7 @@ async function handleLogin(username, password, employeeName) {
     }
 }
 
-// Try Firebase login (optional)
-async function tryFirebaseLogin(username, password, currentUser) {
-    try {
-        if (!window.firebaseAuth) return;
-        
-        const email = `${username}@broiler-project.com`;
-        const userCredential = await firebaseAuth.signInWithEmailAndPassword(email, password);
-        
-        // Update user with Firebase info
-        currentUser.firebaseUid = userCredential.user.uid;
-        currentUser.authType = 'firebase';
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        
-        console.log('Firebase login successful');
-        
-    } catch (error) {
-        console.log('Firebase login failed, using local only:', error.message);
-        // Continue with local authentication
-    }
-    
-    // Redirect to main app
-    setTimeout(() => {
-        window.location.href = 'index.html';
-    }, 500);
-}
-
-// Handle registration (local + optional Firebase)
+// FIXED handleRegister function
 async function handleRegister(username, password, employeeName) {
     try {
         console.log('Attempting registration for:', username);
@@ -237,7 +280,45 @@ async function handleRegister(username, password, employeeName) {
         
         // Try Firebase registration if available
         if (window.firebaseAuth) {
-            await tryFirebaseRegister(username, password, employeeName, users);
+            try {
+                const email = `${username}@broiler-project.com`;
+                const userCredential = await firebaseAuth.createUserWithEmailAndPassword(email, password);
+                
+                // Update local user with Firebase info
+                users[username].firebaseLinked = true;
+                users[username].firebaseUid = userCredential.user.uid;
+                localStorage.setItem('users', JSON.stringify(users));
+                
+                // Create user object
+                const currentUser = {
+                    username: username,
+                    employeeName: employeeName,
+                    authType: 'firebase',
+                    firebaseUid: userCredential.user.uid,
+                    timestamp: new Date().toISOString()
+                };
+                
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                console.log('Firebase registration successful');
+                alert('Registration successful!');
+                window.location.href = 'index.html';
+                
+            } catch (firebaseError) {
+                console.error('Firebase registration failed:', firebaseError);
+                
+                // Fallback: still register locally
+                const currentUser = {
+                    username: username,
+                    employeeName: employeeName,
+                    authType: 'local',
+                    timestamp: new Date().toISOString()
+                };
+                
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                alert('Local registration successful (Firebase failed)');
+                window.location.href = 'index.html';
+            }
         } else {
             // Auto-login after local registration
             const currentUser = {
@@ -258,88 +339,32 @@ async function handleRegister(username, password, employeeName) {
     }
 }
 
-// Try Firebase registration (optional)
-async function tryFirebaseRegister(username, password, employeeName, users) {
-    try {
-        if (!window.firebaseAuth) return;
-        
-        const email = `${username}@broiler-project.com`;
-        const userCredential = await firebaseAuth.createUserWithEmailAndPassword(email, password);
-        
-        // Update local user with Firebase info
-        users[username].firebaseLinked = true;
-        users[username].firebaseUid = userCredential.user.uid;
-        localStorage.setItem('users', JSON.stringify(users));
-        
-        // Create user object
-        const currentUser = {
-            username: username,
-            employeeName: employeeName,
-            authType: 'firebase',
-            firebaseUid: userCredential.user.uid,
-            timestamp: new Date().toISOString()
-        };
-        
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        
-        console.log('Firebase registration successful');
-        alert('Registration successful!');
-        window.location.href = 'index.html';
-        
-    } catch (error) {
-        console.error('Firebase registration failed:', error);
-        
-        // Fallback: still register locally
-        const currentUser = {
-            username: username,
-            employeeName: employeeName,
-            authType: 'local',
-            timestamp: new Date().toISOString()
-        };
-        
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        alert('Local registration successful (Firebase failed)');
-        window.location.href = 'index.html';
-    }
-}
-
 // Keep existing UI functions (they should still work)
 function showRegister() {
-    document.getElementById('login-form').parentElement.style.display = 'none';
+    document.getElementById('login-card').style.display = 'none';
     document.getElementById('register-card').style.display = 'block';
+    document.getElementById('reset-card').style.display = 'none';
 }
 
 function showLogin() {
     document.getElementById('register-card').style.display = 'none';
     document.getElementById('reset-card').style.display = 'none';
-    document.getElementById('login-form').parentElement.style.display = 'block';
+    document.getElementById('login-card').style.display = 'block';
 }
 
 function showReset() {
-    document.getElementById('login-form').parentElement.style.display = 'none';
+    document.getElementById('login-card').style.display = 'none';
+    document.getElementById('register-card').style.display = 'none';
     document.getElementById('reset-card').style.display = 'block';
 }
 
-// Check for existing session on page load
-// Find and update the checkExistingSession function:
-function checkExistingSession() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        const user = JSON.parse(currentUser);
-        console.log('Existing session found for:', user.email || user.username);
-        
-        // FORCE REDIRECT if on auth page
-        if (window.location.pathname.includes('auth.html')) {
-            console.log('Redirecting to index.html...');
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 100);
-        }
-    }
-}
+// Remove duplicate checkExistingSession function - using the one at top
 
 // Emergency reset function for development (remove in production)
 function addEmergencyReset() {
+    // Only add on auth page
+    if (!window.location.pathname.includes('auth.html')) return;
+    
     const emergencyReset = document.createElement('button');
     emergencyReset.textContent = 'Emergency Reset (Clear All Data)';
     emergencyReset.style.cssText = `
@@ -410,3 +435,18 @@ window.authModule = {
         window.location.href = 'auth.html';
     }
 };
+
+// Initialize auth when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeAuth();
+    if (window.location.pathname.includes('auth.html')) {
+        addEmergencyReset();
+    }
+});
+
+// Make functions available globally for debugging
+window.showLogin = showLogin;
+window.showRegister = showRegister;
+window.showReset = showReset;
+window.listAllUsers = listAllUsers;
+window.manualPasswordReset = manualPasswordReset;
