@@ -1,4 +1,4 @@
-// auth.js - FIXED VERSION
+// auth.js - UPDATED TO MATCH HTML IDS
 
 /**
  * Firebase/Local Authentication System
@@ -25,9 +25,21 @@ console.log('User in localStorage:', localStorage.getItem('currentUser'));
     }
 })();
 
+// Hide loading and show auth forms
+function showAuthForms() {
+    const loading = document.getElementById('firebase-loading');
+    const authContainer = document.querySelector('.auth-container');
+    
+    if (loading) loading.style.display = 'none';
+    if (authContainer) authContainer.style.display = 'block';
+}
+
 // Simplified initialization
 function initializeAuth() {
     console.log('Initializing auth...');
+    
+    // Show auth forms after a short delay
+    setTimeout(showAuthForms, 500);
     
     // Already handled redirect above, but keep for other pages
     if (!window.location.pathname.includes('auth.html')) {
@@ -59,43 +71,31 @@ function initializeAuth() {
     }
 }
 
-// Set up authentication forms
+// Set up authentication forms - UPDATED TO MATCH HTML IDS
 function setupAuthForms() {
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
     const resetForm = document.getElementById('reset-form');
     
-    // Show/hide buttons setup
-    const showRegisterBtn = document.getElementById('show-register');
-    const showLoginBtn = document.getElementById('show-login');
-    const showResetBtn = document.getElementById('show-reset');
-    
-    if (showRegisterBtn) {
-        showRegisterBtn.addEventListener('click', showRegister);
-    }
-    
-    if (showLoginBtn) {
-        showLoginBtn.addEventListener('click', showLogin);
-    }
-    
-    if (showResetBtn) {
-        showResetBtn.addEventListener('click', showReset);
-    }
-    
+    // Show/hide buttons setup - ADD MISSING BUTTON REFERENCES
     if (loginForm) {
         loginForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+            // UPDATED: Using HTML IDs
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
             const employeeName = document.getElementById('employee-name-auth').value;
             
-            if (!username || !password || !employeeName) {
+            if (!email || !password || !employeeName) {
                 alert('Please fill all fields');
                 return;
             }
             
-            await handleLogin(username, password, employeeName);
+            // Extract username from email (before @)
+            const username = email.split('@')[0];
+            
+            await handleLogin(username, password, employeeName, email);
         });
     }
     
@@ -103,12 +103,13 @@ function setupAuthForms() {
         registerForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const username = document.getElementById('new-username').value;
-            const password = document.getElementById('new-password').value;
+            // UPDATED: Using HTML IDs
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
             const confirmPassword = document.getElementById('confirm-password').value;
             const employeeName = document.getElementById('new-employee-name').value;
             
-            if (!username || !password || !confirmPassword || !employeeName) {
+            if (!email || !password || !confirmPassword || !employeeName) {
                 alert('Please fill all fields');
                 return;
             }
@@ -123,7 +124,10 @@ function setupAuthForms() {
                 return;
             }
             
-            await handleRegister(username, password, employeeName);
+            // Extract username from email (before @)
+            const username = email.split('@')[0];
+            
+            await handleRegister(username, password, employeeName, email);
         });
     }
     
@@ -131,11 +135,12 @@ function setupAuthForms() {
         resetForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const username = document.getElementById('reset-username').value;
+            // UPDATED: Using HTML IDs
+            const email = document.getElementById('reset-email').value;
             const newPassword = document.getElementById('reset-new-password').value;
             const confirmPassword = document.getElementById('reset-confirm-password').value;
             
-            if (!username || !newPassword || !confirmPassword) {
+            if (!email || !newPassword || !confirmPassword) {
                 alert('Please fill all fields');
                 return;
             }
@@ -145,10 +150,13 @@ function setupAuthForms() {
                 return;
             }
             
+            // Extract username from email (before @)
+            const username = email.split('@')[0];
+            
             // Simple password reset (local only)
             const users = JSON.parse(localStorage.getItem('users') || '{}');
             if (!users[username]) {
-                alert('Username not found');
+                alert('Username/Email not found');
                 return;
             }
             
@@ -162,12 +170,12 @@ function setupAuthForms() {
     }
 }
 
-// FIXED handleLogin function
-async function handleLogin(username, password, employeeName) {
+// UPDATED handleLogin function to accept email parameter
+async function handleLogin(username, password, employeeName, email) {
     let loginBtn = null;
     
     try {
-        console.log('Attempting login for:', username);
+        console.log('Attempting login for:', username, 'Email:', email);
         
         // Disable login button
         loginBtn = document.querySelector('#login-form button[type="submit"]');
@@ -181,7 +189,7 @@ async function handleLogin(username, password, employeeName) {
         const userData = users[username];
         
         if (!userData) {
-            alert('Username not found. Please register first.');
+            alert('Username/Email not found. Please register first.');
             if (loginBtn) {
                 loginBtn.disabled = false;
                 loginBtn.textContent = 'Sign In';
@@ -201,8 +209,8 @@ async function handleLogin(username, password, employeeName) {
         // Create user object with sync preferences
         const currentUser = {
             username: username,
+            email: email,
             employeeName: employeeName,
-            email: `${username}@broiler-project.com`,
             timestamp: new Date().toISOString(),
             authType: 'local',
             preferences: {
@@ -226,7 +234,6 @@ async function handleLogin(username, password, employeeName) {
         // Optional: Try Firebase login
         if (window.firebaseAuth) {
             try {
-                const email = `${username}@broiler-project.com`;
                 const userCredential = await firebaseAuth.signInWithEmailAndPassword(email, password);
                 currentUser.firebaseUid = userCredential.user.uid;
                 currentUser.authType = 'firebase';
@@ -253,23 +260,24 @@ async function handleLogin(username, password, employeeName) {
     }
 }
 
-// FIXED handleRegister function
-async function handleRegister(username, password, employeeName) {
+// UPDATED handleRegister function to accept email parameter
+async function handleRegister(username, password, employeeName, email) {
     try {
-        console.log('Attempting registration for:', username);
+        console.log('Attempting registration for:', username, 'Email:', email);
         
         // Get existing users
         const users = JSON.parse(localStorage.getItem('users') || '{}');
         
         // Check if username already exists
         if (users[username]) {
-            alert('Username already exists');
+            alert('Username/Email already exists');
             return;
         }
         
         // Create local user
         users[username] = {
             password: password,
+            email: email,
             employeeName: employeeName,
             createdAt: new Date().toISOString(),
             firebaseLinked: false
@@ -281,7 +289,6 @@ async function handleRegister(username, password, employeeName) {
         // Try Firebase registration if available
         if (window.firebaseAuth) {
             try {
-                const email = `${username}@broiler-project.com`;
                 const userCredential = await firebaseAuth.createUserWithEmailAndPassword(email, password);
                 
                 // Update local user with Firebase info
@@ -292,6 +299,7 @@ async function handleRegister(username, password, employeeName) {
                 // Create user object
                 const currentUser = {
                     username: username,
+                    email: email,
                     employeeName: employeeName,
                     authType: 'firebase',
                     firebaseUid: userCredential.user.uid,
@@ -310,6 +318,7 @@ async function handleRegister(username, password, employeeName) {
                 // Fallback: still register locally
                 const currentUser = {
                     username: username,
+                    email: email,
                     employeeName: employeeName,
                     authType: 'local',
                     timestamp: new Date().toISOString()
@@ -323,6 +332,7 @@ async function handleRegister(username, password, employeeName) {
             // Auto-login after local registration
             const currentUser = {
                 username: username,
+                email: email,
                 employeeName: employeeName,
                 authType: 'local',
                 timestamp: new Date().toISOString()
@@ -339,9 +349,9 @@ async function handleRegister(username, password, employeeName) {
     }
 }
 
-// Keep existing UI functions (they should still work)
+// Keep existing UI functions
 function showRegister() {
-    document.getElementById('login-card').style.display = 'none';
+    document.getElementById('login-form').parentElement.style.display = 'none';
     document.getElementById('register-card').style.display = 'block';
     document.getElementById('reset-card').style.display = 'none';
 }
@@ -349,18 +359,16 @@ function showRegister() {
 function showLogin() {
     document.getElementById('register-card').style.display = 'none';
     document.getElementById('reset-card').style.display = 'none';
-    document.getElementById('login-card').style.display = 'block';
+    document.querySelector('.auth-card:first-child').style.display = 'block';
 }
 
 function showReset() {
-    document.getElementById('login-card').style.display = 'none';
+    document.getElementById('login-form').parentElement.style.display = 'none';
     document.getElementById('register-card').style.display = 'none';
     document.getElementById('reset-card').style.display = 'block';
 }
 
-// Remove duplicate checkExistingSession function - using the one at top
-
-// Emergency reset function for development (remove in production)
+// Emergency reset function for development
 function addEmergencyReset() {
     // Only add on auth page
     if (!window.location.pathname.includes('auth.html')) return;
@@ -388,33 +396,6 @@ function addEmergencyReset() {
         }
     };
     document.body.appendChild(emergencyReset);
-}
-
-// Manual password reset function (can be called from browser console)
-function manualPasswordReset(username, newPassword) {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    
-    if (!users[username]) {
-        console.error('User not found:', username);
-        return false;
-    }
-    
-    users[username].password = newPassword;
-    users[username].manualResetAt = new Date().toISOString();
-    
-    localStorage.setItem('users', JSON.stringify(users));
-    console.log('Password reset for user:', username);
-    return true;
-}
-
-// List all users (for admin purposes)
-function listAllUsers() {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    console.log('All registered users:');
-    Object.keys(users).forEach(username => {
-        console.log('Username:', username, 'Name:', users[username].employeeName);
-    });
-    return users;
 }
 
 // Export functions for use in other files
@@ -448,5 +429,3 @@ document.addEventListener('DOMContentLoaded', function() {
 window.showLogin = showLogin;
 window.showRegister = showRegister;
 window.showReset = showReset;
-window.listAllUsers = listAllUsers;
-window.manualPasswordReset = manualPasswordReset;
