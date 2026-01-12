@@ -1,3 +1,75 @@
+// Add at the top of sync.js
+let isOnline = navigator.onLine;
+let firestoreInitialized = false;
+
+// Monitor online/offline status
+window.addEventListener('online', () => {
+    console.log('📶 Device is online');
+    isOnline = true;
+    if (firestoreInitialized) {
+        attemptReconnection();
+    }
+});
+
+window.addEventListener('offline', () => {
+    console.log('📵 Device is offline');
+    isOnline = false;
+});
+
+// Function to attempt reconnection
+function attemptReconnection() {
+    if (isOnline && window.firebase && window.firestore) {
+        console.log('Attempting to reconnect to Firebase...');
+        // Force a simple query to re-establish connection
+        const testRef = firestore.collection('test').doc('connection');
+        testRef.get().catch(err => {
+            console.log('Still offline:', err.message);
+        });
+    }
+}
+
+// Update syncFromFirebase function
+async function syncFromFirebase() {
+    try {
+        // Check online status first
+        if (!isOnline) {
+            console.log('📵 Device is offline, cannot sync from Firebase');
+            showNotification('Device is offline. Using local data.', 'warning');
+            return loadFromLocalStorage(); // Fallback to local
+        }
+        
+        console.log('Loading from Firebase for user:', currentUser.username);
+        
+        const userDoc = await firestore
+            .collection('users')
+            .doc(currentUser.username)
+            .get();
+            
+        if (userDoc.exists) {
+            const data = userDoc.data();
+            console.log('✅ Data loaded from Firebase:', data);
+            return data.forms || [];
+        } else {
+            console.log('⚠️ No Firebase data found for user');
+            return loadFromLocalStorage(); // Fallback
+        }
+        
+    } catch (error) {
+        console.error('❌ Firebase retrieval error:', error);
+        
+        // Check specific error types
+        if (error.code === 'permission-denied') {
+            showNotification('Firebase permission denied. Check security rules.', 'error');
+        } else if (error.code === 'unavailable' || error.message.includes('offline')) {
+            console.log('📵 Firebase offline, using local storage');
+            showNotification('Working offline with local data.', 'warning');
+            return loadFromLocalStorage();
+        }
+        
+        return loadFromLocalStorage(); // Always fallback to local
+    }
+}
+
 // sync.js - Complete rewrite for Firebase using Supabase pattern
 const SYNC_CONFIG = {
     autoSyncInterval: 5 * 60 * 1000, // 5 minutes
@@ -170,6 +242,32 @@ async function syncFromLocalBackup(username) {
         return JSON.parse(backupData);
     }
     return null;
+}
+
+function loadFromLocalStorage() {
+    try {
+        // Try to load from localStorage first
+        const savedForms = localStorage.getItem(`forms_${currentUser.username}`);
+        if (savedForms) {
+            const forms = JSON.parse(savedForms);
+            console.log(`📁 Loaded ${forms.length} forms from localStorage`);
+            return forms;
+        }
+        
+        // Try old format (for backward compatibility)
+        const allForms = localStorage.getItem('broilerForms');
+        if (allForms) {
+            console.log('📁 Loaded forms from old localStorage format');
+            return JSON.parse(allForms);
+        }
+        
+        console.log('📁 No forms found in localStorage');
+        return [];
+        
+    } catch (error) {
+        console.error('Error loading from localStorage:', error);
+        return [];
+    }
 }
 
 // ================= AUTO-SYNC =================
