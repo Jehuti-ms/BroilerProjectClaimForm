@@ -325,114 +325,105 @@ function saveCurrentMonth() {
 }
 
 // Load user data for current month - UPDATED for Firebase compatibility
+// Load user data for current month
 function loadUserData(username) {
-    // Try to get data using username (old format) or email (new format)
-    let userData = null;
+    console.log('Loading data for user:', username);
     
-    // First try old format: userData_username
-    userData = localStorage.getItem(`userData_${username}`);
+    // Try multiple possible data locations
+    let userData = localStorage.getItem(`userData_${username}`);
     
-    // If not found and user has email, try email-based key
+    // If not found, try alternative naming
     if (!userData) {
-        const currentUser = localStorage.getItem('currentUser');
-        if (currentUser) {
-            try {
-                const user = JSON.parse(currentUser);
-                if (user.email) {
-                    userData = localStorage.getItem(`userData_${user.email}`);
-                }
-            } catch (e) {
-                console.log('Could not parse user data');
-            }
-        }
+        userData = localStorage.getItem(`forms_${username}`);
+    }
+    
+    if (!userData) {
+        userData = localStorage.getItem('broilerForms');
     }
     
     if (userData) {
-        const allData = JSON.parse(userData);
-        loadCurrentMonthData(allData);
-    } else {
-        loadCurrentMonthData();
+        try {
+            const allData = JSON.parse(userData);
+            console.log('Found user data:', allData);
+            loadCurrentMonthData(allData);
+            return;
+        } catch (e) {
+            console.error('Error parsing user data:', e);
+        }
     }
+    
+    console.log('No saved data found, starting fresh');
+    loadCurrentMonthData();
 }
 
 // Load data for current month
 function loadCurrentMonthData(allData = null) {
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    
-    if (!monthSelect || !yearInput) return;
-    
-    const month = parseInt(monthSelect.value);
-    const year = yearInput.value;
+    const month = parseInt(document.getElementById('month-select').value);
+    const year = document.getElementById('year-input').value;
     const monthYear = `${month}-${year}`;
     
-    const tableBody = document.querySelector('#time-table tbody');
-    if (!tableBody) return;
+    console.log('Loading data for:', monthYear);
     
+    const tableBody = document.querySelector('#time-table tbody');
     tableBody.innerHTML = '';
     currentFormData = [];
     
-    if (allData && allData[monthYear]) {
-        // Load saved data for this month
-        allData[monthYear].forEach(entry => {
-            addRowToTable(entry);
-            currentFormData.push(entry);
-        });
+    if (allData) {
+        // Check if allData is an object with month keys or an array
+        if (typeof allData === 'object' && !Array.isArray(allData)) {
+            // Object format: { "9-2025": [...] }
+            if (allData[monthYear]) {
+                console.log(`Found ${allData[monthYear].length} entries for ${monthYear}`);
+                allData[monthYear].forEach(entry => {
+                    addRowToTable(entry);
+                    currentFormData.push(entry);
+                });
+            } else {
+                console.log(`No data found for ${monthYear}`);
+            }
+        } else if (Array.isArray(allData)) {
+            // Array format: direct array of entries
+            console.log(`Found ${allData.length} entries`);
+            allData.forEach(entry => {
+                addRowToTable(entry);
+                currentFormData.push(entry);
+            });
+        }
     }
     
     calculateTotal();
 }
 
-// Save user data - UPDATED for Firebase compatibility
+// Save user data
 function saveUserData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
+        console.error('No user logged in');
         return;
     }
     
-    try {
-        const user = JSON.parse(currentUser);
-        const monthSelect = document.getElementById('month-select');
-        const yearInput = document.getElementById('year-input');
-        
-        if (!monthSelect || !yearInput) return;
-        
-        const month = parseInt(monthSelect.value);
-        const year = yearInput.value;
-        const monthYear = `${month}-${year}`;
-        
-        // Determine the key to use (username or email)
-        let userKey = user.username;
-        if (!userKey && user.email) {
-            userKey = user.email;
-        } else if (!userKey) {
-            userKey = 'user';
-        }
-        
-        // Get existing user data
-        const existingData = localStorage.getItem(`userData_${userKey}`);
-        let allData = existingData ? JSON.parse(existingData) : {};
-        
-        // Update data for current month
-        allData[monthYear] = currentFormData;
-        
-        // Save back to localStorage
-        localStorage.setItem(`userData_${userKey}`, JSON.stringify(allData));
-        
-        // Show save confirmation
-        showNotification('Form data saved successfully!');
-        
-        // Auto-sync to Firebase if available
-        setTimeout(() => {
-            if (typeof syncToCloud === 'function') {
-                syncToCloud();
-            }
-        }, 500);
-        
-    } catch (error) {
-        console.error('Error saving user data:', error);
-        showNotification('Error saving data', 'error');
+    const user = JSON.parse(currentUser);
+    const month = parseInt(document.getElementById('month-select').value);
+    const year = document.getElementById('year-input').value;
+    const monthYear = `${month}-${year}`;
+    
+    // Get existing user data
+    const existingData = localStorage.getItem(`userData_${user.username}`);
+    let allData = existingData ? JSON.parse(existingData) : {};
+    
+    // Ensure allData is an object
+    if (Array.isArray(allData)) {
+        allData = {};
     }
+    
+    // Update data for current month
+    allData[monthYear] = currentFormData;
+    
+    // Save back to localStorage
+    localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
+    
+    console.log(`Saved ${currentFormData.length} entries for ${monthYear}`);
+    showNotification('Form data saved successfully!');
 }
 
 // Show notification - ENHANCED with types
