@@ -1,16 +1,17 @@
-// app.js - COMPLETE VERSION WITH FIREBASE INTEGRATION AND ALL FUNCTIONALITY
+// app.js - CLEAN VERSION WITHOUT DUPLICATE DECLARATIONS
 
 // Global variables
 let currentEditingRow = null;
 let currentFormData = [];
-let firestore = null;
+let firestoreInstance = null; // Changed variable name to avoid conflict
 const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
 
-// Initialize app when DOM is ready
+// =============== INITIALIZATION ===============
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('📋 APP.JS LOADED - WITH FIREBASE INTEGRATION');
+    console.log('📋 APP.JS LOADED');
     
     // Check authentication
     checkAuthentication();
@@ -37,16 +38,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // =============== FIREBASE FUNCTIONS ===============
 
-// Initialize Firebase services for the app
 function initializeAppFirebase() {
     try {
         // Try to get Firestore from global
         if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
-            firestore = firebase.firestore();
+            firestoreInstance = firebase.firestore(); // Use different variable name
             console.log('✅ Firestore available for cloud sync');
             
             // Enable offline persistence
-            firestore.enablePersistence()
+            firestoreInstance.enablePersistence()
                 .then(() => console.log('Firestore offline persistence enabled'))
                 .catch(err => {
                     if (err.code === 'failed-precondition') {
@@ -63,7 +63,6 @@ function initializeAppFirebase() {
     }
 }
 
-// Sync data to Firebase
 async function syncToCloud() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -86,7 +85,7 @@ async function syncToCloud() {
         return;
     }
     
-    if (!firestore) {
+    if (!firestoreInstance) {
         showNotification('Cloud sync not available. Using local storage only.', 'warning');
         return;
     }
@@ -101,7 +100,7 @@ async function syncToCloud() {
             firebaseUid: user.firebaseUid || null
         };
         
-        await firestore.collection('users').doc(user.username).set(dataToSave, { merge: true });
+        await firestoreInstance.collection('users').doc(user.username).set(dataToSave, { merge: true });
         showNotification('✅ Data synced to cloud successfully!');
         
         // Update last sync time
@@ -114,7 +113,6 @@ async function syncToCloud() {
     }
 }
 
-// Load data from Firebase
 async function loadFromCloud() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -130,13 +128,13 @@ async function loadFromCloud() {
         return;
     }
     
-    if (!firestore) {
+    if (!firestoreInstance) {
         showNotification('Cloud sync not available.', 'warning');
         return;
     }
     
     try {
-        const doc = await firestore.collection('users').doc(user.username).get();
+        const doc = await firestoreInstance.collection('users').doc(user.username).get();
         
         if (doc.exists) {
             const data = doc.data();
@@ -149,7 +147,7 @@ async function loadFromCloud() {
                 updateLastSyncDisplay();
                 
                 // Reload the data
-                loadUserData(user.username);
+                loadUserData(user);
             } else {
                 showNotification('No forms data found in cloud.', 'warning');
             }
@@ -163,58 +161,8 @@ async function loadFromCloud() {
     }
 }
 
-// Sync from Firebase (for auto-loading)
-async function syncFromFirebase(username) {
-    if (!firestore) return null;
-    
-    try {
-        const docRef = firestore.collection('users').doc(username);
-        const doc = await docRef.get();
-        
-        if (doc.exists) {
-            const data = doc.data();
-            console.log('Firebase data retrieved:', data);
-            
-            if (data.forms) {
-                // Save to localStorage as backup
-                localStorage.setItem(`userData_${username}`, JSON.stringify(data.forms));
-                
-                // Update last sync time
-                localStorage.setItem('lastCloudSync', new Date().toISOString());
-                updateLastSyncDisplay();
-                
-                return data.forms;
-            }
-        }
-        
-        return null;
-        
-    } catch (error) {
-        console.error('Firebase sync error:', error);
-        return null;
-    }
-}
+// =============== AUTHENTICATION ===============
 
-// Update last sync display
-function updateLastSyncDisplay() {
-    const lastSync = localStorage.getItem('lastCloudSync');
-    const lastSyncElement = document.getElementById('last-sync');
-    
-    if (lastSyncElement) {
-        if (lastSync) {
-            const lastSyncDate = new Date(lastSync);
-            lastSyncElement.innerHTML = `Last synced: ${lastSyncDate.toLocaleString()}`;
-            lastSyncElement.style.display = 'block';
-        } else {
-            lastSyncElement.innerHTML = 'Never synced';
-            lastSyncElement.style.display = 'block';
-        }
-    }
-}
-
-// =============== AUTHENTICATION FUNCTIONS ===============
-
-// Check if user is authenticated - UPDATED for Firebase compatibility
 function checkAuthentication() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -270,7 +218,225 @@ function checkAuthentication() {
     }
 }
 
-// =============== USER PREFERENCES & AUTO-SYNC ===============
+// =============== APP INITIALIZATION ===============
+
+function initializeApp() {
+    // Load last viewed month from localStorage
+    const lastMonth = localStorage.getItem('lastViewedMonth');
+    const lastYear = localStorage.getItem('lastViewedYear');
+    
+    if (lastMonth !== null && lastYear !== null) {
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        
+        if (monthSelect) monthSelect.value = lastMonth;
+        if (yearInput) yearInput.value = lastYear;
+    }
+    
+    // Add event listeners for date controls
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (monthSelect) {
+        monthSelect.addEventListener('change', function() {
+            updateFormDate();
+            saveCurrentMonth();
+            
+            // Load data for the new month
+            const currentUser = localStorage.getItem('currentUser');
+            if (currentUser) {
+                const user = JSON.parse(currentUser);
+                loadUserData(user);
+            }
+        });
+    }
+    
+    if (yearInput) {
+        yearInput.addEventListener('change', function() {
+            updateFormDate();
+            saveCurrentMonth();
+            
+            // Load data for the new month/year
+            const currentUser = localStorage.getItem('currentUser');
+            if (currentUser) {
+                const user = JSON.parse(currentUser);
+                loadUserData(user);
+            }
+        });
+    }
+    
+    updateFormDate();
+    updateLastSyncDisplay();
+}
+
+// =============== DATA MANAGEMENT ===============
+
+async function loadUserData(user) {
+    console.log('Loading data for user:', user.username || user.email);
+    
+    // First try to sync from Firebase if user has Firebase auth
+    if (user.authType === 'firebase' && firestoreInstance) {
+        try {
+            console.log('Attempting Firebase sync...');
+            const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
+            const doc = await firestoreInstance.collection('users').doc(username).get();
+            
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.forms) {
+                    localStorage.setItem(`userData_${username}`, JSON.stringify(data.forms));
+                    showNotification('✅ Loaded data from Firebase', 'success');
+                    loadCurrentMonthData(data.forms);
+                    return;
+                }
+            }
+        } catch (error) {
+            console.log('Firebase sync failed:', error.message);
+            // Fall back to localStorage
+        }
+    }
+    
+    // Fall back to localStorage
+    const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
+    const localData = localStorage.getItem(`userData_${username}`);
+    
+    if (localData) {
+        console.log('✅ Loaded data from localStorage');
+        loadCurrentMonthData(JSON.parse(localData));
+    } else {
+        console.log('No data found, starting fresh');
+        loadCurrentMonthData();
+    }
+}
+
+function loadCurrentMonthData(allData = null) {
+    const month = parseInt(document.getElementById('month-select').value);
+    const year = document.getElementById('year-input').value;
+    const monthYear = `${month}-${year}`;
+    
+    console.log('Loading data for:', monthYear);
+    
+    const tableBody = document.querySelector('#time-table tbody');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = '';
+    currentFormData = [];
+    
+    if (allData) {
+        // Check if allData is an object with month keys or an array
+        if (typeof allData === 'object' && !Array.isArray(allData)) {
+            // Object format: { "9-2025": [...] }
+            if (allData[monthYear]) {
+                console.log(`Found ${allData[monthYear].length} entries for ${monthYear}`);
+                allData[monthYear].forEach(entry => {
+                    addRowToTable(entry);
+                    currentFormData.push(entry);
+                });
+            } else {
+                console.log(`No data found for ${monthYear}`);
+            }
+        } else if (Array.isArray(allData)) {
+            // Array format: direct array of entries
+            console.log(`Found ${allData.length} entries`);
+            allData.forEach(entry => {
+                addRowToTable(entry);
+                currentFormData.push(entry);
+            });
+        }
+    }
+    
+    calculateTotal();
+}
+
+async function saveUserData() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        console.error('No user logged in');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    const month = parseInt(document.getElementById('month-select').value);
+    const year = document.getElementById('year-input').value;
+    const monthYear = `${month}-${year}`;
+    
+    // Get existing user data
+    const existingData = localStorage.getItem(`userData_${user.username}`);
+    let allData = existingData ? JSON.parse(existingData) : {};
+    
+    // Ensure allData is an object
+    if (Array.isArray(allData)) {
+        allData = {};
+    }
+    
+    // Update data for current month
+    allData[monthYear] = currentFormData;
+    
+    // Save back to localStorage
+    localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
+    
+    console.log(`Saved ${currentFormData.length} entries for ${monthYear}`);
+    
+    // Try to sync to Firebase if user has Firebase auth
+    if (user.authType === 'firebase') {
+        try {
+            await syncToCloud();
+        } catch (error) {
+            console.log('Auto-sync failed, but local save succeeded');
+            showNotification('Form saved locally (cloud sync failed)', 'warning');
+            return;
+        }
+    } else {
+        showNotification('Form saved locally', 'success');
+    }
+}
+
+// =============== AUTO-SYNC FUNCTIONS ===============
+
+function toggleAutoSync() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const isEnabled = checkbox.checked;
+        
+        // Save globally
+        localStorage.setItem('autoSyncEnabled', isEnabled.toString());
+        
+        // Save per-user
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser) {
+            try {
+                const user = JSON.parse(currentUser);
+                const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
+                
+                const userPrefs = localStorage.getItem(`prefs_${username}`);
+                const prefs = userPrefs ? JSON.parse(userPrefs) : {};
+                
+                prefs.autoSync = isEnabled;
+                prefs.autoSyncUpdated = new Date().toISOString();
+                
+                localStorage.setItem(`prefs_${username}`, JSON.stringify(prefs));
+                
+                console.log('Saved auto-sync preference for user:', username, isEnabled);
+                
+                if (isEnabled) {
+                    showNotification('Auto-sync enabled');
+                } else {
+                    showNotification('Auto-sync disabled');
+                }
+            } catch (error) {
+                console.error('Error saving user preference:', error);
+            }
+        }
+    }
+}
+
+function initAutoSyncCheckbox() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        checkbox.checked = autoSync === 'true';
+    }
+}
 
 function loadUserPreferences() {
     const currentUser = localStorage.getItem('currentUser');
@@ -374,102 +540,20 @@ function setupAutoSyncOnLogin() {
     }
 }
 
-function toggleAutoSync() {
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        const isEnabled = checkbox.checked;
-        
-        // Save globally
-        localStorage.setItem('autoSyncEnabled', isEnabled.toString());
-        
-        // Save per-user
-        const currentUser = localStorage.getItem('currentUser');
-        if (currentUser) {
-            try {
-                const user = JSON.parse(currentUser);
-                const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
-                
-                const userPrefs = localStorage.getItem(`prefs_${username}`);
-                const prefs = userPrefs ? JSON.parse(userPrefs) : {};
-                
-                prefs.autoSync = isEnabled;
-                prefs.autoSyncUpdated = new Date().toISOString();
-                
-                localStorage.setItem(`prefs_${username}`, JSON.stringify(prefs));
-                
-                console.log('Saved auto-sync preference for user:', username, isEnabled);
-                
-                if (isEnabled) {
-                    showNotification('Auto-sync enabled');
-                } else {
-                    showNotification('Auto-sync disabled');
-                }
-            } catch (error) {
-                console.error('Error saving user preference:', error);
-            }
+function updateLastSyncDisplay() {
+    const lastSync = localStorage.getItem('lastCloudSync');
+    const lastSyncElement = document.getElementById('last-sync');
+    
+    if (lastSyncElement) {
+        if (lastSync) {
+            const lastSyncDate = new Date(lastSync);
+            lastSyncElement.innerHTML = `Last synced: ${lastSyncDate.toLocaleString()}`;
+            lastSyncElement.style.display = 'block';
+        } else {
+            lastSyncElement.innerHTML = 'Never synced';
+            lastSyncElement.style.display = 'block';
         }
     }
-}
-
-function initAutoSyncCheckbox() {
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        const autoSync = localStorage.getItem('autoSyncEnabled');
-        checkbox.checked = autoSync === 'true';
-    }
-}
-
-// =============== APP INITIALIZATION ===============
-
-function initializeApp() {
-    // Load last viewed month from localStorage
-    const lastMonth = localStorage.getItem('lastViewedMonth');
-    const lastYear = localStorage.getItem('lastViewedYear');
-    
-    if (lastMonth !== null && lastYear !== null) {
-        const monthSelect = document.getElementById('month-select');
-        const yearInput = document.getElementById('year-input');
-        
-        if (monthSelect) monthSelect.value = lastMonth;
-        if (yearInput) yearInput.value = lastYear;
-    }
-    
-    // Add event listeners for date controls
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    
-    if (monthSelect) {
-        monthSelect.addEventListener('change', function() {
-            updateFormDate();
-            saveCurrentMonth();
-            
-            // Load data for the new month
-            const currentUser = localStorage.getItem('currentUser');
-            if (currentUser) {
-                const user = JSON.parse(currentUser);
-                const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
-                loadUserData(user); // Pass user object instead of just username
-            }
-        });
-    }
-    
-    if (yearInput) {
-        yearInput.addEventListener('change', function() {
-            updateFormDate();
-            saveCurrentMonth();
-            
-            // Load data for the new month/year
-            const currentUser = localStorage.getItem('currentUser');
-            if (currentUser) {
-                const user = JSON.parse(currentUser);
-                const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
-                loadUserData(user); // Pass user object instead of just username
-            }
-        });
-    }
-    
-    updateFormDate();
-    updateLastSyncDisplay();
 }
 
 function saveCurrentMonth() {
@@ -485,122 +569,7 @@ function saveCurrentMonth() {
     }
 }
 
-// =============== DATA LOADING & SAVING ===============
-
-async function loadUserData(user) {
-    console.log('Loading data for user:', user.username || user.email);
-    
-    // First try to sync from Firebase if user has Firebase auth
-    if (user.authType === 'firebase' && firestore) {
-        try {
-            console.log('Attempting Firebase sync...');
-            const cloudData = await syncFromFirebase(user.username || user.email.split('@')[0]);
-            
-            if (cloudData) {
-                console.log('✅ Loaded data from Firebase');
-                loadCurrentMonthData(cloudData);
-                return;
-            }
-        } catch (error) {
-            console.log('Firebase sync failed:', error.message);
-            // Fall back to localStorage
-        }
-    }
-    
-    // Fall back to localStorage
-    const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
-    const localData = localStorage.getItem(`userData_${username}`);
-    
-    if (localData) {
-        console.log('✅ Loaded data from localStorage');
-        loadCurrentMonthData(JSON.parse(localData));
-    } else {
-        console.log('No data found, starting fresh');
-        loadCurrentMonthData();
-    }
-}
-
-function loadCurrentMonthData(allData = null) {
-    const month = parseInt(document.getElementById('month-select').value);
-    const year = document.getElementById('year-input').value;
-    const monthYear = `${month}-${year}`;
-    
-    console.log('Loading data for:', monthYear);
-    
-    const tableBody = document.querySelector('#time-table tbody');
-    tableBody.innerHTML = '';
-    currentFormData = [];
-    
-    if (allData) {
-        // Check if allData is an object with month keys or an array
-        if (typeof allData === 'object' && !Array.isArray(allData)) {
-            // Object format: { "9-2025": [...] }
-            if (allData[monthYear]) {
-                console.log(`Found ${allData[monthYear].length} entries for ${monthYear}`);
-                allData[monthYear].forEach(entry => {
-                    addRowToTable(entry);
-                    currentFormData.push(entry);
-                });
-            } else {
-                console.log(`No data found for ${monthYear}`);
-            }
-        } else if (Array.isArray(allData)) {
-            // Array format: direct array of entries
-            console.log(`Found ${allData.length} entries`);
-            allData.forEach(entry => {
-                addRowToTable(entry);
-                currentFormData.push(entry);
-            });
-        }
-    }
-    
-    calculateTotal();
-}
-
-async function saveUserData() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        console.error('No user logged in');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    const month = parseInt(document.getElementById('month-select').value);
-    const year = document.getElementById('year-input').value;
-    const monthYear = `${month}-${year}`;
-    
-    // Get existing user data
-    const existingData = localStorage.getItem(`userData_${user.username}`);
-    let allData = existingData ? JSON.parse(existingData) : {};
-    
-    // Ensure allData is an object
-    if (Array.isArray(allData)) {
-        allData = {};
-    }
-    
-    // Update data for current month
-    allData[monthYear] = currentFormData;
-    
-    // Save back to localStorage
-    localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
-    
-    console.log(`Saved ${currentFormData.length} entries for ${monthYear}`);
-    
-    // Try to sync to Firebase if user has Firebase auth
-    if (user.authType === 'firebase') {
-        try {
-            await syncToCloud();
-        } catch (error) {
-            console.log('Auto-sync failed, but local save succeeded');
-            showNotification('Form saved locally (cloud sync failed)', 'warning');
-            return;
-        }
-    } else {
-        showNotification('Form saved locally', 'success');
-    }
-}
-
-// =============== TABLE & FORM FUNCTIONS ===============
+// =============== TABLE FUNCTIONS ===============
 
 function addRowToTable(data) {
     const tableBody = document.querySelector('#time-table tbody');
@@ -892,7 +861,7 @@ function convertTo24Hour(timeString) {
     return `${hours.toString().padStart(2, '0')}:${minutes}`;
 }
 
-// =============== NOTIFICATION FUNCTIONS ===============
+// =============== NOTIFICATION FUNCTION ===============
 
 function showNotification(message, type = 'success') {
     // Remove any existing notifications
@@ -924,6 +893,122 @@ function showNotification(message, type = 'success') {
             notification.remove();
         }
     }, 3000);
+}
+
+// =============== EXPORT/IMPORT FUNCTIONS ===============
+
+function exportData() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showNotification('Please sign in first', 'error');
+        return;
+    }
+    
+    try {
+        const user = JSON.parse(currentUser);
+        
+        // Determine the key to use (username or email)
+        let userKey = user.username;
+        if (!userKey && user.email) {
+            userKey = user.email;
+        } else if (!userKey) {
+            userKey = 'user';
+        }
+        
+        const userData = localStorage.getItem(`userData_${userKey}`);
+        
+        if (!userData) {
+            alert('No data to export');
+            return;
+        }
+        
+        const exportData = {
+            userData: JSON.parse(userData),
+            exportDate: new Date().toISOString(),
+            employeeName: user.employeeName || user.email || 'User',
+            username: userKey
+        };
+        
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `broiler_data_${userKey}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+        
+        showNotification('Data exported successfully!');
+        
+    } catch (error) {
+        console.error('Export error:', error);
+        showNotification('Error exporting data: ' + error.message, 'error');
+    }
+}
+
+function importData() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    
+    fileInput.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const importData = JSON.parse(event.target.result);
+                
+                // Validate the import file structure
+                if (!importData.userData) {
+                    throw new Error('Invalid backup file format');
+                }
+                
+                // Check if the imported user matches current user
+                const currentUser = localStorage.getItem('currentUser');
+                let usernameToUse = importData.username;
+                
+                if (currentUser) {
+                    const user = JSON.parse(currentUser);
+                    
+                    // If imported data has different username, ask for confirmation
+                    if (importData.username && importData.username !== user.username) {
+                        if (!confirm(`This backup is for user "${importData.username}". Import anyway?`)) {
+                            return;
+                        }
+                        usernameToUse = importData.username;
+                    } else {
+                        // Use current user's identifier
+                        usernameToUse = user.username || (user.email ? user.email.split('@')[0] : 'user');
+                    }
+                }
+                
+                // Apply the imported data
+                localStorage.setItem(`userData_${usernameToUse}`, JSON.stringify(importData.userData));
+                
+                // Reload the current view
+                if (currentUser) {
+                    const user = JSON.parse(currentUser);
+                    loadUserData(user);
+                }
+                
+                showNotification('Data imported successfully!');
+                
+                // Auto-sync the imported data to cloud
+                setTimeout(() => {
+                    syncToCloud();
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Import error:', error);
+                showNotification('Error importing file: ' + error.message, 'error');
+            }
+        };
+        
+        reader.readAsText(file);
+    };
+    
+    fileInput.click();
 }
 
 // =============== PDF GENERATION ===============
@@ -1033,124 +1118,6 @@ function generatePDF() {
         console.error('PDF generation error:', error);
         showNotification('Error generating PDF: ' + error.message, 'error');
     }
-}
-
-// =============== EXPORT/IMPORT FUNCTIONS ===============
-
-function exportData() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showNotification('Please sign in first', 'error');
-        return;
-    }
-    
-    try {
-        const user = JSON.parse(currentUser);
-        
-        // Determine the key to use (username or email)
-        let userKey = user.username;
-        if (!userKey && user.email) {
-            userKey = user.email;
-        } else if (!userKey) {
-            userKey = 'user';
-        }
-        
-        const userData = localStorage.getItem(`userData_${userKey}`);
-        
-        if (!userData) {
-            alert('No data to export');
-            return;
-        }
-        
-        const exportData = {
-            userData: JSON.parse(userData),
-            exportDate: new Date().toISOString(),
-            employeeName: user.employeeName || user.email || 'User',
-            username: userKey // Include username for backward compatibility
-        };
-        
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `broiler_data_${userKey}.json`);
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
-        
-        showNotification('Data exported successfully!');
-        
-    } catch (error) {
-        console.error('Export error:', error);
-        showNotification('Error exporting data: ' + error.message, 'error');
-    }
-}
-
-function importData() {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json';
-    
-    fileInput.onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            try {
-                const importData = JSON.parse(event.target.result);
-                
-                // Validate the import file structure
-                if (!importData.userData) {
-                    throw new Error('Invalid backup file format');
-                }
-                
-                // Check if the imported user matches current user
-                const currentUser = localStorage.getItem('currentUser');
-                let usernameToUse = importData.username;
-                
-                if (currentUser) {
-                    const user = JSON.parse(currentUser);
-                    
-                    // If imported data has different username, ask for confirmation
-                    if (importData.username && importData.username !== user.username) {
-                        if (!confirm(`This backup is for user "${importData.username}". Import anyway?`)) {
-                            return;
-                        }
-                        usernameToUse = importData.username;
-                    } else {
-                        // Use current user's identifier
-                        usernameToUse = user.username || (user.email ? user.email.split('@')[0] : 'user');
-                    }
-                }
-                
-                // Apply the imported data
-                localStorage.setItem(`userData_${usernameToUse}`, JSON.stringify(importData.userData));
-                
-                // Reload the current view
-                if (currentUser) {
-                    const user = JSON.parse(currentUser);
-                    loadUserData(user);
-                }
-                
-                showNotification('Data imported successfully!');
-                
-                // Auto-sync the imported data to cloud
-                setTimeout(() => {
-                    if (typeof syncToCloud === 'function') {
-                        syncToCloud();
-                    }
-                }, 1000);
-                
-            } catch (error) {
-                console.error('Import error:', error);
-                showNotification('Error importing file: ' + error.message, 'error');
-            }
-        };
-        
-        reader.readAsText(file);
-    };
-    
-    fileInput.click();
 }
 
 // =============== EMPLOYEE NAME MEMORY ===============
