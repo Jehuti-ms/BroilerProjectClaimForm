@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
+    
+    <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     
@@ -14,10 +16,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    
-
-    <script src="auth.js"></script>
-    
 </head>
 <body>
     <div class="container">
@@ -33,7 +31,7 @@
                 <button onclick="logout()" class="logout-btn">Logout</button>
             </div>
 
-            <!-- Add this near the user info section -->
+            <!-- Auth Status -->
             <div class="auth-status" id="auth-status" style="
                 position: absolute;
                 top: 80px;
@@ -136,7 +134,7 @@
                         <span class="btn-icon">📤</span>
                         Sync to Firebase
                     </button>
-                    <button onclick="syncFromCloud()" class="cloud-btn">
+                    <button onclick="loadFromCloud()" class="cloud-btn">
                         <span class="btn-icon">📥</span>
                         Load from Firebase
                     </button>
@@ -277,108 +275,149 @@
             </div>
         </div>
     </div>
-    
-    <!-- Firebase scripts (REPLACE SUPABASE) -->
+
+    <!-- Emergency Recovery Button -->
+    <div id="emergency-recovery" style="position: fixed; bottom: 20px; right: 20px; z-index: 10000; display: none;">
+        <button onclick="emergencyDataRecovery()" 
+                style="background: #ff5722; color: white; border: none; padding: 10px 15px; 
+                       border-radius: 50px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-size: 12px;">
+            🔧 Data Recovery
+        </button>
+    </div>
+
+    <!-- =============== CRITICAL FIX: Load scripts in CORRECT ORDER =============== -->
+    <!-- 1. Firebase Config FIRST -->
     <script src="firebase-config.js"></script>
+    
+    <!-- 2. Auth.js SECOND -->
     <script src="auth.js"></script>
-    <script src="sync.js"></script>  
+    
+    <!-- 3. App.js LAST (contains ALL functionality) -->
     <script src="app.js"></script>
     
-   <!-- Emergency Recovery Button -->
-<div id="emergency-recovery" style="position: fixed; bottom: 20px; right: 20px; z-index: 10000;">
-    <button onclick="emergencyDataRecovery()" 
-            style="background: #ff5722; color: white; border: none; padding: 10px 15px; 
-                   border-radius: 50px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-size: 12px;">
-        🔧 Data Recovery
-    </button>
-</div>
-
-<script>
-// Emergency data recovery function
-function emergencyDataRecovery() {
-    const user = JSON.parse(localStorage.getItem('currentUser'));
-    if (!user) {
-        alert('Please log in first');
-        return;
+    <!-- =============== DO NOT LOAD THESE: They cause conflicts =============== -->
+    <!-- ❌ DELETE: sync.js - conflicts with app.js -->
+    <!-- ❌ DELETE: global.js - third-party extension -->
+    <!-- ❌ DELETE: config.js - duplicate Firebase config -->
+    
+    <script>
+    // Add missing function that might be referenced
+    function backupToLocal() {
+        const currentUser = localStorage.getItem('currentUser');
+        if (!currentUser) {
+            alert('Please log in first');
+            return;
+        }
+        
+        const user = JSON.parse(currentUser);
+        const userData = localStorage.getItem(`userData_${user.username}`);
+        
+        if (!userData) {
+            alert('No data to backup');
+            return;
+        }
+        
+        // Create backup with timestamp
+        const backup = {
+            data: JSON.parse(userData),
+            timestamp: new Date().toISOString(),
+            user: user.username
+        };
+        
+        localStorage.setItem(`backup_${Date.now()}`, JSON.stringify(backup));
+        alert('✅ Local backup created!');
     }
     
-    console.log('🔍 Emergency data recovery for user:', user.username);
-    
-    // Check all localStorage keys
-    const allKeys = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        allKeys.push(localStorage.key(i));
-    }
-    
-    console.log('All localStorage keys:', allKeys);
-    
-    // Look for data related to this user
-    const userKeys = allKeys.filter(key => 
-        key.includes(user.username) || 
-        key.includes('forms') || 
-        key.includes('broiler') ||
-        key.includes('userData')
-    );
-    
-    console.log('User-related keys:', userKeys);
-    
-    let foundData = null;
-    let foundKey = null;
-    
-    // Try to find and load data
-    for (const key of userKeys) {
+    // Test Firebase connection
+    function testFirebaseConnection() {
+        if (typeof firebase === 'undefined') {
+            alert('Firebase not loaded');
+            return;
+        }
+        
+        if (firebase.apps.length === 0) {
+            alert('Firebase not initialized');
+            return;
+        }
+        
         try {
-            const data = localStorage.getItem(key);
-            const parsed = JSON.parse(data);
+            const auth = firebase.auth();
+            const firestore = firebase.firestore();
             
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                foundData = parsed;
-                foundKey = key;
-                console.log(`✅ Found ${parsed.length} entries in ${key}`);
-                break;
-            } else if (typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-                // Check if it contains array data
-                for (const subKey in parsed) {
-                    if (Array.isArray(parsed[subKey]) && parsed[subKey].length > 0) {
-                        foundData = parsed;
-                        foundKey = key;
-                        console.log(`✅ Found data object in ${key}`);
-                        break;
-                    }
+            // Simple test query
+            firestore.collection('test').doc('connection').set({
+                test: true,
+                timestamp: new Date().toISOString()
+            }, { merge: true })
+            .then(() => alert('✅ Firebase connection successful!'))
+            .catch(err => alert('❌ Firebase error: ' + err.message));
+            
+        } catch (error) {
+            alert('Firebase test error: ' + error.message);
+        }
+    }
+    
+    // Show/hide recovery button
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(() => {
+            const user = localStorage.getItem('currentUser');
+            if (user) {
+                const parsedUser = JSON.parse(user);
+                const hasData = localStorage.getItem(`userData_${parsedUser.username}`);
+                if (!hasData) {
+                    console.log('No data found, showing recovery button');
+                    document.getElementById('emergency-recovery').style.display = 'block';
                 }
             }
-        } catch (e) {
-            // Not JSON, skip
-        }
-    }
+        }, 1000);
+    });
     
-    if (foundData) {
-        if (confirm(`Found data in ${foundKey}. Load it now?`)) {
-            // Save to correct location
-            localStorage.setItem(`userData_${user.username}`, JSON.stringify(foundData));
-            
-            // Reload the page
-            location.reload();
-        }
-    } else {
-        alert('No data found. Starting with empty form.');
-    }
-}
-
-// Check if data exists on load
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
+    // Emergency recovery function
+    function emergencyDataRecovery() {
         const user = JSON.parse(localStorage.getItem('currentUser'));
-        if (user) {
-            const hasData = localStorage.getItem(`userData_${user.username}`);
-            if (!hasData) {
-                console.log('No data found for user, showing recovery button');
-                document.getElementById('emergency-recovery').style.display = 'block';
+        if (!user) {
+            alert('Please log in first');
+            return;
+        }
+        
+        console.log('Emergency recovery for:', user.username);
+        
+        // Check all localStorage for user data
+        let foundData = null;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.includes(user.username) || key.includes('forms') || key.includes('broiler')) {
+                const data = localStorage.getItem(key);
+                try {
+                    const parsed = JSON.parse(data);
+                    if (Array.isArray(parsed) || (typeof parsed === 'object' && parsed !== null)) {
+                        foundData = parsed;
+                        console.log('Found data in:', key);
+                        break;
+                    }
+                } catch (e) {
+                    // Not JSON
+                }
             }
         }
-    }, 1000);
-});
-</script>
-    
+        
+        if (foundData) {
+            localStorage.setItem(`userData_${user.username}`, JSON.stringify(foundData));
+            alert('Data recovered! Refreshing...');
+            location.reload();
+        } else {
+            alert('No data found. Creating sample...');
+            // Create sample data
+            const sampleData = {
+                "9-2025": [
+                    { date: '2025-10-01', amPm: 'AM', inTime: '08:00', outTime: '12:00', hours: '4:00' },
+                    { date: '2025-10-01', amPm: 'PM', inTime: '13:00', outTime: '17:00', hours: '4:00' }
+                ]
+            };
+            localStorage.setItem(`userData_${user.username}`, JSON.stringify(sampleData));
+            location.reload();
+        }
+    }
+    </script>
 </body>
 </html>
