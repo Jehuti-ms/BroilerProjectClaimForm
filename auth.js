@@ -1,74 +1,104 @@
-// auth.js - UPDATED WITH FIREBASE INTEGRATION
-// Authentication functions
-function showRegister() {
-    document.getElementById('login-form').parentElement.style.display = 'none';
-    document.getElementById('register-card').style.display = 'block';
-}
+// auth.js - FIXED VERSION
+// Wait for DOM to load before attaching event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, setting up authentication...');
+    
+    // Check if user is already logged in
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        window.location.href = 'index.html';
+        return;
+    }
+    
+    // Set up auth functions
+    window.showRegister = function() {
+        document.getElementById('login-form').parentElement.style.display = 'none';
+        document.getElementById('register-card').style.display = 'block';
+    };
+    
+    window.showLogin = function() {
+        document.getElementById('register-card').style.display = 'none';
+        document.getElementById('login-form').parentElement.style.display = 'block';
+    };
+    
+    // Initialize Firebase
+    initializeFirebase();
+    
+    // Set up login form
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+    
+    // Set up register form
+    const registerForm = document.getElementById('register-form');
+    if (registerForm) {
+        registerForm.addEventListener('submit', handleRegister);
+    }
+});
 
-function showLogin() {
-    document.getElementById('register-card').style.display = 'none';
-    document.getElementById('login-form').parentElement.style.display = 'block';
-}
-
-// Initialize Firebase (add this to your HTML head)
-const firebaseConfig = {
-    apiKey: "AIzaSyAJhRNUgsrvUvjKXXosS6YZLhbHhpBq0Zg",
-    authDomain: "broiler-project-e1f62.firebaseapp.com",
-    projectId: "broiler-project-e1f62",
-    storageBucket: "broiler-project-e1f62.appspot.com",
-    messagingSenderId: "1084373471420",
-    appId: "1:1084373471420:web:f60bf8c5db75b9fe4f90c4"
-};
-
-// Initialize Firebase (only once)
+// Firebase initialization
 let firebaseInitialized = false;
 let auth = null;
 
 function initializeFirebase() {
     if (typeof firebase === 'undefined') {
-        console.error('Firebase SDK not loaded');
+        console.log('Firebase SDK not loaded');
         return false;
     }
     
+    // Firebase config - MOVE THIS HERE TO AVOID DUPLICATION
+    const firebaseConfig = {
+        apiKey: "AIzaSyAJhRNUgsrvUvjKXXosS6YZLhbHhpBq0Zg",
+        authDomain: "broiler-project-e1f62.firebaseapp.com",
+        projectId: "broiler-project-e1f62",
+        storageBucket: "broiler-project-e1f62.appspot.com",
+        messagingSenderId: "1084373471420",
+        appId: "1:1084373471420:web:f60bf8c5db75b9fe4f90c4"
+    };
+    
     if (!firebaseInitialized) {
         try {
-            firebase.initializeApp(firebaseConfig);
+            // Check if Firebase is already initialized
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
             auth = firebase.auth();
             firebaseInitialized = true;
-            console.log('✅ Firebase initialized successfully');
+            console.log('✅ Firebase Auth initialized');
             return true;
         } catch (error) {
-            console.error('Firebase initialization error:', error);
+            console.log('Firebase initialization error:', error.message);
             return false;
         }
     }
     return true;
 }
 
-// Handle login form submission
-document.getElementById('login-form').addEventListener('submit', async function(e) {
+// Handle login
+async function handleLogin(e) {
     e.preventDefault();
     
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
     const employeeName = document.getElementById('employee-name-auth').value;
     
-    // Validate input
     if (!username || !password || !employeeName) {
         alert('Please fill in all fields');
         return;
     }
     
     const loginBtn = document.querySelector('#login-form button[type="submit"]');
-    loginBtn.disabled = true;
-    loginBtn.textContent = 'Signing in...';
+    if (loginBtn) {
+        loginBtn.disabled = true;
+        loginBtn.textContent = 'Signing in...';
+    }
     
     try {
-        // Try local authentication first
+        // Try local authentication
         const users = JSON.parse(localStorage.getItem('users') || '{}');
         
         if (users[username] && users[username].password === password) {
-            // Successful local login
             const currentUser = {
                 username: username,
                 employeeName: employeeName,
@@ -83,16 +113,13 @@ document.getElementById('login-form').addEventListener('submit', async function(
             return;
         }
         
-        // If local login failed, try Firebase
+        // Try Firebase if local fails
         if (initializeFirebase() && auth) {
+            const email = `${username}@broiler-project.com`;
+            
             try {
-                // Create email from username
-                const email = `${username}@broiler-project.com`;
-                
-                // Sign in with Firebase
                 const userCredential = await auth.signInWithEmailAndPassword(email, password);
                 
-                // Successful Firebase login
                 const currentUser = {
                     username: username,
                     employeeName: employeeName,
@@ -104,7 +131,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
                 
                 localStorage.setItem('currentUser', JSON.stringify(currentUser));
                 
-                // Also save to local users for future local login
+                // Save to local users for future
                 if (!users[username]) {
                     users[username] = {
                         password: password,
@@ -121,39 +148,24 @@ document.getElementById('login-form').addEventListener('submit', async function(
                 
             } catch (firebaseError) {
                 console.log('Firebase login failed:', firebaseError.message);
-                
-                // If Firebase fails but credentials are correct locally, use local
-                if (users[username] && users[username].password === password) {
-                    const currentUser = {
-                        username: username,
-                        employeeName: employeeName,
-                        email: `${username}@broiler-project.com`,
-                        authType: 'local',
-                        timestamp: new Date().toISOString()
-                    };
-                    
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    console.log('✅ Fallback to local login');
-                    window.location.href = 'index.html';
-                    return;
-                }
             }
         }
         
-        // If we get here, authentication failed
         alert('Invalid username or password');
         
     } catch (error) {
         console.error('Login error:', error);
         alert('Login error: ' + error.message);
     } finally {
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'Sign In';
+        if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Sign In';
+        }
     }
-});
+}
 
-// Handle registration form submission
-document.getElementById('register-form').addEventListener('submit', async function(e) {
+// Handle registration
+async function handleRegister(e) {
     e.preventDefault();
     
     const username = document.getElementById('new-username').value;
@@ -161,7 +173,6 @@ document.getElementById('register-form').addEventListener('submit', async functi
     const confirmPassword = document.getElementById('confirm-password').value;
     const employeeName = document.getElementById('new-employee-name').value;
     
-    // Validation
     if (password !== confirmPassword) {
         alert('Passwords do not match');
         return;
@@ -173,20 +184,20 @@ document.getElementById('register-form').addEventListener('submit', async functi
     }
     
     const registerBtn = document.querySelector('#register-form button[type="submit"]');
-    registerBtn.disabled = true;
-    registerBtn.textContent = 'Creating account...';
+    if (registerBtn) {
+        registerBtn.disabled = true;
+        registerBtn.textContent = 'Creating account...';
+    }
     
     try {
-        // Get existing users
         const users = JSON.parse(localStorage.getItem('users') || '{}');
         
-        // Check if username already exists
         if (users[username]) {
             alert('Username already exists');
             return;
         }
         
-        // Create local user first
+        // Create local user
         users[username] = {
             password: password,
             employeeName: employeeName,
@@ -196,18 +207,17 @@ document.getElementById('register-form').addEventListener('submit', async functi
         
         localStorage.setItem('users', JSON.stringify(users));
         
-        // Try Firebase registration if available
+        // Try Firebase registration
         if (initializeFirebase() && auth) {
+            const email = `${username}@broiler-project.com`;
+            
             try {
-                const email = `${username}@broiler-project.com`;
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 
-                // Update local user with Firebase info
                 users[username].firebaseLinked = true;
                 users[username].firebaseUid = userCredential.user.uid;
                 localStorage.setItem('users', JSON.stringify(users));
                 
-                // Create user object
                 const currentUser = {
                     username: username,
                     employeeName: employeeName,
@@ -225,7 +235,6 @@ document.getElementById('register-form').addEventListener('submit', async functi
                 
             } catch (firebaseError) {
                 console.log('Firebase registration failed:', firebaseError.message);
-                // Continue with local registration only
             }
         }
         
@@ -246,18 +255,9 @@ document.getElementById('register-form').addEventListener('submit', async functi
         console.error('Registration error:', error);
         alert('Registration error: ' + error.message);
     } finally {
-        registerBtn.disabled = false;
-        registerBtn.textContent = 'Register';
+        if (registerBtn) {
+            registerBtn.disabled = false;
+            registerBtn.textContent = 'Register';
+        }
     }
-});
-
-// Check if user is already logged in
-document.addEventListener('DOMContentLoaded', function() {
-    // Try to initialize Firebase
-    initializeFirebase();
-    
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        window.location.href = 'index.html';
-    }
-});
+}
