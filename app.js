@@ -1021,6 +1021,94 @@ function setupEmployeeNameMemory() {
     }
 }
 
+// Cloud sync functions
+let firestore = null;
+
+// Initialize Firestore
+function initializeFirestore() {
+    if (typeof firebase === 'undefined') return false;
+    
+    try {
+        if (!firestore) {
+            firestore = firebase.firestore();
+            console.log('✅ Firestore initialized');
+        }
+        return true;
+    } catch (error) {
+        console.log('Firestore not available:', error.message);
+        return false;
+    }
+}
+
+// Sync to Firebase
+async function syncToFirebase() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) return;
+    
+    const user = JSON.parse(currentUser);
+    const userData = localStorage.getItem(`userData_${user.username}`);
+    
+    if (!userData) {
+        alert('No data to sync');
+        return;
+    }
+    
+    if (!initializeFirestore()) {
+        alert('Cloud sync not available. Using local storage only.');
+        return;
+    }
+    
+    try {
+        const dataToSave = {
+            username: user.username,
+            employeeName: user.employeeName,
+            forms: JSON.parse(userData),
+            lastSync: new Date().toISOString()
+        };
+        
+        await firestore.collection('users').doc(user.username).set(dataToSave, { merge: true });
+        alert('✅ Data synced to cloud successfully!');
+        
+    } catch (error) {
+        console.error('Cloud sync error:', error);
+        alert('Cloud sync failed: ' + error.message);
+    }
+}
+
+// Load from Firebase
+async function loadFromFirebase() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) return;
+    
+    const user = JSON.parse(currentUser);
+    
+    if (!initializeFirestore()) {
+        alert('Cloud sync not available.');
+        return;
+    }
+    
+    try {
+        const doc = await firestore.collection('users').doc(user.username).get();
+        
+        if (doc.exists) {
+            const data = doc.data();
+            if (data.forms) {
+                localStorage.setItem(`userData_${user.username}`, JSON.stringify(data.forms));
+                alert('✅ Cloud data loaded successfully!');
+                location.reload();
+            } else {
+                alert('No forms data found in cloud.');
+            }
+        } else {
+            alert('No data found in cloud for your account.');
+        }
+        
+    } catch (error) {
+        console.error('Cloud load error:', error);
+        alert('Failed to load from cloud: ' + error.message);
+    }
+}
+
 // Make all functions globally available
 window.openModal = openModal;
 window.closeModal = closeModal;
