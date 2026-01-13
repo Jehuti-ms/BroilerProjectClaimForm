@@ -5,419 +5,109 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Broiler Production Project - Claim Form</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐔</text></svg>">
-    
-    <!-- External Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-    
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <div class="container">
-        <!-- Header Section -->
+        <!-- Simple Header -->
         <div class="header">
             <h1>Grantley Adams Memorial School</h1>
             <h2>Broiler Production Project</h2>
             <h3>Claim Form - <span id="form-date">October 2025</span></h3>
             
-            <!-- User Info and Controls -->
             <div class="user-info">
                 <span id="user-display">Welcome, User</span>
                 <button onclick="logout()" class="logout-btn">Logout</button>
             </div>
-
-            <!-- Auth Status -->
-            <div class="auth-status" id="auth-status" style="
-                position: absolute;
-                top: 80px;
-                right: 20px;
-                font-size: 12px;
-                padding: 4px 8px;
-                border-radius: 4px;
-                display: none;
-            ">
-                Auth: <span id="auth-status-text">Checking...</span>
-            </div>
-            
-            <!-- Auto-Sync Controls -->
-            <div class="sync-controls">
-                <label>
-                    <input type="checkbox" id="auto-sync">
-                    Auto-Sync
-                </label>
-            </div>
-            
-            <!-- Firebase Connection Status -->
-            <div id="firebase-status" style="position: absolute; top: 15px; left: 15px; font-size: 12px; background: #f8f9fa; padding: 4px 8px; border-radius: 4px; display: none;">
-                <span id="firebase-status-text">Firebase: 🔄</span>
-            </div>
         </div>
 
-        <!-- Date and Employee Controls -->
+        <!-- Simple Controls -->
         <div class="date-controls">
-            <div class="date-selectors">
-                <div class="date-group">
-                    <label for="month-select">Month:</label>
-                    <select id="month-select">
-                        <option value="0">January</option>
-                        <option value="1">February</option>
-                        <option value="2">March</option>
-                        <option value="3">April</option>
-                        <option value="4">May</option>
-                        <option value="5">June</option>
-                        <option value="6">July</option>
-                        <option value="7">August</option>
-                        <option value="8">September</option>
-                        <option value="9" selected>October</option>
-                        <option value="10">November</option>
-                        <option value="11">December</option>
-                    </select>
-                </div>
+            <div>
+                <label for="month-select">Month:</label>
+                <select id="month-select">
+                    <option value="0">January</option>
+                    <option value="1">February</option>
+                    <option value="2">March</option>
+                    <option value="3">April</option>
+                    <option value="4">May</option>
+                    <option value="5">June</option>
+                    <option value="6">July</option>
+                    <option value="7">August</option>
+                    <option value="8">September</option>
+                    <option value="9" selected>October</option>
+                    <option value="10">November</option>
+                    <option value="11">December</option>
+                </select>
                 
-                <div class="date-group">
-                    <label for="year-input">Year:</label>
-                    <input type="number" id="year-input" value="2025" min="2020" max="2030">
-                </div>
+                <label for="year-input" style="margin-left: 15px;">Year:</label>
+                <input type="number" id="year-input" value="2025" min="2020" max="2030">
             </div>
-            
             <button class="add-entry-btn" onclick="openModal()">Add New Entry</button>
         </div>
 
-        <!-- Employee Information -->
+        <!-- Employee Info -->
         <div class="employee-info">
             <label for="employee-name">Employee Name:</label>
-            <input type="text" id="employee-name" value="Jeoffery Knight">
+            <input type="text" id="employee-name" value="">
         </div>
 
-        <!-- Time Entry Table -->
+        <!-- Simple Table -->
         <div class="form-section">
-            <div class="table-container">
-                <table id="time-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Am/Pm</th>
-                            <th>Time IN</th>
-                            <th>Time OUT</th>
-                            <th>Hours</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Rows will be added dynamically -->
-                    </tbody>
-                </table>
-            </div>
+            <table id="time-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Am/Pm</th>
+                        <th>Time IN</th>
+                        <th>Time OUT</th>
+                        <th>Hours</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will appear here -->
+                </tbody>
+            </table>
             
-            <!-- Total Hours -->
             <div class="total-hours">
                 Total Hours: <span id="total-hours">0:00</span>
             </div>
-            
-            <!-- Sync Status -->
-            <div id="sync-status" class="sync-status" style="display: none;"></div>
         </div>
 
-        <!-- Cloud Sync Section -->
-        <div class="form-section">
-            <div class="cloud-sync-section">
-                <h3>📡 Firebase Cloud Sync</h3>
-                <p class="sync-description">Securely sync your data to Firebase across all devices</p>
-                
-                <div class="cloud-sync-buttons">
-                    <button onclick="syncToCloud()" class="cloud-btn">
-                        <span class="btn-icon">📤</span>
-                        Sync to Firebase
-                    </button>
-                    <button onclick="loadFromCloud()" class="cloud-btn">
-                        <span class="btn-icon">📥</span>
-                        Load from Firebase
-                    </button>
-                    <button onclick="testFirebaseConnection()" class="cloud-btn" style="background: #FF9800;">
-                        <span class="btn-icon">🔧</span>
-                        Test Connection
-                    </button>
-                </div>
-                
-                <div id="last-sync" class="last-sync" style="display: none; margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;"></div>
-                
-                <!-- Auto-Sync Option -->
-                <div class="auto-sync-container" style="margin-top: 15px;">
-                    <label>
-                        <input type="checkbox" id="firebase-auto-sync">
-                        Enable Firebase Auto-Sync (every 5 minutes)
-                    </label>
-                </div>
-                
-                <div class="sync-features">
-                    <div class="feature">
-                        <span class="feature-icon">🔒</span>
-                        <span>Secure Firebase storage</span>
-                    </div>
-                    <div class="feature">
-                        <span class="feature-icon">📱</span>
-                        <span>Works across all devices</span>
-                    </div>
-                    <div class="feature">
-                        <span class="feature-icon">⚡</span>
-                        <span>Real-time updates</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Data Management Section -->
-        <div class="form-section">
-            <div class="data-management-section">
-                <h3>💾 Data Management</h3>
-                
-                <div class="data-buttons">
-                    <button onclick="exportData()" class="export-btn">
-                        <span class="btn-icon">📄</span>
-                        Export Data
-                    </button>
-                    <button onclick="importData()" class="import-btn">
-                        <span class="btn-icon">📂</span>
-                        Import Data
-                    </button>
-                    <button onclick="clearForm()" class="clear-btn">
-                        <span class="btn-icon">🗑️</span>
-                        Clear Form
-                    </button>
-                    <button onclick="backupToLocal()" class="export-btn" style="background: #9C27B0;">
-                        <span class="btn-icon">💾</span>
-                        Local Backup
-                    </button>
-                </div>
-                
-                <p class="data-help">
-                    Export for backup or transfer. Import to restore. Local backup for offline safety.
-                </p>
-            </div>
-        </div>
-
-        <!-- Signatures Section -->
-        <div class="signature-section">
-            <div class="signature-box">
-                <div>Signature Claimant:</div>
-                <div class="signature-line"></div>
-            </div>
-            <div class="signature-box">
-                <div>Signature HOD:</div>
-                <div class="signature-line"></div>
-            </div>
-            <div class="signature-box">
-                <div>Signature Principal:</div>
-                <div class="signature-line"></div>
-            </div>
-        </div>
-
-        <!-- Action Buttons -->
+        <!-- Simple Buttons -->
         <div class="buttons">
-            <button onclick="calculateTotal()" class="calc-btn">
-                <span class="btn-icon">🧮</span>
-                Calculate Total
-            </button>
-            <button onclick="generatePDF()" class="pdf-btn">
-                <span class="btn-icon">📊</span>
-                Generate PDF
-            </button>
-            <button onclick="saveForm()" class="save-btn">
-                <span class="btn-icon">💾</span>
-                Save Form
-            </button>
+            <button onclick="calculateTotal()">Calculate Total</button>
+            <button onclick="saveForm()" class="save-btn">Save Form</button>
+            <button onclick="clearForm()">Clear Form</button>
+            <button onclick="exportData()">Export Data</button>
         </div>
     </div>
 
-    <!-- Modal for adding/editing entries -->
-    <div id="entry-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modal-title">Add New Time Entry</h2>
-                <span class="close" onclick="closeModal()">&times;</span>
-            </div>
-            
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="entry-date">Date:</label>
-                    <input type="date" id="entry-date">
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="entry-am-pm">AM/PM:</label>
-                        <select id="entry-am-pm">
-                            <option value="AM">AM</option>
-                            <option value="PM">PM</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="entry-time-in">Time IN:</label>
-                        <input type="time" id="entry-time-in">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="entry-time-out">Time OUT:</label>
-                        <input type="time" id="entry-time-out">
-                    </div>
-                </div>
-            </div>
-            
-            <div class="modal-buttons">
-                <button onclick="closeModal()" class="cancel-btn">Cancel</button>
-                <button onclick="saveEntry()" class="confirm-btn">Save Entry</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Emergency Recovery Button -->
-    <div id="emergency-recovery" style="position: fixed; bottom: 20px; right: 20px; z-index: 10000; display: none;">
-        <button onclick="emergencyDataRecovery()" 
-                style="background: #ff5722; color: white; border: none; padding: 10px 15px; 
-                       border-radius: 50px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-size: 12px;">
-            🔧 Data Recovery
-        </button>
-    </div>
-
-    <!-- =============== CRITICAL FIX: Load scripts in CORRECT ORDER =============== -->
-    <!-- 1. Firebase Config FIRST -->
-    <script src="firebase-config.js"></script>
-    
-    <!-- 2. Auth.js SECOND -->
-    <script src="auth.js"></script>
-    
-    <!-- 3. App.js LAST (contains ALL functionality) -->
+    <!-- Load ONLY this script -->
     <script src="app.js"></script>
     
-    <!-- =============== DO NOT LOAD THESE: They cause conflicts =============== -->
-    <!-- ❌ DELETE: sync.js - conflicts with app.js -->
-    <!-- ❌ DELETE: global.js - third-party extension -->
-    <!-- ❌ DELETE: config.js - duplicate Firebase config -->
-    
     <script>
-    // Add missing function that might be referenced
-    function backupToLocal() {
-        const currentUser = localStorage.getItem('currentUser');
-        if (!currentUser) {
-            alert('Please log in first');
-            return;
-        }
-        
-        const user = JSON.parse(currentUser);
-        const userData = localStorage.getItem(`userData_${user.username}`);
-        
-        if (!userData) {
-            alert('No data to backup');
-            return;
-        }
-        
-        // Create backup with timestamp
-        const backup = {
-            data: JSON.parse(userData),
-            timestamp: new Date().toISOString(),
-            user: user.username
-        };
-        
-        localStorage.setItem(`backup_${Date.now()}`, JSON.stringify(backup));
-        alert('✅ Local backup created!');
-    }
-    
-    // Test Firebase connection
-    function testFirebaseConnection() {
-        if (typeof firebase === 'undefined') {
-            alert('Firebase not loaded');
-            return;
-        }
-        
-        if (firebase.apps.length === 0) {
-            alert('Firebase not initialized');
-            return;
-        }
-        
-        try {
-            const auth = firebase.auth();
-            const firestore = firebase.firestore();
+    // Emergency data creation
+    setTimeout(() => {
+        const user = localStorage.getItem('currentUser');
+        if (user) {
+            const parsedUser = JSON.parse(user);
+            const username = parsedUser.username || (parsedUser.email ? parsedUser.email.split('@')[0] : 'user');
+            const hasData = localStorage.getItem(`userData_${username}`);
             
-            // Simple test query
-            firestore.collection('test').doc('connection').set({
-                test: true,
-                timestamp: new Date().toISOString()
-            }, { merge: true })
-            .then(() => alert('✅ Firebase connection successful!'))
-            .catch(err => alert('❌ Firebase error: ' + err.message));
-            
-        } catch (error) {
-            alert('Firebase test error: ' + error.message);
-        }
-    }
-    
-    // Show/hide recovery button
-    document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(() => {
-            const user = localStorage.getItem('currentUser');
-            if (user) {
-                const parsedUser = JSON.parse(user);
-                const hasData = localStorage.getItem(`userData_${parsedUser.username}`);
-                if (!hasData) {
-                    console.log('No data found, showing recovery button');
-                    document.getElementById('emergency-recovery').style.display = 'block';
-                }
-            }
-        }, 1000);
-    });
-    
-    // Emergency recovery function
-    function emergencyDataRecovery() {
-        const user = JSON.parse(localStorage.getItem('currentUser'));
-        if (!user) {
-            alert('Please log in first');
-            return;
-        }
-        
-        console.log('Emergency recovery for:', user.username);
-        
-        // Check all localStorage for user data
-        let foundData = null;
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key.includes(user.username) || key.includes('forms') || key.includes('broiler')) {
-                const data = localStorage.getItem(key);
-                try {
-                    const parsed = JSON.parse(data);
-                    if (Array.isArray(parsed) || (typeof parsed === 'object' && parsed !== null)) {
-                        foundData = parsed;
-                        console.log('Found data in:', key);
-                        break;
-                    }
-                } catch (e) {
-                    // Not JSON
-                }
+            if (!hasData) {
+                console.log('Creating sample data...');
+                const sampleData = {
+                    "9-2025": [
+                        { date: '2025-10-01', amPm: 'AM', inTime: '08:00', outTime: '12:00', hours: '4:00' },
+                        { date: '2025-10-01', amPm: 'PM', inTime: '13:00', outTime: '17:00', hours: '4:00' }
+                    ]
+                };
+                localStorage.setItem(`userData_${username}`, JSON.stringify(sampleData));
+                location.reload();
             }
         }
-        
-        if (foundData) {
-            localStorage.setItem(`userData_${user.username}`, JSON.stringify(foundData));
-            alert('Data recovered! Refreshing...');
-            location.reload();
-        } else {
-            alert('No data found. Creating sample...');
-            // Create sample data
-            const sampleData = {
-                "9-2025": [
-                    { date: '2025-10-01', amPm: 'AM', inTime: '08:00', outTime: '12:00', hours: '4:00' },
-                    { date: '2025-10-01', amPm: 'PM', inTime: '13:00', outTime: '17:00', hours: '4:00' }
-                ]
-            };
-            localStorage.setItem(`userData_${user.username}`, JSON.stringify(sampleData));
-            location.reload();
-        }
-    }
+    }, 1000);
     </script>
 </body>
 </html>
