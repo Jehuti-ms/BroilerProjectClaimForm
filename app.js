@@ -1,18 +1,26 @@
-// app.js - COMPLETE VERSION WITH ALL FUNCTIONALITY
+// app.js - COMPLETE VERSION WITH FIREBASE INTEGRATION AND ALL FUNCTIONALITY
+
 // Global variables
 let currentEditingRow = null;
 let currentFormData = [];
+let firestore = null;
 const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
 
-// Check authentication on page load
-// Check authentication on page load
+// Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('📋 APP.JS LOADED - WITH FIREBASE INTEGRATION');
+    
+    // Check authentication
     checkAuthentication();
-    loadUserPreferences();      // ADD THIS LINE
+    
+    // Load user preferences
+    loadUserPreferences();
+    
+    // Initialize auto-sync
     initAutoSyncCheckbox();
-    setupAutoSyncOnLogin();     // ADD THIS LINE
+    setupAutoSyncOnLogin();
     
     // Add event listener for auto-sync checkbox
     const autoSyncCheckbox = document.getElementById('auto-sync');
@@ -23,13 +31,188 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set up employee name memory for MAIN FORM
     setupEmployeeNameMemory();
     
-    // Initialize Firebase sync if available (optional)
-    setTimeout(() => {
-        if (typeof initCloudSync === 'function') {
-            initCloudSync();
-        }
-    }, 1000);
+    // Initialize Firebase services
+    initializeAppFirebase();
 });
+
+// =============== FIREBASE FUNCTIONS ===============
+
+// Initialize Firebase services for the app
+function initializeAppFirebase() {
+    try {
+        // Try to get Firestore from global
+        if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+            firestore = firebase.firestore();
+            console.log('✅ Firestore available for cloud sync');
+            
+            // Enable offline persistence
+            firestore.enablePersistence()
+                .then(() => console.log('Firestore offline persistence enabled'))
+                .catch(err => {
+                    if (err.code === 'failed-precondition') {
+                        console.log('Multiple tabs open, persistence disabled');
+                    } else if (err.code === 'unimplemented') {
+                        console.log('Browser doesn\'t support persistence');
+                    }
+                });
+        } else {
+            console.log('Firebase not available, using localStorage only');
+        }
+    } catch (error) {
+        console.log('Firebase initialization error:', error.message);
+    }
+}
+
+// Sync data to Firebase
+async function syncToCloud() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showNotification('Please log in first', 'error');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    
+    // Check if user has Firebase authentication
+    if (user.authType !== 'firebase') {
+        showNotification('You need to register with Firebase to use cloud sync', 'warning');
+        return;
+    }
+    
+    const userData = localStorage.getItem(`userData_${user.username}`);
+    
+    if (!userData) {
+        showNotification('No data to sync', 'error');
+        return;
+    }
+    
+    if (!firestore) {
+        showNotification('Cloud sync not available. Using local storage only.', 'warning');
+        return;
+    }
+    
+    try {
+        const dataToSave = {
+            username: user.username,
+            employeeName: user.employeeName,
+            email: user.email,
+            forms: JSON.parse(userData),
+            lastSync: new Date().toISOString(),
+            firebaseUid: user.firebaseUid || null
+        };
+        
+        await firestore.collection('users').doc(user.username).set(dataToSave, { merge: true });
+        showNotification('✅ Data synced to cloud successfully!');
+        
+        // Update last sync time
+        localStorage.setItem('lastCloudSync', new Date().toISOString());
+        updateLastSyncDisplay();
+        
+    } catch (error) {
+        console.error('Cloud sync error:', error);
+        showNotification('Cloud sync failed: ' + error.message, 'error');
+    }
+}
+
+// Load data from Firebase
+async function loadFromCloud() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showNotification('Please log in first', 'error');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    
+    // Check if user has Firebase authentication
+    if (user.authType !== 'firebase') {
+        showNotification('You need to register with Firebase to use cloud sync', 'warning');
+        return;
+    }
+    
+    if (!firestore) {
+        showNotification('Cloud sync not available.', 'warning');
+        return;
+    }
+    
+    try {
+        const doc = await firestore.collection('users').doc(user.username).get();
+        
+        if (doc.exists) {
+            const data = doc.data();
+            if (data.forms) {
+                localStorage.setItem(`userData_${user.username}`, JSON.stringify(data.forms));
+                showNotification('✅ Cloud data loaded successfully!');
+                
+                // Update last sync time
+                localStorage.setItem('lastCloudSync', new Date().toISOString());
+                updateLastSyncDisplay();
+                
+                // Reload the data
+                loadUserData(user.username);
+            } else {
+                showNotification('No forms data found in cloud.', 'warning');
+            }
+        } else {
+            showNotification('No data found in cloud for your account.', 'warning');
+        }
+        
+    } catch (error) {
+        console.error('Cloud load error:', error);
+        showNotification('Failed to load from cloud: ' + error.message, 'error');
+    }
+}
+
+// Sync from Firebase (for auto-loading)
+async function syncFromFirebase(username) {
+    if (!firestore) return null;
+    
+    try {
+        const docRef = firestore.collection('users').doc(username);
+        const doc = await docRef.get();
+        
+        if (doc.exists) {
+            const data = doc.data();
+            console.log('Firebase data retrieved:', data);
+            
+            if (data.forms) {
+                // Save to localStorage as backup
+                localStorage.setItem(`userData_${username}`, JSON.stringify(data.forms));
+                
+                // Update last sync time
+                localStorage.setItem('lastCloudSync', new Date().toISOString());
+                updateLastSyncDisplay();
+                
+                return data.forms;
+            }
+        }
+        
+        return null;
+        
+    } catch (error) {
+        console.error('Firebase sync error:', error);
+        return null;
+    }
+}
+
+// Update last sync display
+function updateLastSyncDisplay() {
+    const lastSync = localStorage.getItem('lastCloudSync');
+    const lastSyncElement = document.getElementById('last-sync');
+    
+    if (lastSyncElement) {
+        if (lastSync) {
+            const lastSyncDate = new Date(lastSync);
+            lastSyncElement.innerHTML = `Last synced: ${lastSyncDate.toLocaleString()}`;
+            lastSyncElement.style.display = 'block';
+        } else {
+            lastSyncElement.innerHTML = 'Never synced';
+            lastSyncElement.style.display = 'block';
+        }
+    }
+}
+
+// =============== AUTHENTICATION FUNCTIONS ===============
 
 // Check if user is authenticated - UPDATED for Firebase compatibility
 function checkAuthentication() {
@@ -77,7 +260,9 @@ function checkAuthentication() {
         
         // Initialize the app
         initializeApp();
-        loadUserData(username);
+        
+        // Load data (with Firebase sync if available)
+        loadUserData(user);
         
     } catch (error) {
         console.error('Error parsing user data:', error);
@@ -85,7 +270,8 @@ function checkAuthentication() {
     }
 }
 
-// Add this function to app.js (after checkAuthentication):
+// =============== USER PREFERENCES & AUTO-SYNC ===============
+
 function loadUserPreferences() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) return;
@@ -120,23 +306,6 @@ function loadUserPreferences() {
     }
 }
 
-// Update DOMContentLoaded in app.js:
-document.addEventListener('DOMContentLoaded', function() {
-    checkAuthentication();
-    loadUserPreferences(); // ADD THIS LINE
-    initAutoSyncCheckbox();
-    
-    // Add event listener for auto-sync checkbox
-    const autoSyncCheckbox = document.getElementById('auto-sync');
-    if (autoSyncCheckbox) {
-        autoSyncCheckbox.addEventListener('change', toggleAutoSync);
-    }
-    
-    // Set up employee name memory for MAIN FORM
-    setupEmployeeNameMemory();
-});
-
-// Add this function RIGHT AFTER loadUserPreferences() in app.js
 function setupAutoSyncOnLogin() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -164,14 +333,13 @@ function setupAutoSyncOnLogin() {
             console.log('Using global auto-sync setting:', autoSyncEnabled);
         }
         
-        // Auto-sync on login if preference is set
-        if (autoSyncEnabled) {
+        // Auto-sync on login if preference is set AND user has Firebase auth
+        if (autoSyncEnabled && user.authType === 'firebase') {
             console.log('Auto-sync on login enabled for:', username);
             
             // Check if we have data to sync
             const userDataKey = `userData_${username}`;
-            const userEmailKey = `userData_${user.email}`;
-            const hasData = localStorage.getItem(userDataKey) || localStorage.getItem(userEmailKey);
+            const hasData = localStorage.getItem(userDataKey);
             
             if (hasData) {
                 console.log('User has data, will auto-sync in 5 seconds...');
@@ -206,7 +374,53 @@ function setupAutoSyncOnLogin() {
     }
 }
 
-// Initialize the application
+function toggleAutoSync() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const isEnabled = checkbox.checked;
+        
+        // Save globally
+        localStorage.setItem('autoSyncEnabled', isEnabled.toString());
+        
+        // Save per-user
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser) {
+            try {
+                const user = JSON.parse(currentUser);
+                const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
+                
+                const userPrefs = localStorage.getItem(`prefs_${username}`);
+                const prefs = userPrefs ? JSON.parse(userPrefs) : {};
+                
+                prefs.autoSync = isEnabled;
+                prefs.autoSyncUpdated = new Date().toISOString();
+                
+                localStorage.setItem(`prefs_${username}`, JSON.stringify(prefs));
+                
+                console.log('Saved auto-sync preference for user:', username, isEnabled);
+                
+                if (isEnabled) {
+                    showNotification('Auto-sync enabled');
+                } else {
+                    showNotification('Auto-sync disabled');
+                }
+            } catch (error) {
+                console.error('Error saving user preference:', error);
+            }
+        }
+    }
+}
+
+function initAutoSyncCheckbox() {
+    const checkbox = document.getElementById('auto-sync');
+    if (checkbox) {
+        const autoSync = localStorage.getItem('autoSyncEnabled');
+        checkbox.checked = autoSync === 'true';
+    }
+}
+
+// =============== APP INITIALIZATION ===============
+
 function initializeApp() {
     // Load last viewed month from localStorage
     const lastMonth = localStorage.getItem('lastViewedMonth');
@@ -234,7 +448,7 @@ function initializeApp() {
             if (currentUser) {
                 const user = JSON.parse(currentUser);
                 const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
-                loadUserData(username);
+                loadUserData(user); // Pass user object instead of just username
             }
         });
     }
@@ -249,68 +463,15 @@ function initializeApp() {
             if (currentUser) {
                 const user = JSON.parse(currentUser);
                 const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
-                loadUserData(username);
+                loadUserData(user); // Pass user object instead of just username
             }
         });
     }
     
     updateFormDate();
+    updateLastSyncDisplay();
 }
 
-// Auto-sync functions
-// Update toggleAutoSync in app.js:
-function toggleAutoSync() {
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        const isEnabled = checkbox.checked;
-        
-        // Save globally
-        localStorage.setItem('autoSyncEnabled', isEnabled.toString());
-        
-        // Save per-user
-        const currentUser = localStorage.getItem('currentUser');
-        if (currentUser) {
-            try {
-                const user = JSON.parse(currentUser);
-                const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
-                
-                const userPrefs = localStorage.getItem(`prefs_${username}`);
-                const prefs = userPrefs ? JSON.parse(userPrefs) : {};
-                
-                prefs.autoSync = isEnabled;
-                prefs.autoSyncUpdated = new Date().toISOString();
-                
-                localStorage.setItem(`prefs_${username}`, JSON.stringify(prefs));
-                
-                console.log('Saved auto-sync preference for user:', username, isEnabled);
-            } catch (error) {
-                console.error('Error saving user preference:', error);
-            }
-        }
-        
-        if (isEnabled) {
-            showNotification('Auto-sync enabled');
-            if (typeof startAutoSync === 'function') {
-                startAutoSync();
-            }
-        } else {
-            showNotification('Auto-sync disabled');
-            if (typeof stopAutoSync === 'function') {
-                stopAutoSync();
-            }
-        }
-    }
-}
-
-function initAutoSyncCheckbox() {
-    const checkbox = document.getElementById('auto-sync');
-    if (checkbox) {
-        const autoSync = localStorage.getItem('autoSyncEnabled');
-        checkbox.checked = autoSync === 'true';
-    }
-}
-
-// Save current month/year to localStorage
 function saveCurrentMonth() {
     const monthSelect = document.getElementById('month-select');
     const yearInput = document.getElementById('year-input');
@@ -324,39 +485,41 @@ function saveCurrentMonth() {
     }
 }
 
-// Load user data for current month - UPDATED for Firebase compatibility
-// Load user data for current month
-function loadUserData(username) {
-    console.log('Loading data for user:', username);
+// =============== DATA LOADING & SAVING ===============
+
+async function loadUserData(user) {
+    console.log('Loading data for user:', user.username || user.email);
     
-    // Try multiple possible data locations
-    let userData = localStorage.getItem(`userData_${username}`);
-    
-    // If not found, try alternative naming
-    if (!userData) {
-        userData = localStorage.getItem(`forms_${username}`);
-    }
-    
-    if (!userData) {
-        userData = localStorage.getItem('broilerForms');
-    }
-    
-    if (userData) {
+    // First try to sync from Firebase if user has Firebase auth
+    if (user.authType === 'firebase' && firestore) {
         try {
-            const allData = JSON.parse(userData);
-            console.log('Found user data:', allData);
-            loadCurrentMonthData(allData);
-            return;
-        } catch (e) {
-            console.error('Error parsing user data:', e);
+            console.log('Attempting Firebase sync...');
+            const cloudData = await syncFromFirebase(user.username || user.email.split('@')[0]);
+            
+            if (cloudData) {
+                console.log('✅ Loaded data from Firebase');
+                loadCurrentMonthData(cloudData);
+                return;
+            }
+        } catch (error) {
+            console.log('Firebase sync failed:', error.message);
+            // Fall back to localStorage
         }
     }
     
-    console.log('No saved data found, starting fresh');
-    loadCurrentMonthData();
+    // Fall back to localStorage
+    const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
+    const localData = localStorage.getItem(`userData_${username}`);
+    
+    if (localData) {
+        console.log('✅ Loaded data from localStorage');
+        loadCurrentMonthData(JSON.parse(localData));
+    } else {
+        console.log('No data found, starting fresh');
+        loadCurrentMonthData();
+    }
 }
 
-// Load data for current month
 function loadCurrentMonthData(allData = null) {
     const month = parseInt(document.getElementById('month-select').value);
     const year = document.getElementById('year-input').value;
@@ -394,8 +557,7 @@ function loadCurrentMonthData(allData = null) {
     calculateTotal();
 }
 
-// Save user data
-function saveUserData() {
+async function saveUserData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
         console.error('No user logged in');
@@ -423,69 +585,60 @@ function saveUserData() {
     localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
     
     console.log(`Saved ${currentFormData.length} entries for ${monthYear}`);
-    showNotification('Form data saved successfully!');
+    
+    // Try to sync to Firebase if user has Firebase auth
+    if (user.authType === 'firebase') {
+        try {
+            await syncToCloud();
+        } catch (error) {
+            console.log('Auto-sync failed, but local save succeeded');
+            showNotification('Form saved locally (cloud sync failed)', 'warning');
+            return;
+        }
+    } else {
+        showNotification('Form saved locally', 'success');
+    }
 }
 
-// Show notification - ENHANCED with types
-function showNotification(message, type = 'success') {
-    // Remove any existing notifications
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => notification.remove());
+// =============== TABLE & FORM FUNCTIONS ===============
+
+function addRowToTable(data) {
+    const tableBody = document.querySelector('#time-table tbody');
+    if (!tableBody) return;
     
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#f44336' : 
-                     type === 'warning' ? '#FF9800' : '#4CAF50'};
-        color: white;
-        padding: 15px 20px;
-        border-radius: 5px;
-        z-index: 10000;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    const newRow = document.createElement('tr');
+    const rowIndex = tableBody.children.length;
+    
+    newRow.innerHTML = `
+        <td>${formatDateForDisplay(data.date)}</td>
+        <td>${data.amPm}</td>
+        <td>${formatTimeDisplay(data.inTime)}</td>
+        <td>${formatTimeDisplay(data.outTime)}</td>
+        <td>${data.hours}</td>
+        <td>
+            <button class="edit-btn" onclick="openModal(${rowIndex})">Edit</button>
+            <button class="delete-btn" onclick="deleteRow(${rowIndex})">Delete</button>
+        </td>
     `;
     
-    document.body.appendChild(notification);
-    
-    // Remove after 3 seconds
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.remove();
-        }
-    }, 3000);
+    tableBody.appendChild(newRow);
 }
 
-// Update the form date display
-function updateFormDate() {
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    const formDate = document.getElementById('form-date');
-    
-    if (monthSelect && yearInput && formDate) {
-        const month = monthSelect.value;
-        const year = yearInput.value;
-        formDate.textContent = `${monthNames[month]} ${year}`;
+function updateRowInTable(rowIndex, data) {
+    const rows = document.querySelectorAll('#time-table tbody tr');
+    if (rows[rowIndex]) {
+        const row = rows[rowIndex];
+        
+        row.cells[0].textContent = formatDateForDisplay(data.date);
+        row.cells[1].textContent = data.amPm;
+        row.cells[2].textContent = formatTimeDisplay(data.inTime);
+        row.cells[3].textContent = formatTimeDisplay(data.outTime);
+        row.cells[4].textContent = data.hours;
     }
 }
 
-// Clear the form
-function clearForm() {
-    if (confirm('Are you sure you want to clear all entries for this month?')) {
-        const tableBody = document.querySelector('#time-table tbody');
-        if (tableBody) {
-            tableBody.innerHTML = '';
-            currentFormData = [];
-            document.getElementById('total-hours').textContent = '0:00';
-            saveUserData(); // Save empty data
-        }
-    }
-}
+// =============== MODAL FUNCTIONS ===============
 
-// Open the modal for adding/editing entries
 function openModal(rowIndex = null) {
     const modal = document.getElementById('entry-modal');
     const modalTitle = document.getElementById('modal-title');
@@ -528,7 +681,6 @@ function openModal(rowIndex = null) {
     modal.style.display = 'block';
 }
 
-// Close the modal
 function closeModal() {
     const modal = document.getElementById('entry-modal');
     if (modal) {
@@ -537,7 +689,6 @@ function closeModal() {
     }
 }
 
-// Save entry from modal
 function saveEntry() {
     const date = document.getElementById('entry-date').value;
     const amPm = document.getElementById('entry-am-pm').value;
@@ -593,123 +744,32 @@ function saveEntry() {
     closeModal();
 }
 
-// Add a row to the table
-function addRowToTable(data) {
-    const tableBody = document.querySelector('#time-table tbody');
-    if (!tableBody) return;
-    
-    const newRow = document.createElement('tr');
-    const rowIndex = tableBody.children.length;
-    
-    newRow.innerHTML = `
-        <td>${formatDateForDisplay(data.date)}</td>
-        <td>${data.amPm}</td>
-        <td>${formatTimeDisplay(data.inTime)}</td>
-        <td>${formatTimeDisplay(data.outTime)}</td>
-        <td>${data.hours}</td>
-        <td>
-            <button class="edit-btn" onclick="openModal(${rowIndex})">Edit</button>
-            <button class="delete-btn" onclick="deleteRow(${rowIndex})">Delete</button>
-        </td>
-    `;
-    
-    tableBody.appendChild(newRow);
-}
+// =============== UTILITY FUNCTIONS ===============
 
-// Update an existing row in the table
-function updateRowInTable(rowIndex, data) {
-    const rows = document.querySelectorAll('#time-table tbody tr');
-    if (rows[rowIndex]) {
-        const row = rows[rowIndex];
-        
-        row.cells[0].textContent = formatDateForDisplay(data.date);
-        row.cells[1].textContent = data.amPm;
-        row.cells[2].textContent = formatTimeDisplay(data.inTime);
-        row.cells[3].textContent = formatTimeDisplay(data.outTime);
-        row.cells[4].textContent = data.hours;
+function updateFormDate() {
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    const formDate = document.getElementById('form-date');
+    
+    if (monthSelect && yearInput && formDate) {
+        const month = monthSelect.value;
+        const year = yearInput.value;
+        formDate.textContent = `${monthNames[month]} ${year}`;
     }
 }
 
-// Format date for display (DD/MM/YYYY format)
-function formatDateForDisplay(dateString) {
-    if (!dateString) return '';
-    
-    // Check if already in DD/MM/YYYY format
-    if (dateString.includes('/')) {
-        return dateString;
+function clearForm() {
+    if (confirm('Are you sure you want to clear all entries for this month?')) {
+        const tableBody = document.querySelector('#time-table tbody');
+        if (tableBody) {
+            tableBody.innerHTML = '';
+            currentFormData = [];
+            document.getElementById('total-hours').textContent = '0:00';
+            saveUserData(); // Save empty data
+        }
     }
-    
-    // Assume YYYY-MM-DD format
-    const [year, month, day] = dateString.split('-');
-    const date = new Date(year, month - 1, day);
-    
-    const displayDay = date.getDate().toString().padStart(2, '0');
-    const displayMonth = (date.getMonth() + 1).toString().padStart(2, '0');
-    const displayYear = date.getFullYear();
-    
-    return `${displayDay}/${displayMonth}/${displayYear}`;
 }
 
-// Format date for input (YYYY-MM-DD format)
-function formatDateForInput(dateString) {
-    if (!dateString) return '';
-    
-    // Check if already in YYYY-MM-DD format
-    if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
-        return dateString;
-    }
-    
-    // Assume DD/MM/YYYY format
-    const [day, month, year] = dateString.split('/');
-    
-    const date = new Date(year, month - 1, day);
-    const inputYear = date.getFullYear();
-    const inputMonth = (date.getMonth() + 1).toString().padStart(2, '0');
-    const inputDay = date.getDate().toString().padStart(2, '0');
-    
-    return `${inputYear}-${inputMonth}-${inputDay}`;
-}
-
-// Format time for display (convert 24h to 12h format)
-function formatTimeDisplay(time) {
-    if (!time) return '';
-    
-    // Check if already formatted
-    if (time.includes('AM') || time.includes('PM')) {
-        return time;
-    }
-    
-    const [hours, minutes] = time.split(':');
-    const hourNum = parseInt(hours);
-    const amPm = hourNum >= 12 ? 'PM' : 'AM';
-    const displayHour = hourNum % 12 || 12;
-    
-    return `${displayHour}:${minutes} ${amPm}`;
-}
-
-// Convert 12h time to 24h time
-function convertTo24Hour(timeString) {
-    if (!timeString) return '';
-    
-    // Check if already in 24h format
-    if (!timeString.includes('AM') && !timeString.includes('PM')) {
-        return timeString;
-    }
-    
-    const [time, modifier] = timeString.split(' ');
-    let [hours, minutes] = time.split(':');
-    
-    if (modifier === 'PM' && hours !== '12') {
-        hours = parseInt(hours, 10) + 12;
-    }
-    if (modifier === 'AM' && hours === '12') {
-        hours = '00';
-    }
-    
-    return `${hours.toString().padStart(2, '0')}:${minutes}`;
-}
-
-// Delete a row from the table
 function deleteRow(rowIndex) {
     if (confirm('Are you sure you want to delete this entry?')) {
         const rows = document.querySelectorAll('#time-table tbody tr');
@@ -735,7 +795,6 @@ function deleteRow(rowIndex) {
     }
 }
 
-// Calculate total hours
 function calculateTotal() {
     const rows = document.querySelectorAll('#time-table tbody tr');
     let totalMinutes = 0;
@@ -756,7 +815,119 @@ function calculateTotal() {
     }
 }
 
-// Generate PDF
+// =============== FORMATTING FUNCTIONS ===============
+
+function formatDateForDisplay(dateString) {
+    if (!dateString) return '';
+    
+    // Check if already in DD/MM/YYYY format
+    if (dateString.includes('/')) {
+        return dateString;
+    }
+    
+    // Assume YYYY-MM-DD format
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(year, month - 1, day);
+    
+    const displayDay = date.getDate().toString().padStart(2, '0');
+    const displayMonth = (date.getMonth() + 1).toString().padStart(2, '0');
+    const displayYear = date.getFullYear();
+    
+    return `${displayDay}/${displayMonth}/${displayYear}`;
+}
+
+function formatDateForInput(dateString) {
+    if (!dateString) return '';
+    
+    // Check if already in YYYY-MM-DD format
+    if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+        return dateString;
+    }
+    
+    // Assume DD/MM/YYYY format
+    const [day, month, year] = dateString.split('/');
+    
+    const date = new Date(year, month - 1, day);
+    const inputYear = date.getFullYear();
+    const inputMonth = (date.getMonth() + 1).toString().padStart(2, '0');
+    const inputDay = date.getDate().toString().padStart(2, '0');
+    
+    return `${inputYear}-${inputMonth}-${inputDay}`;
+}
+
+function formatTimeDisplay(time) {
+    if (!time) return '';
+    
+    // Check if already formatted
+    if (time.includes('AM') || time.includes('PM')) {
+        return time;
+    }
+    
+    const [hours, minutes] = time.split(':');
+    const hourNum = parseInt(hours);
+    const amPm = hourNum >= 12 ? 'PM' : 'AM';
+    const displayHour = hourNum % 12 || 12;
+    
+    return `${displayHour}:${minutes} ${amPm}`;
+}
+
+function convertTo24Hour(timeString) {
+    if (!timeString) return '';
+    
+    // Check if already in 24h format
+    if (!timeString.includes('AM') && !timeString.includes('PM')) {
+        return timeString;
+    }
+    
+    const [time, modifier] = timeString.split(' ');
+    let [hours, minutes] = time.split(':');
+    
+    if (modifier === 'PM' && hours !== '12') {
+        hours = parseInt(hours, 10) + 12;
+    }
+    if (modifier === 'AM' && hours === '12') {
+        hours = '00';
+    }
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+}
+
+// =============== NOTIFICATION FUNCTIONS ===============
+
+function showNotification(message, type = 'success') {
+    // Remove any existing notifications
+    const existingNotifications = document.querySelectorAll('.notification');
+    existingNotifications.forEach(notification => notification.remove());
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#f44336' : 
+                     type === 'warning' ? '#FF9800' : '#4CAF50'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 5px;
+        z-index: 10000;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
+// =============== PDF GENERATION ===============
+
 function generatePDF() {
     // Check if jsPDF is loaded
     if (typeof jsPDF === 'undefined' || typeof window.jspdf === 'undefined') {
@@ -864,7 +1035,8 @@ function generatePDF() {
     }
 }
 
-// Export Data - UPDATED for Firebase compatibility
+// =============== EXPORT/IMPORT FUNCTIONS ===============
+
 function exportData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -913,7 +1085,6 @@ function exportData() {
     }
 }
 
-// Import Data Function - UPDATED for Firebase compatibility
 function importData() {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -958,8 +1129,7 @@ function importData() {
                 // Reload the current view
                 if (currentUser) {
                     const user = JSON.parse(currentUser);
-                    const username = user.username || (user.email ? user.email.split('@')[0] : 'user');
-                    loadUserData(username);
+                    loadUserData(user);
                 }
                 
                 showNotification('Data imported successfully!');
@@ -983,22 +1153,8 @@ function importData() {
     fileInput.click();
 }
 
-// Utility Functions
-function saveForm() {
-    saveUserData();
-}
+// =============== EMPLOYEE NAME MEMORY ===============
 
-function logout() {
-    // Sign out from Firebase if available
-    if (typeof firebase !== 'undefined' && window.firebaseAuth) {
-        firebaseAuth.signOut();
-    }
-    
-    localStorage.removeItem('currentUser');
-    window.location.href = 'auth.html';
-}
-
-// Save employee name when it's typed in the main form
 function setupEmployeeNameMemory() {
     const employeeNameInput = document.getElementById('employee-name');
     
@@ -1021,95 +1177,20 @@ function setupEmployeeNameMemory() {
     }
 }
 
-// Cloud sync functions
-let firestore = null;
+// =============== LOGOUT FUNCTION ===============
 
-// Initialize Firestore
-function initializeFirestore() {
-    if (typeof firebase === 'undefined') return false;
-    
-    try {
-        if (!firestore) {
-            firestore = firebase.firestore();
-            console.log('✅ Firestore initialized');
-        }
-        return true;
-    } catch (error) {
-        console.log('Firestore not available:', error.message);
-        return false;
+function logout() {
+    // Sign out from Firebase if available
+    if (typeof firebase !== 'undefined' && window.firebaseAuth) {
+        firebaseAuth.signOut();
     }
+    
+    localStorage.removeItem('currentUser');
+    window.location.href = 'auth.html';
 }
 
-// Sync to Firebase
-async function syncToFirebase() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) return;
-    
-    const user = JSON.parse(currentUser);
-    const userData = localStorage.getItem(`userData_${user.username}`);
-    
-    if (!userData) {
-        alert('No data to sync');
-        return;
-    }
-    
-    if (!initializeFirestore()) {
-        alert('Cloud sync not available. Using local storage only.');
-        return;
-    }
-    
-    try {
-        const dataToSave = {
-            username: user.username,
-            employeeName: user.employeeName,
-            forms: JSON.parse(userData),
-            lastSync: new Date().toISOString()
-        };
-        
-        await firestore.collection('users').doc(user.username).set(dataToSave, { merge: true });
-        alert('✅ Data synced to cloud successfully!');
-        
-    } catch (error) {
-        console.error('Cloud sync error:', error);
-        alert('Cloud sync failed: ' + error.message);
-    }
-}
+// =============== MAKE FUNCTIONS GLOBALLY AVAILABLE ===============
 
-// Load from Firebase
-async function loadFromFirebase() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) return;
-    
-    const user = JSON.parse(currentUser);
-    
-    if (!initializeFirestore()) {
-        alert('Cloud sync not available.');
-        return;
-    }
-    
-    try {
-        const doc = await firestore.collection('users').doc(user.username).get();
-        
-        if (doc.exists) {
-            const data = doc.data();
-            if (data.forms) {
-                localStorage.setItem(`userData_${user.username}`, JSON.stringify(data.forms));
-                alert('✅ Cloud data loaded successfully!');
-                location.reload();
-            } else {
-                alert('No forms data found in cloud.');
-            }
-        } else {
-            alert('No data found in cloud for your account.');
-        }
-        
-    } catch (error) {
-        console.error('Cloud load error:', error);
-        alert('Failed to load from cloud: ' + error.message);
-    }
-}
-
-// Make all functions globally available
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.saveEntry = saveEntry;
@@ -1121,3 +1202,5 @@ window.exportData = exportData;
 window.importData = importData;
 window.calculateTotal = calculateTotal;
 window.logout = logout;
+window.syncToCloud = syncToCloud;
+window.loadFromCloud = loadFromCloud;
