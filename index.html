@@ -282,7 +282,101 @@
     <script src="sync.js"></script>  
     <script src="app.js"></script>
     
-   
+   <!-- Emergency Recovery Button -->
+<div id="emergency-recovery" style="position: fixed; bottom: 20px; right: 20px; z-index: 10000;">
+    <button onclick="emergencyDataRecovery()" 
+            style="background: #ff5722; color: white; border: none; padding: 10px 15px; 
+                   border-radius: 50px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-size: 12px;">
+        🔧 Data Recovery
+    </button>
+</div>
+
+<script>
+// Emergency data recovery function
+function emergencyDataRecovery() {
+    const user = JSON.parse(localStorage.getItem('currentUser'));
+    if (!user) {
+        alert('Please log in first');
+        return;
+    }
+    
+    console.log('🔍 Emergency data recovery for user:', user.username);
+    
+    // Check all localStorage keys
+    const allKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        allKeys.push(localStorage.key(i));
+    }
+    
+    console.log('All localStorage keys:', allKeys);
+    
+    // Look for data related to this user
+    const userKeys = allKeys.filter(key => 
+        key.includes(user.username) || 
+        key.includes('forms') || 
+        key.includes('broiler') ||
+        key.includes('userData')
+    );
+    
+    console.log('User-related keys:', userKeys);
+    
+    let foundData = null;
+    let foundKey = null;
+    
+    // Try to find and load data
+    for (const key of userKeys) {
+        try {
+            const data = localStorage.getItem(key);
+            const parsed = JSON.parse(data);
+            
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                foundData = parsed;
+                foundKey = key;
+                console.log(`✅ Found ${parsed.length} entries in ${key}`);
+                break;
+            } else if (typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                // Check if it contains array data
+                for (const subKey in parsed) {
+                    if (Array.isArray(parsed[subKey]) && parsed[subKey].length > 0) {
+                        foundData = parsed;
+                        foundKey = key;
+                        console.log(`✅ Found data object in ${key}`);
+                        break;
+                    }
+                }
+            }
+        } catch (e) {
+            // Not JSON, skip
+        }
+    }
+    
+    if (foundData) {
+        if (confirm(`Found data in ${foundKey}. Load it now?`)) {
+            // Save to correct location
+            localStorage.setItem(`userData_${user.username}`, JSON.stringify(foundData));
+            
+            // Reload the page
+            location.reload();
+        }
+    } else {
+        alert('No data found. Starting with empty form.');
+    }
+}
+
+// Check if data exists on load
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        const user = JSON.parse(localStorage.getItem('currentUser'));
+        if (user) {
+            const hasData = localStorage.getItem(`userData_${user.username}`);
+            if (!hasData) {
+                console.log('No data found for user, showing recovery button');
+                document.getElementById('emergency-recovery').style.display = 'block';
+            }
+        }
+    }, 1000);
+});
+</script>
     
 </body>
 </html>
