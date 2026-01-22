@@ -1,119 +1,94 @@
-// auth.js - SIMPLE VERSION
-console.log('🔐 SIMPLE AUTH.JS');
+// Authentication functions
+function showRegister() {
+    document.getElementById('login-form').parentElement.style.display = 'none';
+    document.getElementById('register-card').style.display = 'block';
+}
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM ready for auth');
+function showLogin() {
+    document.getElementById('register-card').style.display = 'none';
+    document.getElementById('login-form').parentElement.style.display = 'block';
+}
+
+// Handle login form submission
+document.getElementById('login-form').addEventListener('submit', function(e) {
+    e.preventDefault();
     
-    // Check if already logged in
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-        console.log('User already logged in');
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const employeeName = document.getElementById('employee-name-auth').value;
+    
+    // Simple authentication (in a real app, this would be server-side)
+    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    
+    if (users[username] && users[username].password === password) {
+        // Successful login
+        const currentUser = {
+            username: username,
+            employeeName: users[username].employeeName
+        };
+        
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
         window.location.href = 'index.html';
+    } else {
+        alert('Invalid username or password');
+    }
+});
+
+// Handle registration form submission
+document.getElementById('register-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('new-username').value;
+    const password = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    const employeeName = document.getElementById('new-employee-name').value;
+    
+    // Validation
+    if (password !== confirmPassword) {
+        alert('Passwords do not match');
         return;
     }
     
-    setupSimpleAuth();
+    if (password.length < 4) {
+        alert('Password must be at least 4 characters long');
+        return;
+    }
+    
+    // Get existing users
+    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    
+    // Check if username already exists
+    if (users[username]) {
+        alert('Username already exists');
+        return;
+    }
+    
+    // Create new user
+    users[username] = {
+        password: password,
+        employeeName: employeeName,
+        createdAt: new Date().toISOString()
+    };
+    
+    // Save users
+    localStorage.setItem('users', JSON.stringify(users));
+    
+    // Auto-login after registration
+    const currentUser = {
+        username: username,
+        employeeName: employeeName
+    };
+    
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    
+    alert('Registration successful!');
+    window.location.href = 'index.html';
 });
 
-function setupSimpleAuth() {
-    console.log('Setting up simple auth...');
-    
-    const loginForm = document.getElementById('login-form');
-    if (loginForm) {
-        loginForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const employeeName = document.getElementById('employee-name-auth').value;
-            
-            if (!username || !password || !employeeName) {
-                alert('Please fill all fields');
-                return;
-            }
-            
-            // Simple login
-            const users = JSON.parse(localStorage.getItem('users') || '{}');
-            
-            if (users[username] && users[username].password === password) {
-                // Login successful
-                const currentUser = {
-                    username: username,
-                    employeeName: employeeName,
-                    timestamp: new Date().toISOString()
-                };
-                
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                console.log('Login successful');
-                window.location.href = 'index.html';
-                
-            } else {
-                alert('Invalid credentials. Please register first.');
-            }
-        });
+// Check if user is already logged in
+document.addEventListener('DOMContentLoaded', function() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        window.location.href = 'index.html';
     }
-    
-    const registerForm = document.getElementById('register-form');
-    if (registerForm) {
-        registerForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('new-username').value;
-            const password = document.getElementById('new-password').value;
-            const confirmPassword = document.getElementById('confirm-password').value;
-            const employeeName = document.getElementById('new-employee-name').value;
-            
-            if (password !== confirmPassword) {
-                alert('Passwords do not match');
-                return;
-            }
-            
-            if (password.length < 4) {
-                alert('Password must be at least 4 characters');
-                return;
-            }
-            
-            // Simple registration
-            const users = JSON.parse(localStorage.getItem('users') || '{}');
-            
-            if (users[username]) {
-                alert('Username already exists');
-                return;
-            }
-            
-            users[username] = {
-                password: password,
-                employeeName: employeeName,
-                createdAt: new Date().toISOString()
-            };
-            
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            // Auto-login
-            const currentUser = {
-                username: username,
-                employeeName: employeeName,
-                timestamp: new Date().toISOString()
-            };
-            
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            console.log('Registration successful');
-            
-            alert('Account created!');
-            window.location.href = 'index.html';
-        });
-    }
-    
-    // Simple UI functions
-    window.showRegister = function() {
-        document.querySelector('.auth-card:first-child').style.display = 'none';
-        document.getElementById('register-card').style.display = 'block';
-    };
-    
-    window.showLogin = function() {
-        document.getElementById('register-card').style.display = 'none';
-        document.querySelector('.auth-card:first-child').style.display = 'block';
-    };
-}
-
-console.log('✅ Simple auth.js loaded');
+});
