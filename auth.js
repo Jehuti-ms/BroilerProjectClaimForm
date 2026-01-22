@@ -1,94 +1,190 @@
 // Authentication functions
 function showRegister() {
     document.getElementById('login-form').parentElement.style.display = 'none';
+    document.getElementById('reset-card').style.display = 'none';
     document.getElementById('register-card').style.display = 'block';
 }
 
 function showLogin() {
     document.getElementById('register-card').style.display = 'none';
+    document.getElementById('reset-card').style.display = 'none';
     document.getElementById('login-form').parentElement.style.display = 'block';
 }
 
+function showResetPassword() {
+    document.getElementById('login-form').parentElement.style.display = 'none';
+    document.getElementById('register-card').style.display = 'none';
+    document.getElementById('reset-card').style.display = 'block';
+}
+
 // Handle login form submission
-document.getElementById('login-form').addEventListener('submit', function(e) {
+document.getElementById('login-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const username = document.getElementById('username').value;
+    const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const employeeName = document.getElementById('employee-name-auth').value;
+    const errorElement = document.getElementById('auth-error');
     
-    // Simple authentication (in a real app, this would be server-side)
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
+    errorElement.style.display = 'none';
+    errorElement.textContent = '';
     
-    if (users[username] && users[username].password === password) {
-        // Successful login
-        const currentUser = {
-            username: username,
-            employeeName: users[username].employeeName
-        };
+    try {
+        // Sign in with Firebase
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        const user = userCredential.user;
         
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        // Check if user profile exists in Firestore
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        
+        if (!userDoc.exists) {
+            // Create user profile if it doesn't exist
+            await db.collection('users').doc(user.uid).set({
+                email: user.email,
+                employeeName: employeeName,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } else {
+            // Update last login
+            await db.collection('users').doc(user.uid).update({
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
+        // Store user info in localStorage for quick access
+        localStorage.setItem('currentUser', JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            employeeName: employeeName
+        }));
+        
+        // Redirect to main app
         window.location.href = 'index.html';
-    } else {
-        alert('Invalid username or password');
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        errorElement.textContent = getAuthErrorMessage(error);
+        errorElement.style.display = 'block';
     }
 });
 
 // Handle registration form submission
-document.getElementById('register-form').addEventListener('submit', function(e) {
+document.getElementById('register-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const username = document.getElementById('new-username').value;
-    const password = document.getElementById('new-password').value;
+    const email = document.getElementById('register-email').value;
+    const password = document.getElementById('register-password').value;
     const confirmPassword = document.getElementById('confirm-password').value;
-    const employeeName = document.getElementById('new-employee-name').value;
+    const employeeName = document.getElementById('register-employee-name').value;
+    const errorElement = document.getElementById('register-error');
+    
+    errorElement.style.display = 'none';
+    errorElement.textContent = '';
     
     // Validation
     if (password !== confirmPassword) {
-        alert('Passwords do not match');
+        errorElement.textContent = 'Passwords do not match';
+        errorElement.style.display = 'block';
         return;
     }
     
-    if (password.length < 4) {
-        alert('Password must be at least 4 characters long');
+    if (password.length < 6) {
+        errorElement.textContent = 'Password must be at least 6 characters long';
+        errorElement.style.display = 'block';
         return;
     }
     
-    // Get existing users
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    
-    // Check if username already exists
-    if (users[username]) {
-        alert('Username already exists');
-        return;
+    try {
+        // Create user with Firebase Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        
+        // Create user profile in Firestore
+        await db.collection('users').doc(user.uid).set({
+            email: user.email,
+            employeeName: employeeName,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Store user info in localStorage
+        localStorage.setItem('currentUser', JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            employeeName: employeeName
+        }));
+        
+        // Redirect to main app
+        window.location.href = 'index.html';
+        
+    } catch (error) {
+        console.error('Registration error:', error);
+        errorElement.textContent = getAuthErrorMessage(error);
+        errorElement.style.display = 'block';
     }
-    
-    // Create new user
-    users[username] = {
-        password: password,
-        employeeName: employeeName,
-        createdAt: new Date().toISOString()
-    };
-    
-    // Save users
-    localStorage.setItem('users', JSON.stringify(users));
-    
-    // Auto-login after registration
-    const currentUser = {
-        username: username,
-        employeeName: employeeName
-    };
-    
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-    
-    alert('Registration successful!');
-    window.location.href = 'index.html';
 });
+
+// Handle password reset
+document.getElementById('reset-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('reset-email').value;
+    const errorElement = document.getElementById('reset-error');
+    const successElement = document.getElementById('reset-success');
+    
+    errorElement.style.display = 'none';
+    successElement.style.display = 'none';
+    errorElement.textContent = '';
+    successElement.textContent = '';
+    
+    try {
+        await auth.sendPasswordResetEmail(email);
+        successElement.textContent = 'Password reset email sent! Check your inbox.';
+        successElement.style.display = 'block';
+    } catch (error) {
+        console.error('Reset error:', error);
+        errorElement.textContent = getAuthErrorMessage(error);
+        errorElement.style.display = 'block';
+    }
+});
+
+// Helper function to get user-friendly error messages
+function getAuthErrorMessage(error) {
+    switch (error.code) {
+        case 'auth/invalid-email':
+            return 'Invalid email address';
+        case 'auth/user-disabled':
+            return 'This account has been disabled';
+        case 'auth/user-not-found':
+            return 'No account found with this email';
+        case 'auth/wrong-password':
+            return 'Incorrect password';
+        case 'auth/email-already-in-use':
+            return 'Email already in use';
+        case 'auth/weak-password':
+            return 'Password is too weak';
+        case 'auth/network-request-failed':
+            return 'Network error. Please check your connection';
+        default:
+            return 'An error occurred. Please try again';
+    }
+}
 
 // Check if user is already logged in
 document.addEventListener('DOMContentLoaded', function() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        window.location.href = 'index.html';
-    }
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            // User is signed in, redirect to main app
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (userDoc.exists) {
+                localStorage.setItem('currentUser', JSON.stringify({
+                    uid: user.uid,
+                    email: user.email,
+                    employeeName: userDoc.data().employeeName
+                }));
+                window.location.href = 'index.html';
+            }
+        }
+    });
 });
