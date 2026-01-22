@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In - Broiler Production Project</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <div class="auth-container">
@@ -17,8 +21,8 @@
             
             <form id="login-form" class="auth-form">
                 <div class="form-group">
-                    <label for="username">Username:</label>
-                    <input type="text" id="username" name="username" required>
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" required>
                 </div>
                 
                 <div class="form-group">
@@ -31,11 +35,14 @@
                     <input type="text" id="employee-name-auth" name="employee-name" required>
                 </div>
                 
+                <div id="auth-error" class="error-message" style="display: none; color: red; margin-bottom: 10px;"></div>
+                
                 <button type="submit" class="auth-btn">Sign In</button>
             </form>
             
             <div class="auth-footer">
                 <p>Don't have an account? <a href="#" onclick="showRegister()">Register here</a></p>
+                <p>Forgot password? <a href="#" onclick="showResetPassword()">Reset here</a></p>
             </div>
         </div>
 
@@ -47,13 +54,13 @@
             
             <form id="register-form" class="auth-form">
                 <div class="form-group">
-                    <label for="new-username">Username:</label>
-                    <input type="text" id="new-username" name="new-username" required>
+                    <label for="register-email">Email:</label>
+                    <input type="email" id="register-email" name="register-email" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="new-password">Password:</label>
-                    <input type="password" id="new-password" name="new-password" required>
+                    <label for="register-password">Password:</label>
+                    <input type="password" id="register-password" name="register-password" minlength="6" required>
                 </div>
                 
                 <div class="form-group">
@@ -62,9 +69,11 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="new-employee-name">Your Full Name:</label>
-                    <input type="text" id="new-employee-name" name="new-employee-name" required>
+                    <label for="register-employee-name">Your Full Name:</label>
+                    <input type="text" id="register-employee-name" name="register-employee-name" required>
                 </div>
+                
+                <div id="register-error" class="error-message" style="display: none; color: red; margin-bottom: 10px;"></div>
                 
                 <button type="submit" class="auth-btn">Register</button>
             </form>
@@ -73,8 +82,32 @@
                 <p>Already have an account? <a href="#" onclick="showLogin()">Sign in here</a></p>
             </div>
         </div>
+
+        <div class="auth-card" id="reset-card" style="display: none;">
+            <div class="auth-header">
+                <h1>Reset Password</h1>
+                <p>Enter your email to reset password</p>
+            </div>
+            
+            <form id="reset-form" class="auth-form">
+                <div class="form-group">
+                    <label for="reset-email">Email:</label>
+                    <input type="email" id="reset-email" name="reset-email" required>
+                </div>
+                
+                <div id="reset-error" class="error-message" style="display: none; color: red; margin-bottom: 10px;"></div>
+                <div id="reset-success" class="success-message" style="display: none; color: green; margin-bottom: 10px;"></div>
+                
+                <button type="submit" class="auth-btn">Send Reset Email</button>
+            </form>
+            
+            <div class="auth-footer">
+                <p>Remember your password? <a href="#" onclick="showLogin()">Sign in here</a></p>
+            </div>
+        </div>
     </div>
 
+    <script src="firebase-config.js"></script>
     <script src="auth.js"></script>
 </body>
 </html>
