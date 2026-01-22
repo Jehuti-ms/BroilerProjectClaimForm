@@ -5,36 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In - Broiler Production Project</title>
     <link rel="stylesheet" href="styles.css">
-    
-    <!-- Add Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-
-    
-    <style>
-        #firebase-loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-        }
-    </style>
 </head>
 <body>
-    <!-- Loading indicator -->
-    <div id="firebase-loading">
-        <h2>Loading Authentication System...</h2>
-        <p>Please wait while we initialize the system.</p>
-    </div>
-    
-    <div class="auth-container" style="display: none;">
+    <div class="auth-container">
         <div class="auth-card">
             <div class="auth-header">
                 <h1>Grantley Adams Memorial School</h1>
@@ -44,28 +17,25 @@
             
             <form id="login-form" class="auth-form">
                 <div class="form-group">
-                    <label for="login-email">Email:</label>
-                    <input type="email" id="login-email" name="login-email" required>
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="login-password">Password:</label>
-                    <input type="password" id="login-password" name="login-password" required>
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="employee-name-auth">Your Full Name:</label>
+                    <label for="employee-name">Your Full Name:</label>
                     <input type="text" id="employee-name-auth" name="employee-name" required>
                 </div>
-                
-                <div id="auth-error" class="error-message" style="display: none;"></div>
                 
                 <button type="submit" class="auth-btn">Sign In</button>
             </form>
             
             <div class="auth-footer">
                 <p>Don't have an account? <a href="#" onclick="showRegister()">Register here</a></p>
-                <p>Forgot password? <a href="#" onclick="showReset()">Reset password</a></p>
             </div>
         </div>
 
@@ -77,13 +47,13 @@
             
             <form id="register-form" class="auth-form">
                 <div class="form-group">
-                    <label for="signup-email">Email:</label>
-                    <input type="email" id="signup-email" name="signup-email" required>
+                    <label for="new-username">Username:</label>
+                    <input type="text" id="new-username" name="new-username" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="signup-password">Password:</label>
-                    <input type="password" id="signup-password" name="signup-password" required>
+                    <label for="new-password">Password:</label>
+                    <input type="password" id="new-password" name="new-password" required>
                 </div>
                 
                 <div class="form-group">
@@ -96,8 +66,6 @@
                     <input type="text" id="new-employee-name" name="new-employee-name" required>
                 </div>
                 
-                <div id="auth-error-register" class="error-message" style="display: none;"></div>
-                
                 <button type="submit" class="auth-btn">Register</button>
             </form>
             
@@ -105,71 +73,8 @@
                 <p>Already have an account? <a href="#" onclick="showLogin()">Sign in here</a></p>
             </div>
         </div>
-
-        <div class="auth-card" id="reset-card" style="display: none;">
-            <div class="auth-header">
-                <h1>Reset Password</h1>
-                <p>Enter your email and new password</p>
-            </div>
-            
-            <form id="reset-form" class="auth-form">
-                <div class="form-group">
-                    <label for="reset-email">Email:</label>
-                    <input type="email" id="reset-email" name="reset-email" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="reset-new-password">New Password:</label>
-                    <input type="password" id="reset-new-password" name="reset-new-password" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="reset-confirm-password">Confirm New Password:</label>
-                    <input type="password" id="reset-confirm-password" name="reset-confirm-password" required>
-                </div>
-                
-                <div id="auth-error-reset" class="error-message" style="display: none;"></div>
-                
-                <button type="submit" class="auth-btn">Reset Password</button>
-            </form>
-            
-            <div class="auth-footer">
-                <p>Remember your password? <a href="#" onclick="showLogin()">Sign in here</a></p>
-            </div>
-        </div>
     </div>
 
-    <!-- Initialize Firebase -->
-   <script>
-// SIMPLE CONFIG FOR AUTH.HTML ONLY
-const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyAJhRNUgsrvUvjKXXosS6YZLhbHhpBq0Zg",
-    authDomain: "broiler-project-e1f62.firebaseapp.com",
-    projectId: "broiler-project-e1f62",
-    storageBucket: "broiler-project-e1f62.appspot.com",
-    messagingSenderId: "1084373471420",
-    appId: "1:1084373471420:web:f60bf8c5db75b9fe4f90c4"
-};
-
-// Initialize only auth (no firestore)
-document.addEventListener('DOMContentLoaded', function() {
-    if (typeof firebase !== 'undefined') {
-        try {
-            const app = firebase.initializeApp(FIREBASE_CONFIG);
-            const auth = firebase.auth(app);
-            window.firebaseAuth = auth;
-            console.log('✅ Firebase Auth initialized');
-        } catch (error) {
-            if (error.code === 'app/duplicate-app') {
-                // Already initialized
-                window.firebaseAuth = firebase.auth();
-                console.log('Firebase Auth already initialized');
-            }
-        }
-    }
-});
-</script>
-
-<script src="auth.js"></script>
+    <script src="auth.js"></script>
 </body>
 </html>
