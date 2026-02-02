@@ -48,7 +48,38 @@ function checkAuthentication() {
 
 // Initialize the application
 function initializeApp() {
+    // Load saved employee name if exists
+    const savedName = localStorage.getItem('employeeName');
+    const nameInput = document.getElementById('employee-name');
+    
+    if (savedName && savedName.trim() !== '') {
+        nameInput.value = savedName;
+    } else {
+        // Leave blank for first-time users
+        nameInput.value = '';
+    }
+    
+    // Save name automatically when changed
+    nameInput.addEventListener('change', function() {
+        if (this.value.trim() !== '') {
+            localStorage.setItem('employeeName', this.value.trim());
+            showNotification('Name saved successfully!');
+        }
+    });
+    
+    // Also save on blur (when user clicks away)
+    nameInput.addEventListener('blur', function() {
+        if (this.value.trim() !== '') {
+            localStorage.setItem('employeeName', this.value.trim());
+        }
+    });
+    
     // Set current month/year
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+      // Set current month/year
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -92,6 +123,36 @@ function initializeApp() {
     });
     
     updateFormDate();
+    setupNameAutoSave()
+}
+
+// Add this to initializeApp or create a separate function
+function setupNameAutoSave() {
+    const nameInput = document.getElementById('employee-name');
+    let saveTimeout;
+    
+    nameInput.addEventListener('input', function() {
+        clearTimeout(saveTimeout);
+        
+        saveTimeout = setTimeout(() => {
+            const name = this.value.trim();
+            if (name) {
+                localStorage.setItem('employeeName', name);
+                // Update welcome message in real-time
+                document.getElementById('user-display').textContent = `Welcome, ${name}`;
+                console.log('Auto-saved name:', name);
+            }
+        }, 1000); // Wait 1 second after typing stops
+    });
+    
+    // Immediate save on blur
+    nameInput.addEventListener('blur', function() {
+        const name = this.value.trim();
+        if (name) {
+            localStorage.setItem('employeeName', name);
+            document.getElementById('user-display').textContent = `Welcome, ${name}`;
+        }
+    });
 }
 
 // Save current month/year to localStorage
