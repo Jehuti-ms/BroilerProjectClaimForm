@@ -580,3 +580,191 @@ window.onclick = function(event) {
         closeModal();
     }
 };
+
+// Generate PDF function
+function generatePDF() {
+    if (!window.jspdf) {
+        alert('PDF library not loaded. Please check your internet connection.');
+        return;
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Grantley Adams Memorial School', 105, 20, { align: 'center' });
+    
+    doc.setFontSize(14);
+    doc.text('Broiler Production Project', 105, 28, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.text('Claim Form', 105, 36, { align: 'center' });
+    
+    const month = document.getElementById('month-select').value;
+    const year = document.getElementById('year-input').value;
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+    
+    doc.text(`${monthNames[month]} ${year}`, 105, 44, { align: 'center' });
+    
+    // Employee Info
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(`Employee: ${document.getElementById('employee-name').value}`, 20, 60);
+    
+    // Create table data
+    const tableData = [];
+    const rows = document.querySelectorAll('#time-table tbody tr');
+    
+    rows.forEach(row => {
+        const date = row.cells[0].textContent;
+        const amPm = row.cells[1].textContent;
+        const timeIn = row.cells[2].textContent;
+        const timeOut = row.cells[3].textContent;
+        const hours = row.cells[4].textContent;
+        
+        tableData.push([date, amPm, timeIn, timeOut, hours]);
+    });
+    
+    // Add table
+    if (jsPDF.API.autoTable) {
+        doc.autoTable({
+            startY: 70,
+            head: [['Date', 'AM/PM', 'Time IN', 'Time OUT', 'Hours']],
+            body: tableData,
+            theme: 'grid',
+            styles: { 
+                fontSize: 10, 
+                cellPadding: 4,
+                textColor: [0, 0, 0]
+            },
+            headStyles: { 
+                fillColor: [220, 220, 220],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold'
+            },
+            margin: { left: 20, right: 20 }
+        });
+        
+        // Total hours
+        const finalY = doc.lastAutoTable.finalY + 10;
+        const totalHours = document.getElementById('total-hours').textContent;
+        doc.text(`Total Hours: ${totalHours}`, 160, finalY);
+        
+        // Signature lines
+        const signatureY = finalY + 25;
+        
+        doc.text('Signature Claimant:', 25, signatureY);
+        doc.line(25, signatureY + 10, 65, signatureY + 10);
+        
+        doc.text('Signature HOD:', 85, signatureY);
+        doc.line(85, signatureY + 10, 125, signatureY + 10);
+        
+        doc.text('Signature Principal:', 145, signatureY);
+        doc.line(145, signatureY + 10, 185, signatureY + 10);
+        
+        // Save PDF
+        doc.save(`Broiler_Claim_${monthNames[month]}_${year}.pdf`);
+    } else {
+        alert('PDF table generation failed. Please refresh the page.');
+    }
+}
+
+// Print function
+function printForm() {
+    // Create a print-friendly version
+    const printWindow = window.open('', '_blank');
+    const month = document.getElementById('month-select').value;
+    const year = document.getElementById('year-input').value;
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+    
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Broiler Production Claim Form - ${monthNames[month]} ${year}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .header { text-align: center; margin-bottom: 30px; }
+                .header h1 { margin: 0; font-size: 24px; }
+                .header h2 { margin: 5px 0; font-size: 18px; font-style: italic; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { border: 1px solid #000; padding: 8px; text-align: center; }
+                th { background-color: #f2f2f2; }
+                .total { text-align: right; font-weight: bold; font-size: 16px; margin-top: 20px; }
+                .signature-section { display: flex; justify-content: space-between; margin-top: 40px; }
+                .signature-box { width: 30%; }
+                .signature-line { border-top: 1px solid #000; margin-top: 40px; }
+                @media print {
+                    .no-print { display: none; }
+                    button { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Grantley Adams Memorial School</h1>
+                <h2>Broiler Production Project</h2>
+                <h2>Claim Form - ${monthNames[month]} ${year}</h2>
+            </div>
+            
+            <div>Employee: ${document.getElementById('employee-name').value}</div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>AM/PM</th>
+                        <th>Time IN</th>
+                        <th>Time OUT</th>
+                        <th>Hours</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Array.from(document.querySelectorAll('#time-table tbody tr')).map(row => `
+                        <tr>
+                            <td>${row.cells[0].textContent}</td>
+                            <td>${row.cells[1].textContent}</td>
+                            <td>${row.cells[2].textContent}</td>
+                            <td>${row.cells[3].textContent}</td>
+                            <td>${row.cells[4].textContent}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            
+            <div class="total">Total Hours: ${document.getElementById('total-hours').textContent}</div>
+            
+            <div class="signature-section">
+                <div class="signature-box">
+                    <div>Signature Claimant:</div>
+                    <div class="signature-line"></div>
+                </div>
+                <div class="signature-box">
+                    <div>Signature HOD:</div>
+                    <div class="signature-line"></div>
+                </div>
+                <div class="signature-box">
+                    <div>Signature Principal:</div>
+                    <div class="signature-line"></div>
+                </div>
+            </div>
+            
+            <script>
+                window.onload = function() {
+                    window.print();
+                    setTimeout(function() {
+                        window.close();
+                    }, 1000);
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
