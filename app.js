@@ -39,13 +39,27 @@ function checkAuthentication() {
     }
     
     const user = JSON.parse(currentUser);
-    document.getElementById('user-display').textContent = `Welcome, ${user.employeeName}`;
-    document.getElementById('employee-name').value = user.employeeName;
+    
+    // Get saved employee name or use default
+    const savedName = localStorage.getItem('employeeName');
+    const displayName = savedName || user.employeeName || user.email || 'User';
+    
+    // Update welcome message
+    document.getElementById('user-display').textContent = `Welcome, ${displayName}`;
+    
+    // Only pre-fill employee name if we have a saved name
+    if (savedName && savedName.trim() !== '') {
+        document.getElementById('employee-name').value = savedName;
+    }
     
     initializeApp();
-    loadUserData(user.username);
+    
+    // Load user data
+    if (user.username || user.email) {
+        const username = user.username || user.email.split('@')[0];
+        loadUserData(username);
+    }
 }
-
 // Initialize the application
 function initializeApp() {
     // Load saved employee name if exists
@@ -119,8 +133,6 @@ function initializeApp() {
     
     updateFormDate();
     setupNameAutoSave()
-     // Update form date with selected month/year
-    updateFormDate();
 }
 
 // Add this to initializeApp or create a separate function
@@ -260,21 +272,31 @@ function showNotification(message) {
 }
 
 // Update both form date (current) and report period (selected)
-function updateFormDates() {
-    // Form date = CURRENT date (when filling form)
-    const currentDate = new Date();
-    const currentMonth = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
+// Update the form date display
+function updateFormDate() {
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    const formDateSpan = document.getElementById('form-date');
     
-    document.getElementById('form-date').textContent = 
-        `${monthNames[currentMonth]} ${currentYear}`;
+    if (!monthSelect || !yearInput || !formDateSpan) {
+        console.error('Required elements not found for updateFormDate');
+        return;
+    }
     
-    // Report period = SELECTED month/year (work period)
-    const selectedMonth = document.getElementById('month-select').value;
-    const selectedYear = document.getElementById('year-input').value;
+    const month = monthSelect.value;
+    const year = yearInput.value;
     
-    document.getElementById('report-period').textContent = 
-        `${monthNames[selectedMonth]} ${selectedYear}`;
+    if (month === '' || year === '') {
+        console.error('Month or year is empty');
+        return;
+    }
+    
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+    
+    formDateSpan.textContent = `${monthNames[month]} ${year}`;
+    console.log('Form date updated to:', formDateSpan.textContent);
 }
 
 // Clear the form
