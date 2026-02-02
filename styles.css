@@ -680,3 +680,31 @@ button:hover {
         border-top: 1px solid #dee2e6;
     }
 }
+
+.pdf-btn {
+    background: linear-gradient(135deg, #F44336, #D32F2F);
+}
+
+.pdf-btn:hover {
+    background: linear-gradient(135deg, #D32F2F, #C2185B);
+}
+
+.print-btn {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+}
+
+.print-btn:hover {
+    background: linear-gradient(135deg, #1976D2, #0D47A1);
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    body {
+        margin: 0;
+        padding: 20px;
+    }
+}
+
