@@ -119,6 +119,8 @@ function initializeApp() {
     
     updateFormDate();
     setupNameAutoSave()
+     // Update form date with selected month/year
+    updateFormDate();
 }
 
 // Add this to initializeApp or create a separate function
@@ -257,10 +259,11 @@ function showNotification(message) {
     }, 3000);
 }
 
-// Update the form date display
+// Update the form date display based on selected month
 function updateFormDate() {
     const month = document.getElementById('month-select').value;
     const year = document.getElementById('year-input').value;
+    
     document.getElementById('form-date').textContent = `${monthNames[month]} ${year}`;
 }
 
