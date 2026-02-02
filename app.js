@@ -859,3 +859,27 @@ function printForm() {
     printWindow.document.close();
 }
 
+// Add this at the end of app.js
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM fully loaded, checking authentication...');
+    checkAuthentication();
+    
+    // Force update form date after a short delay
+    setTimeout(function() {
+        console.log('Forcing form date update...');
+        updateFormDate();
+        
+        // Check if welcome message is correct
+        const welcomeMsg = document.getElementById('user-display');
+        if (welcomeMsg && welcomeMsg.textContent === 'Welcome, User') {
+            // Try to get actual user name
+            const currentUser = localStorage.getItem('currentUser');
+            if (currentUser) {
+                const user = JSON.parse(currentUser);
+                const savedName = localStorage.getItem('employeeName');
+                const displayName = savedName || user.employeeName || user.email || 'User';
+                welcomeMsg.textContent = `Welcome, ${displayName}`;
+            }
+        }
+    }, 500);
+});
