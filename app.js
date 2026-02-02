@@ -259,12 +259,22 @@ function showNotification(message) {
     }, 3000);
 }
 
-// Update the form date display based on selected month
-function updateFormDate() {
-    const month = document.getElementById('month-select').value;
-    const year = document.getElementById('year-input').value;
+// Update both form date (current) and report period (selected)
+function updateFormDates() {
+    // Form date = CURRENT date (when filling form)
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
     
-    document.getElementById('form-date').textContent = `${monthNames[month]} ${year}`;
+    document.getElementById('form-date').textContent = 
+        `${monthNames[currentMonth]} ${currentYear}`;
+    
+    // Report period = SELECTED month/year (work period)
+    const selectedMonth = document.getElementById('month-select').value;
+    const selectedYear = document.getElementById('year-input').value;
+    
+    document.getElementById('report-period').textContent = 
+        `${monthNames[selectedMonth]} ${selectedYear}`;
 }
 
 // Clear the form
