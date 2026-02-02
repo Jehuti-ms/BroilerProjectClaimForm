@@ -27,66 +27,63 @@ const sampleData = [
 
 // Check authentication on page load
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded - Starting authentication check');
     checkAuthentication();
 });
 
 // Check if user is authenticated
 function checkAuthentication() {
+    console.log('checkAuthentication called');
+    
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
+        console.log('No user found, redirecting to auth.html');
         window.location.href = 'auth.html';
         return;
     }
     
-    const user = JSON.parse(currentUser);
-    
-    // Get saved employee name or use default
-    const savedName = localStorage.getItem('employeeName');
-    const displayName = savedName || user.employeeName || user.email || 'User';
-    
-    // Update welcome message
-    document.getElementById('user-display').textContent = `Welcome, ${displayName}`;
-    
-    // Only pre-fill employee name if we have a saved name
-    if (savedName && savedName.trim() !== '') {
-        document.getElementById('employee-name').value = savedName;
-    }
-    
-    initializeApp();
-    
-    // Load user data
-    if (user.username || user.email) {
-        const username = user.username || user.email.split('@')[0];
-        loadUserData(username);
+    try {
+        const user = JSON.parse(currentUser);
+        console.log('User authenticated:', user.email);
+        
+        // Get saved employee name or use default
+        const savedName = localStorage.getItem('employeeName');
+        const displayName = savedName || user.employeeName || user.email || 'User';
+        
+        // Update welcome message IMMEDIATELY
+        const welcomeElement = document.getElementById('user-display');
+        if (welcomeElement) {
+            welcomeElement.textContent = `Welcome, ${displayName}`;
+            console.log('Welcome message set to:', welcomeElement.textContent);
+        }
+        
+        // Only pre-fill employee name if we have a saved name
+        const nameInput = document.getElementById('employee-name');
+        if (savedName && savedName.trim() !== '') {
+            nameInput.value = savedName;
+        } else {
+            nameInput.value = '';
+        }
+        
+        // Initialize app
+        initializeApp();
+        
+        // Load user data
+        if (user.username || user.email) {
+            const username = user.username || user.email.split('@')[0];
+            loadUserData(username);
+        }
+        
+    } catch (error) {
+        console.error('Authentication error:', error);
+        localStorage.removeItem('currentUser');
+        window.location.href = 'auth.html';
     }
 }
+
 // Initialize the application
 function initializeApp() {
-    // Load saved employee name if exists
-    const savedName = localStorage.getItem('employeeName');
-    const nameInput = document.getElementById('employee-name');
-    
-    if (savedName && savedName.trim() !== '') {
-        nameInput.value = savedName;
-    } else {
-        // Leave blank for first-time users
-        nameInput.value = '';
-    }
-    
-    // Save name automatically when changed
-    nameInput.addEventListener('change', function() {
-        if (this.value.trim() !== '') {
-            localStorage.setItem('employeeName', this.value.trim());
-            showNotification('Name saved successfully!');
-        }
-    });
-    
-    // Also save on blur (when user clicks away)
-    nameInput.addEventListener('blur', function() {
-        if (this.value.trim() !== '') {
-            localStorage.setItem('employeeName', this.value.trim());
-        }
-    });
+    console.log('initializeApp called');
     
     // Set current month/year
     const now = new Date();
@@ -97,17 +94,21 @@ function initializeApp() {
     const lastMonth = localStorage.getItem('lastViewedMonth');
     const lastYear = localStorage.getItem('lastViewedYear');
     
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
     if (lastMonth !== null && lastYear !== null) {
-        document.getElementById('month-select').value = lastMonth;
-        document.getElementById('year-input').value = lastYear;
+        monthSelect.value = lastMonth;
+        yearInput.value = lastYear;
     } else {
-        document.getElementById('month-select').value = currentMonth;
-        document.getElementById('year-input').value = currentYear;
+        monthSelect.value = currentMonth;
+        yearInput.value = currentYear;
         saveCurrentMonth();
     }
     
-    // Add event listeners for date controls
-    document.getElementById('month-select').addEventListener('change', function() {
+    // CRITICAL FIX: Add event listeners for date controls
+    monthSelect.addEventListener('change', function() {
+        console.log('Month changed to:', this.value);
         updateFormDate();
         saveCurrentMonth();
         
@@ -119,7 +120,8 @@ function initializeApp() {
         }
     });
     
-    document.getElementById('year-input').addEventListener('change', function() {
+    yearInput.addEventListener('change', function() {
+        console.log('Year changed to:', this.value);
         updateFormDate();
         saveCurrentMonth();
         
@@ -131,8 +133,13 @@ function initializeApp() {
         }
     });
     
+    // Set up name auto-save
+    setupNameAutoSave();
+    
+    // Initial update of form date
     updateFormDate();
-    setupNameAutoSave()
+    
+    console.log('App initialized. Current month:', monthSelect.value, 'Year:', yearInput.value);
 }
 
 // Add this to initializeApp or create a separate function
@@ -271,32 +278,32 @@ function showNotification(message) {
     }, 3000);
 }
 
-// Update both form date (current) and report period (selected)
-// Update the form date display
+// Update the form date display - FIXED VERSION
 function updateFormDate() {
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    const formDateSpan = document.getElementById('form-date');
-    
-    if (!monthSelect || !yearInput || !formDateSpan) {
-        console.error('Required elements not found for updateFormDate');
-        return;
+    try {
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        const formDateSpan = document.getElementById('form-date');
+        
+        if (!monthSelect || !yearInput || !formDateSpan) {
+            console.error('Date elements not found');
+            return;
+        }
+        
+        const monthIndex = parseInt(monthSelect.value);
+        const year = yearInput.value;
+        
+        // Validate
+        if (isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+            console.error('Invalid month index:', monthIndex);
+            return;
+        }
+        
+        formDateSpan.textContent = `${monthNames[monthIndex]} ${year}`;
+        console.log('✅ Form date updated to:', formDateSpan.textContent);
+    } catch (error) {
+        console.error('Error updating form date:', error);
     }
-    
-    const month = monthSelect.value;
-    const year = yearInput.value;
-    
-    if (month === '' || year === '') {
-        console.error('Month or year is empty');
-        return;
-    }
-    
-    const monthNames = ["January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ];
-    
-    formDateSpan.textContent = `${monthNames[month]} ${year}`;
-    console.log('Form date updated to:', formDateSpan.textContent);
 }
 
 // Clear the form
@@ -556,123 +563,7 @@ function calculateTotal() {
         `${totalHours}:${remainingMinutes.toString().padStart(2, '0')}`;
 }
 
-// Generate PDF
-function generatePDF() {
-    if (!window.jspdf) {
-        alert('PDF library not loaded. Please check your internet connection.');
-        return;
-    }
-    
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // Set document properties
-    doc.setProperties({
-        title: 'Broiler Production Project - Claim Form',
-        subject: 'Employee Time Claim',
-        author: 'Grantley Adams Memorial School'
-    });
-    
-    // Add header
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Grantley Adams Memorial School', 105, 20, { align: 'center' });
-    doc.setFontSize(14);
-    doc.text('Broiler Production Project', 105, 28, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text('Claim Form', 105, 36, { align: 'center' });
-    
-    const month = document.getElementById('month-select').value;
-    const year = document.getElementById('year-input').value;
-    doc.text(`${monthNames[month]} ${year}`, 105, 44, { align: 'center' });
-    
-    // Add employee name
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Employee Name: ${document.getElementById('employee-name').value}`, 20, 60);
-    
-    // Create table data
-    const tableData = [];
-    
-    currentFormData.forEach(entry => {
-        const date = formatDateForDisplay(entry.date);
-        const amPm = entry.amPm;
-        const timeIn = formatTimeDisplay(entry.inTime);
-        const timeOut = formatTimeDisplay(entry.outTime);
-        const hours = entry.hours;
-        
-        tableData.push([date, amPm, timeIn, timeOut, hours]);
-    });
-    
-    // Add table using autoTable plugin
-    if (jsPDF.API.autoTable) {
-        doc.autoTable({
-            startY: 70,
-            head: [['Date', 'Am/Pm', 'Time IN', 'Time OUT', 'Hours']],
-            body: tableData,
-            theme: 'grid',
-            styles: { 
-                fontSize: 10, 
-                cellPadding: 4,
-                textColor: [0, 0, 0]
-            },
-            headStyles: { 
-                fillColor: [220, 220, 220],
-                textColor: [0, 0, 0],
-                fontStyle: 'bold'
-            },
-            margin: { left: 20, right: 20 }
-        });
-        
-        // Add total hours
-        const finalY = doc.lastAutoTable.finalY + 10;
-        const totalHours = document.getElementById('total-hours').textContent;
-        doc.text(`Total Hours: ${totalHours}`, 160, finalY);
-        
-        // Add signature areas
-        const signatureY = finalY + 25;
-        
-        doc.text('Signature Claimant:', 25, signatureY);
-        doc.line(25, signatureY + 10, 65, signatureY + 10);
-        
-        doc.text('Signature HOD:', 85, signatureY);
-        doc.line(85, signatureY + 10, 125, signatureY + 10);
-        
-        doc.text('Signature Principal:', 145, signatureY);
-        doc.line(145, signatureY + 10, 185, signatureY + 10);
-        
-        // Save the PDF
-        doc.save(`Broiler_Claim_Form_${monthNames[month]}_${year}.pdf`);
-    } else {
-        alert('PDF table generation failed. Please refresh the page.');
-    }
-}
-
-// Utility Functions
-function saveForm() {
-    saveUserData();
-}
-
-function logout() {
-    localStorage.removeItem('currentUser');
-    window.location.href = 'auth.html';
-}
-
-// Add event listener for Escape key to close modal
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        closeModal();
-    }
-});
-
-// Close modal when clicking outside
-window.onclick = function(event) {
-    const modal = document.getElementById('entry-modal');
-    if (event.target === modal) {
-        closeModal();
-    }
-};
-
-// Generate PDF function
+// Generate PDF - SINGLE VERSION (removed duplicate)
 function generatePDF() {
     if (!window.jspdf) {
         alert('PDF library not loaded. Please check your internet connection.');
@@ -695,9 +586,6 @@ function generatePDF() {
     
     const month = document.getElementById('month-select').value;
     const year = document.getElementById('year-input').value;
-    const monthNames = ["January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ];
     
     doc.text(`${monthNames[month]} ${year}`, 105, 44, { align: 'center' });
     
@@ -770,9 +658,6 @@ function printForm() {
     const printWindow = window.open('', '_blank');
     const month = document.getElementById('month-select').value;
     const year = document.getElementById('year-input').value;
-    const monthNames = ["January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ];
     
     printWindow.document.write(`
         <html>
@@ -859,27 +744,59 @@ function printForm() {
     printWindow.document.close();
 }
 
-// Add this at the end of app.js
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM fully loaded, checking authentication...');
-    checkAuthentication();
+// Utility Functions
+function saveForm() {
+    saveUserData();
+}
+
+// FIXED logout function
+function logout() {
+    console.log('Logging out...');
     
-    // Force update form date after a short delay
-    setTimeout(function() {
-        console.log('Forcing form date update...');
-        updateFormDate();
-        
-        // Check if welcome message is correct
-        const welcomeMsg = document.getElementById('user-display');
-        if (welcomeMsg && welcomeMsg.textContent === 'Welcome, User') {
-            // Try to get actual user name
-            const currentUser = localStorage.getItem('currentUser');
-            if (currentUser) {
-                const user = JSON.parse(currentUser);
-                const savedName = localStorage.getItem('employeeName');
-                const displayName = savedName || user.employeeName || user.email || 'User';
-                welcomeMsg.textContent = `Welcome, ${displayName}`;
+    // Sign out from Firebase
+    if (typeof auth !== 'undefined' && auth) {
+        auth.signOut().then(() => {
+            console.log('Firebase signout successful');
+        }).catch((error) => {
+            console.log('Firebase signout error:', error);
+        });
+    }
+    
+    // Clear ALL localStorage data
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('employeeName');
+    localStorage.removeItem('lastViewedMonth');
+    localStorage.removeItem('lastViewedYear');
+    
+    // Clear any user-specific data
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        try {
+            const user = JSON.parse(currentUser);
+            if (user.email) {
+                const username = user.username || user.email.split('@')[0];
+                localStorage.removeItem(`userData_${username}`);
             }
+        } catch (e) {
+            console.log('Error clearing user data:', e);
         }
-    }, 500);
+    }
+    
+    // Force redirect with cache busting
+    window.location.href = 'auth.html?t=' + new Date().getTime();
+}
+
+// Add event listener for Escape key to close modal
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeModal();
+    }
 });
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('entry-modal');
+    if (event.target === modal) {
+        closeModal();
+    }
+};
