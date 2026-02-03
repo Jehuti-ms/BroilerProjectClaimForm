@@ -30,7 +30,7 @@ if (!document.getElementById('debug-clear')) {
     document.body.appendChild(debugBtn);
 }
 
-// Authentication functions
+// Authentication functions - SIMPLIFIED VERSION
 function showRegister() {
     document.getElementById('login-form').parentElement.style.display = 'none';
     document.getElementById('reset-card').style.display = 'none';
@@ -52,6 +52,7 @@ function showResetPassword() {
 // Handle login form submission
 document.getElementById('login-form').addEventListener('submit', async function(e) {
     e.preventDefault();
+    console.log('=== LOGIN ATTEMPT ===');
     
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
@@ -62,47 +63,32 @@ document.getElementById('login-form').addEventListener('submit', async function(
     errorElement.textContent = '';
     
     try {
-        // Sign in with Firebase
+        console.log('Attempting login with:', email);
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         const user = userCredential.user;
+        console.log('Firebase login successful:', user.email);
         
-        // Check if user profile exists in Firestore
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        
-        if (!userDoc.exists) {
-            // Create user profile if it doesn't exist
-            await db.collection('users').doc(user.uid).set({
-                email: user.email,
-                employeeName: employeeName,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        } else {
-            // Update last login
-            await db.collection('users').doc(user.uid).update({
-                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            // Use stored employee name if not provided
-            if (!employeeName && userDoc.data().employeeName) {
-                employeeName = userDoc.data().employeeName;
-            }
-        }
-        
-        // Store user info in localStorage for quick access - FIXED
-        localStorage.setItem('currentUser', JSON.stringify({
+        // SIMPLE: Just save basic user info
+        const userData = {
             uid: user.uid,
             email: user.email,
-            employeeName: employeeName,
-            username: user.email.split('@')[0]  // ← CRITICAL: Add username
-        }));
+            employeeName: employeeName || user.displayName || 'User',
+            username: user.email.split('@')[0]
+        };
         
-        // Save employee name separately
-        localStorage.setItem('employeeName', employeeName);
+        console.log('Saving to localStorage:', userData);
+        localStorage.setItem('currentUser', JSON.stringify(userData));
+        localStorage.setItem('employeeName', employeeName || 'User');
         
-        // Redirect to main app
-        console.log('Login successful, redirecting...');
-        window.location.href = 'index.html';
+        // TEST: Check what we saved
+        console.log('Saved currentUser:', localStorage.getItem('currentUser'));
+        
+        // Wait 1 second then redirect
+        console.log('Will redirect in 1 second...');
+        setTimeout(() => {
+            console.log('Redirecting to index.html...');
+            window.location.href = 'index.html';
+        }, 1000);
         
     } catch (error) {
         console.error('Login error:', error);
@@ -114,6 +100,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
 // Handle registration form submission
 document.getElementById('register-form').addEventListener('submit', async function(e) {
     e.preventDefault();
+    console.log('=== REGISTRATION ATTEMPT ===');
     
     const email = document.getElementById('register-email').value;
     const password = document.getElementById('register-password').value;
@@ -124,7 +111,6 @@ document.getElementById('register-form').addEventListener('submit', async functi
     errorElement.style.display = 'none';
     errorElement.textContent = '';
     
-    // Validation
     if (password !== confirmPassword) {
         errorElement.textContent = 'Passwords do not match';
         errorElement.style.display = 'block';
@@ -138,31 +124,29 @@ document.getElementById('register-form').addEventListener('submit', async functi
     }
     
     try {
-        // Create user with Firebase Auth
+        console.log('Attempting registration with:', email);
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
+        console.log('Firebase registration successful:', user.email);
         
-        // Create user profile in Firestore
-        await db.collection('users').doc(user.uid).set({
-            email: user.email,
-            employeeName: employeeName,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        // Store user info in localStorage - FIXED
-        localStorage.setItem('currentUser', JSON.stringify({
+        // SIMPLE: Just save basic user info
+        const userData = {
             uid: user.uid,
             email: user.email,
-            employeeName: employeeName,
-            username: user.email.split('@')[0]  // ← CRITICAL: Add username
-        }));
+            employeeName: employeeName || 'User',
+            username: user.email.split('@')[0]
+        };
         
-        // Save employee name separately
-        localStorage.setItem('employeeName', employeeName);
+        console.log('Saving to localStorage:', userData);
+        localStorage.setItem('currentUser', JSON.stringify(userData));
+        localStorage.setItem('employeeName', employeeName || 'User');
         
-        // Redirect to main app - SIMPLE FIX
-        window.location.href = 'index.html';
+        // Wait 1 second then redirect
+        console.log('Will redirect in 1 second...');
+        setTimeout(() => {
+            console.log('Redirecting to index.html...');
+            window.location.href = 'index.html';
+        }, 1000);
         
     } catch (error) {
         console.error('Registration error:', error);
@@ -221,73 +205,23 @@ function getAuthErrorMessage(error) {
     }
 }
 
-    // Check if user is already logged in - FIXED VERSION
+// NO AUTO-REDIRECT! Let user click login
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Auth page loaded');
-    /*
-    // Check if user is already logged in
-    auth.onAuthStateChanged(async (user) => {
+    console.log('=== AUTH PAGE LOADED ===');
+    console.log('URL:', window.location.href);
+    console.log('localStorage.currentUser:', localStorage.getItem('currentUser'));
+    
+    // Just check Firebase state for display purposes
+    auth.onAuthStateChanged((user) => {
         if (user) {
-            console.log('User already logged in via Firebase:', user.email);
+            console.log('Firebase says user is logged in:', user.email);
+            console.log('But NOT auto-redirecting. User must click Login.');
             
-            try {
-                // Get user data from Firestore
-                const userDoc = await db.collection('users').doc(user.uid).get();
-                let employeeName = '';
-                
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    employeeName = userData.employeeName || user.displayName || 'User';
-                    
-                    // Save to localStorage
-                    localStorage.setItem('currentUser', JSON.stringify({
-                        uid: user.uid,
-                        email: user.email,
-                        employeeName: employeeName,
-                        username: user.email.split('@')[0]
-                    }));
-                    
-                    localStorage.setItem('employeeName', employeeName);
-                } else {
-                    // Create user profile if it doesn't exist
-                    await db.collection('users').doc(user.uid).set({
-                        email: user.email,
-                        employeeName: 'User',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    
-                    // Save to localStorage
-                    localStorage.setItem('currentUser', JSON.stringify({
-                        uid: user.uid,
-                        email: user.email,
-                        employeeName: 'User',
-                        username: user.email.split('@')[0]
-                    }));
-                    
-                    localStorage.setItem('employeeName', 'User');
-                }
-                
-                // AUTO-REDIRECT to main app - THIS IS CRITICAL!
-                console.log('Auto-login successful, redirecting to main app...');
-                window.location.href = 'index.html';
-                
-            } catch (error) {
-                console.error('Error loading user data:', error);
-                // Still redirect with basic info
-                localStorage.setItem('currentUser', JSON.stringify({
-                    uid: user.uid,
-                    email: user.email,
-                    employeeName: user.displayName || 'User',
-                    username: user.email.split('@')[0]
-                }));
-                
-                window.location.href = 'index.html';
-            }
+            // Pre-fill the form for convenience
+            document.getElementById('email').value = user.email || '';
+            document.getElementById('employee-name-auth').value = user.displayName || '';
         } else {
-            console.log('No user logged in');
-            localStorage.removeItem('currentUser');
-            localStorage.removeItem('employeeName');
+            console.log('Firebase says no user logged in');
         }
-    });  */
+    });
 });
