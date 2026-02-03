@@ -15,7 +15,15 @@ body {
 /* Main container */
 .container {
     max-width: 1000px;
-    margin: 0 auto;
+    margin: 0 auto;/* HEADER STYLING */
+.header {
+    padding: 20px;
+    position: relative;
+    border-bottom: 1px solid #eee;
+}
+
+.header-text {
+    text-align: c
     background-color: white;
     padding: 30px;
     box-shadow: 0 0 20px rgba(0,0,0,0.1);
@@ -30,9 +38,17 @@ body {
     border-bottom: 1px solid #eee;
 }
 
+.header-content {
+    display: flex;
+    justify-content: center;
+    position: relative;
+}
+
+/* Centered Header Text */
 .header-text {
     text-align: center;
-    margin-bottom: 10px;
+    flex: 1;
+    max-width: 600px;
 }
 
 /* School and Project Info */
@@ -83,12 +99,13 @@ body {
     font-weight: bold;
 }
 
-/* User Info */
+/* User Info - Top Right */
 .user-info {
     position: absolute;
-    top: 20px;
-    right: 20px;
+    top: 0;
+    right: 0;
     text-align: right;
+    min-width: 150px;
 }
 
 #user-display {
@@ -151,7 +168,7 @@ body {
     border-radius: 4px;
 }
 
-/* Date Controls Row with Add New Entry button */
+/* Date Controls Row - Fixed to have button on right side */
 .date-controls-row {
     display: flex;
     justify-content: space-between;
@@ -160,17 +177,23 @@ body {
     padding: 10px;
     background-color: #f8f9fa;
     border-radius: 4px;
+    flex-wrap: nowrap;
+}
+
+.date-controls-container {
+    flex: 1;
 }
 
 .date-selectors {
     display: flex;
     align-items: center;
+    gap: 15px;
     flex-wrap: wrap;
-    gap: 10px;
 }
 
 .date-selectors label {
     font-weight: bold;
+    white-space: nowrap;
 }
 
 .date-selectors select,
@@ -178,9 +201,14 @@ body {
     padding: 6px;
     border: 1px solid #ccc;
     border-radius: 4px;
+    min-width: 120px;
 }
 
-/* Add New Entry button */
+.date-selectors input {
+    width: 80px;
+}
+
+/* Add New Entry button - Fixed position */
 .add-entry-btn {
     padding: 8px 20px;
     background-color: #28a745;
@@ -192,13 +220,100 @@ body {
     font-weight: bold;
     transition: background-color 0.3s;
     white-space: nowrap;
+    margin-left: 20px;
+    flex-shrink: 0;
 }
 
 .add-entry-btn:hover {
     background-color: #218838;
 }
 
-/* Rest of your existing CSS for form-section, signature-section, buttons, etc. */
+/* Form Table */
+.form-section {
+    margin-top: 20px;
+}
+
+#time-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+#time-table th {
+    background-color: #f2f2f2;
+    padding: 10px;
+    text-align: left;
+    border: 1px solid #ddd;
+}
+
+#time-table td {
+    padding: 10px;
+    border: 1px solid #ddd;
+}
+
+.total-hours {
+    text-align: right;
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+/* Signature Section */
+.signature-section {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #ccc;
+}
+
+.signature-box {
+    flex: 1;
+    margin: 0 10px;
+    text-align: center;
+}
+
+.signature-line {
+    height: 2px;
+    background-color: #000;
+    margin-top: 40px;
+    width: 100%;
+}
+
+/* Action Buttons */
+.buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 30px;
+    justify-content: center;
+}
+
+.buttons button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.calc-btn { background-color: #17a2b8; color: white; }
+.pdf-btn { background-color: #007bff; color: white; }
+.print-btn { background-color: #6c757d; color: white; }
+.clear-btn { background-color: #ffc107; color: black; }
+.save-btn { background-color: #28a745; color: white; }
+.sync-btn { background-color: #6f42c1; color: white; }
+.load-btn { background-color: #20c997; color: white; }
+.recovery-btn { background-color: #fd7e14; color: white; }
+
+.buttons button:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+}
 /* Separator line */
 .separator {
     border: none;
