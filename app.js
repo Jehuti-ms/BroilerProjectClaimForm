@@ -308,6 +308,147 @@ function getCurrentEmployeeName() {
     return savedName || 'Employee';
 }
 
+function updateEmployeeDisplayInHeader() {
+    console.log('Updating employee name in header...');
+    
+    // Check if we have a saved claim recipient name
+    const savedName = localStorage.getItem('claimEmployeeName');
+    const display = document.getElementById('employee-display');
+    
+    if (!display) {
+        console.error('Employee display element not found!');
+        return;
+    }
+    
+    if (savedName && savedName.trim() !== '') {
+        display.textContent = savedName;
+        console.log('Updated header with saved name:', savedName);
+    } else {
+        display.textContent = 'Employee Name';
+        console.log('No saved name found, using default');
+    }
+}
+
+// Update the date display in the header
+function updateDateDisplayInHeader() {
+    console.log('Updating date in header...');
+    
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    const display = document.getElementById('month-year-display');
+    
+    if (!monthSelect || !yearInput || !display) {
+        console.error('Date elements not found!');
+        return;
+    }
+    
+    const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    const month = parseInt(monthSelect.value);
+    const year = parseInt(yearInput.value);
+    
+    if (!isNaN(month) && month >= 0 && month <= 11 && !isNaN(year)) {
+        display.textContent = months[month] + ' ' + year;
+        console.log('Updated date display:', display.textContent);
+    } else {
+        console.error('Invalid month or year values:', month, year);
+    }
+}
+
+// Update the logged-in user display
+function updateLoggedInUserDisplay() {
+    console.log('Updating logged-in user display...');
+    
+    const userData = localStorage.getItem('currentUser');
+    const usernameElement = document.getElementById('username');
+    
+    if (!usernameElement) {
+        console.error('Username element not found!');
+        return;
+    }
+    
+    if (!userData) {
+        usernameElement.textContent = 'Not logged in';
+        console.log('No user data found');
+        return;
+    }
+    
+    try {
+        const user = JSON.parse(userData);
+        console.log('User data found:', user);
+        
+        // Get display name in order of preference
+        let displayName = '';
+        
+        if (user.employeeName && user.employeeName.trim() !== '') {
+            displayName = user.employeeName;
+        } else if (user.displayName && user.displayName.trim() !== '') {
+            displayName = user.displayName;
+        } else if (user.email) {
+            // Extract username from email
+            const username = user.email.split('@')[0];
+            displayName = username.charAt(0).toUpperCase() + username.slice(1);
+        } else {
+            displayName = 'User';
+        }
+        
+        usernameElement.textContent = displayName;
+        console.log('Updated logged-in user display to:', displayName);
+        
+    } catch (error) {
+        console.error('Error updating user display:', error);
+        usernameElement.textContent = 'Error loading';
+    }
+}
+
+// Setup date controls event listeners
+function setupDateControls() {
+    console.log('Setting up date controls...');
+    
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (!monthSelect || !yearInput) {
+        console.error('Date controls not found!');
+        return;
+    }
+    
+    // Add event listeners
+    monthSelect.addEventListener('change', function() {
+        console.log('Month changed to:', this.value);
+        updateDateDisplayInHeader();
+        // Also update any other date-dependent functions
+        loadUserData(); // If you have this function
+    });
+    
+    yearInput.addEventListener('change', function() {
+        console.log('Year changed to:', this.value);
+        updateDateDisplayInHeader();
+        loadUserData(); // If you have this function
+    });
+    
+    console.log('Date controls setup complete');
+}
+
+// Setup header updates on page load
+function setupHeader() {
+    console.log('Setting up header...');
+    
+    // Update all header displays
+    updateEmployeeDisplayInHeader();
+    updateDateDisplayInHeader();
+    updateLoggedInUserDisplay();
+    
+    // Setup date controls
+    setupDateControls();
+    
+    console.log('Header setup complete');
+}
+
+
 // Check Authentication
 function checkAuth() {
     console.log('=== APP.JS CHECKAUTH CALLED ===');
@@ -750,7 +891,6 @@ function calculateTotal() {
     return totalDisplay;
 }
 
-// ==================== GENERATE PDF ====================
 // ==================== GENERATE PDF - A4 OPTIMIZED ====================
 function generatePDF() {
     console.log('Generating A4 PDF...');
