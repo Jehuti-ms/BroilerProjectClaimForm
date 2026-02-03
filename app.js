@@ -183,45 +183,34 @@ function saveCurrentMonth() {
 // Load user data for current month
 // Load user data for current month
 function loadUserData(username) {
-    // First try with username parameter
-    if (username) {
-        const userData = localStorage.getItem(`userData_${username}`);
+    console.log('Attempting to load data for:', username);
+    
+    // Try multiple possible storage keys
+    const possibleKeys = [
+        `userData_${username}`,
+        `userData_${username}@gmail.com`, // common email pattern
+        'userData_demo', // fallback
+        'broilerForms', // old format
+        'forms' // another old format
+    ];
+    
+    for (const key of possibleKeys) {
+        const userData = localStorage.getItem(key);
         if (userData) {
-            console.log(`✅ Loaded data for username: ${username}`);
-            const allData = JSON.parse(userData);
-            loadCurrentMonthData(allData);
-            return;
-        }
-    }
-    
-    // If not found, try with current user's uid/email
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        try {
-            const user = JSON.parse(currentUser);
-            // Try multiple possible keys
-            const possibleKeys = [
-                `userData_${user.uid}`,
-                `userData_${user.email}`,
-                `userData_${user.email.split('@')[0]}`
-            ];
-            
-            for (const key of possibleKeys) {
-                const userData = localStorage.getItem(key);
-                if (userData) {
-                    console.log(`✅ Loaded data from key: ${key}`);
-                    const allData = JSON.parse(userData);
-                    loadCurrentMonthData(allData);
-                    return;
-                }
+            console.log(`✅ Found data with key: ${key}`);
+            try {
+                const allData = JSON.parse(userData);
+                loadCurrentMonthData(allData);
+                return;
+            } catch (error) {
+                console.error(`Error parsing data from ${key}:`, error);
             }
-        } catch (error) {
-            console.error('Error loading user data:', error);
         }
     }
     
-    // If no data found, load sample data for current month
-    console.log('ℹ️ No saved data found, loading sample or empty data');
+    console.log('❌ No saved data found');
+    
+    // For new users, check if we should load sample data
     loadCurrentMonthData();
 }
 
