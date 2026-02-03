@@ -190,73 +190,72 @@ function getAuthErrorMessage(error) {
 }
 
     // Check if user is already logged in - FIXED VERSION
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('Auth page loaded');
-        
-        // Check if user is already logged in
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                console.log('User already logged in via Firebase:', user.email);
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Auth page loaded');
+    
+    // Check if user is already logged in
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            console.log('User already logged in via Firebase:', user.email);
+            
+            try {
+                // Get user data from Firestore
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                let employeeName = '';
                 
-                try {
-                    // Get user data from Firestore
-                    const userDoc = await db.collection('users').doc(user.uid).get();
-                    let employeeName = '';
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    employeeName = userData.employeeName || user.displayName || 'User';
                     
-                    if (userDoc.exists) {
-                        const userData = userDoc.data();
-                        employeeName = userData.employeeName || user.displayName || 'User';
-                        
-                        // Save to localStorage
-                        localStorage.setItem('currentUser', JSON.stringify({
-                            uid: user.uid,
-                            email: user.email,
-                            employeeName: employeeName,
-                            username: user.email.split('@')[0]
-                        }));
-                        
-                        localStorage.setItem('employeeName', employeeName);
-                    } else {
-                        // Create user profile if it doesn't exist
-                        await db.collection('users').doc(user.uid).set({
-                            email: user.email,
-                            employeeName: 'User',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        
-                        // Save to localStorage
-                        localStorage.setItem('currentUser', JSON.stringify({
-                            uid: user.uid,
-                            email: user.email,
-                            employeeName: 'User',
-                            username: user.email.split('@')[0]
-                        }));
-                        
-                        localStorage.setItem('employeeName', 'User');
-                    }
-                    
-                        // Redirect to main app
-                        console.log('Registration successful, redirecting...');
-                        window.location.href = 'index.html';
-                    
-                } catch (error) {
-                    console.error('Error loading user data:', error);
-                    // Still redirect with basic info
+                    // Save to localStorage
                     localStorage.setItem('currentUser', JSON.stringify({
                         uid: user.uid,
                         email: user.email,
-                        employeeName: user.displayName || 'User',
+                        employeeName: employeeName,
                         username: user.email.split('@')[0]
                     }));
                     
-                    window.location.href = 'index.html';
+                    localStorage.setItem('employeeName', employeeName);
+                } else {
+                    // Create user profile if it doesn't exist
+                    await db.collection('users').doc(user.uid).set({
+                        email: user.email,
+                        employeeName: 'User',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    // Save to localStorage
+                    localStorage.setItem('currentUser', JSON.stringify({
+                        uid: user.uid,
+                        email: user.email,
+                        employeeName: 'User',
+                        username: user.email.split('@')[0]
+                    }));
+                    
+                    localStorage.setItem('employeeName', 'User');
                 }
-            } else {
-                console.log('No user logged in');
-                localStorage.removeItem('currentUser');
-                localStorage.removeItem('employeeName');
+                
+                // AUTO-REDIRECT to main app - THIS IS CRITICAL!
+                console.log('Auto-login successful, redirecting to main app...');
+                window.location.href = 'index.html';
+                
+            } catch (error) {
+                console.error('Error loading user data:', error);
+                // Still redirect with basic info
+                localStorage.setItem('currentUser', JSON.stringify({
+                    uid: user.uid,
+                    email: user.email,
+                    employeeName: user.displayName || 'User',
+                    username: user.email.split('@')[0]
+                }));
+                
+                window.location.href = 'index.html';
             }
-        });
+        } else {
+            console.log('No user logged in');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('employeeName');
+        }
     });
-        
+});
