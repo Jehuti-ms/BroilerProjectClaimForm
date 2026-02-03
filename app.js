@@ -1,10 +1,3 @@
-// Debug: Track page loads and redirects
-console.log('=== PAGE LOAD DEBUG ===');
-console.log('Current page:', window.location.pathname);
-console.log('Has currentUser in localStorage?', !!localStorage.getItem('currentUser'));
-console.log('Has employeeName in localStorage?', !!localStorage.getItem('employeeName'));
-console.log('=== END DEBUG ===');
-
 // Global variables
 let currentEditingRow = null;
 let currentFormData = [];
@@ -32,6 +25,13 @@ const sampleData = [
     { date: '2025-10-26', amPm: 'PM', inTime: '15:30', outTime: '17:30', hours: '2:00' }
 ];
 
+// Debug: Track page loads
+console.log('=== PAGE LOAD DEBUG ===');
+console.log('Current page:', window.location.pathname);
+console.log('Has currentUser in localStorage?', !!localStorage.getItem('currentUser'));
+console.log('Has employeeName in localStorage?', !!localStorage.getItem('employeeName'));
+console.log('=== END DEBUG ===');
+
 // Check authentication on page load
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM Content Loaded - Starting authentication check');
@@ -39,54 +39,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Check if user is authenticated
-function checkAuthentication() {
-    console.log('checkAuthentication called');
-    
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        console.log('No user found, redirecting to auth.html');
-        safeRedirect('auth.html');
-        return;
-    }
-    
-    try {
-        const user = JSON.parse(currentUser);
-        console.log('User authenticated:', user.email);
-        
-        // Get saved employee name or use default
-        const savedName = localStorage.getItem('employeeName');
-        const displayName = savedName || user.employeeName || user.email || 'User';
-        
-        // Update welcome message IMMEDIATELY
-        const welcomeElement = document.getElementById('user-display');
-        if (welcomeElement) {
-            welcomeElement.textContent = `Welcome, ${displayName}`;
-            console.log('Welcome message set to:', welcomeElement.textContent);
-        }
-        
-        // Only pre-fill employee name if we have a saved name
-        const nameInput = document.getElementById('employee-name');
-        if (savedName && savedName.trim() !== '') {
-            nameInput.value = savedName;
-        } else {
-            nameInput.value = '';
-        }
-        
-        // Initialize app
-        initializeApp();
-        
-        // Load user data
-        if (user.username || user.email) {
-            const username = user.username || user.email.split('@')[0];
-            loadUserData(username);
-        }
-        
-    } catch (error) {
-        console.error('Authentication error:', error);
-        localStorage.removeItem('currentUser');
-        safeRedirect('auth.html');
-    }
-}// Check if user is authenticated - FIXED VERSION
 function checkAuthentication() {
     console.log('checkAuthentication called on:', window.location.pathname);
     
@@ -103,7 +55,7 @@ function checkAuthentication() {
         console.log('No user found, redirecting to auth.html');
         // Clear any stale data
         localStorage.clear();
-        safeRedirect('auth.html');
+        window.location.href = 'auth.html';
         return;
     }
     
@@ -115,22 +67,15 @@ function checkAuthentication() {
         const savedName = localStorage.getItem('employeeName');
         const displayName = savedName || user.employeeName || user.email || 'User';
         
-        // Update welcome message IMMEDIATELY
-        const welcomeElement = document.getElementById('user-display');
-        if (welcomeElement) {
-            welcomeElement.textContent = `Welcome, ${displayName}`;
-            console.log('Welcome message set to:', welcomeElement.textContent);
-        }
+        // Update welcome message
+        document.getElementById('user-display').textContent = `Welcome, ${displayName}`;
+        console.log('Welcome message set to:', document.getElementById('user-display').textContent);
         
         // Only pre-fill employee name if we have a saved name
-        const nameInput = document.getElementById('employee-name');
         if (savedName && savedName.trim() !== '') {
-            nameInput.value = savedName;
-        } else {
-            nameInput.value = '';
+            document.getElementById('employee-name').value = savedName;
         }
         
-        // Initialize app
         initializeApp();
         
         // Load user data using email as username
@@ -143,7 +88,7 @@ function checkAuthentication() {
         console.error('Authentication error:', error);
         // Clear corrupted data and redirect
         localStorage.removeItem('currentUser');
-        safeRedirect('auth.html');
+        window.location.href = 'auth.html';
     }
 }
 
@@ -172,7 +117,7 @@ function initializeApp() {
         saveCurrentMonth();
     }
     
-    // CRITICAL FIX: Add event listeners for date controls
+    // Add event listeners for date controls
     monthSelect.addEventListener('change', function() {
         console.log('Month changed to:', this.value);
         updateFormDate();
@@ -182,7 +127,7 @@ function initializeApp() {
         const currentUser = localStorage.getItem('currentUser');
         if (currentUser) {
             const user = JSON.parse(currentUser);
-            loadUserData(user.username);
+            loadUserData(user.email.split('@')[0]);
         }
     });
     
@@ -195,20 +140,16 @@ function initializeApp() {
         const currentUser = localStorage.getItem('currentUser');
         if (currentUser) {
             const user = JSON.parse(currentUser);
-            loadUserData(user.username);
+            loadUserData(user.email.split('@')[0]);
         }
     });
     
-    // Set up name auto-save
-    setupNameAutoSave();
-    
-    // Initial update of form date
     updateFormDate();
+    setupNameAutoSave();
     
     console.log('App initialized. Current month:', monthSelect.value, 'Year:', yearInput.value);
 }
 
-// Add this to initializeApp or create a separate function
 function setupNameAutoSave() {
     const nameInput = document.getElementById('employee-name');
     let saveTimeout;
@@ -224,7 +165,7 @@ function setupNameAutoSave() {
                 document.getElementById('user-display').textContent = `Welcome, ${name}`;
                 console.log('Auto-saved name:', name);
             }
-        }, 1000); // Wait 1 second after typing stops
+        }, 1000);
     });
     
     // Immediate save on blur
@@ -247,29 +188,36 @@ function saveCurrentMonth() {
 }
 
 // Load user data for current month
-// Load user data for current month
 function loadUserData(username) {
     console.log('Attempting to load data for:', username);
     
-    // Try multiple possible storage keys
-    const possibleKeys = [
-        `userData_${username}`,
-        `userData_${username}@gmail.com`, // common email pattern
-        'userData_demo', // fallback
-        'broilerForms', // old format
-        'forms' // another old format
-    ];
+    const userData = localStorage.getItem(`userData_${username}`);
     
-    for (const key of possibleKeys) {
-        const userData = localStorage.getItem(key);
-        if (userData) {
-            console.log(`✅ Found data with key: ${key}`);
+    if (userData) {
+        console.log('✅ Found user data');
+        try {
+            const allData = JSON.parse(userData);
+            loadCurrentMonthData(allData);
+            return;
+        } catch (error) {
+            console.error('Error parsing user data:', error);
+        }
+    }
+    
+    // Try alternative keys
+    const altKeys = ['broilerForms', 'forms', 'userData_demo'];
+    for (const key of altKeys) {
+        const data = localStorage.getItem(key);
+        if (data) {
+            console.log(`✅ Found data in alternative key: ${key}`);
             try {
-                const allData = JSON.parse(userData);
+                const allData = JSON.parse(data);
                 loadCurrentMonthData(allData);
+                // Migrate to new format
+                localStorage.setItem(`userData_${username}`, data);
                 return;
             } catch (error) {
-                console.error(`Error parsing data from ${key}:`, error);
+                console.error(`Error parsing ${key}:`, error);
             }
         }
     }
@@ -278,97 +226,6 @@ function loadUserData(username) {
     
     // For new users, check if we should load sample data
     loadCurrentMonthData();
-}
-
-// Emergency data recovery function
-function recoverLostData() {
-    console.log('🔍 Attempting data recovery...');
-    
-    // Get current user
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        alert('Please log in first');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    
-    // Look for data with any possible key
-    const allKeys = Object.keys(localStorage);
-    const userDataKeys = allKeys.filter(key => 
-        key.includes('userData_') || 
-        key.includes('forms_') || 
-        key.includes('broilerForms')
-    );
-    
-    console.log('Found potential data keys:', userDataKeys);
-    
-    let recoveredData = null;
-    let recoveredKey = null;
-    
-    for (const key of userDataKeys) {
-        try {
-            const data = localStorage.getItem(key);
-            if (data) {
-                const parsed = JSON.parse(data);
-                console.log(`Checking ${key}:`, typeof parsed, Array.isArray(parsed) ? `array with ${parsed.length} items` : 'object');
-                
-                // If it's an array of forms, we found our data
-                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].date) {
-                    recoveredData = parsed;
-                    recoveredKey = key;
-                    break;
-                }
-                // If it's an object with month keys
-                else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
-                    // Check if any value is an array of forms
-                    for (const monthKey in parsed) {
-                        if (Array.isArray(parsed[monthKey]) && parsed[monthKey].length > 0) {
-                            recoveredData = parsed;
-                            recoveredKey = key;
-                            console.log(`Found data in month: ${monthKey}`);
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.log(`Error parsing ${key}:`, e.message);
-        }
-    }
-    
-    if (recoveredData) {
-        // Save with correct user key
-        const userId = user.uid || user.email.split('@')[0];
-        localStorage.setItem(`userData_${userId}`, JSON.stringify(recoveredData));
-        
-        alert(`✅ Recovered data from ${recoveredKey}! Refreshing page...`);
-        setTimeout(() => {
-            location.reload();
-        }, 1000);
-    } else {
-        // Create backup sample data
-        if (confirm('No data found. Create sample data for this month?')) {
-            const month = parseInt(document.getElementById('month-select').value);
-            const year = document.getElementById('year-input').value;
-            
-            if (month == 9 && year == 2025) { // October 2025
-                const userId = user.uid || user.email.split('@')[0];
-                const monthYear = `${month}-${year}`;
-                
-                const allData = {};
-                allData[monthYear] = sampleData;
-                
-                localStorage.setItem(`userData_${userId}`, JSON.stringify(allData));
-                alert('Sample data created! Refreshing...');
-                setTimeout(() => {
-                    location.reload();
-                }, 1000);
-            } else {
-                alert('Can only create sample data for October 2025. Please switch to October 2025 first.');
-            }
-        }
-    }
 }
 
 // Load data for current month
@@ -383,12 +240,14 @@ function loadCurrentMonthData(allData = null) {
     
     if (allData && allData[monthYear]) {
         // Load saved data for this month
+        console.log(`Found ${allData[monthYear].length} saved entries for ${monthYear}`);
         allData[monthYear].forEach(entry => {
             addRowToTable(entry);
             currentFormData.push(entry);
         });
     } else if (month == 9 && year == 2025) {
         // Load sample data for October 2025 (only for new users in this specific month)
+        console.log('Loading sample data for October 2025');
         sampleData.forEach(entry => {
             addRowToTable(entry);
             currentFormData.push(entry);
@@ -399,7 +258,6 @@ function loadCurrentMonthData(allData = null) {
 }
 
 // Save user data
-// Save user data
 function saveUserData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
@@ -409,25 +267,21 @@ function saveUserData() {
     
     try {
         const user = JSON.parse(currentUser);
-        
-        // Get user identifier - prefer uid, fallback to email username
-        const userId = user.uid || user.email.split('@')[0];
-        
         const month = parseInt(document.getElementById('month-select').value);
         const year = document.getElementById('year-input').value;
         const monthYear = `${month}-${year}`;
         
         // Get existing user data
-        const existingData = localStorage.getItem(`userData_${userId}`);
+        const existingData = localStorage.getItem(`userData_${user.email.split('@')[0]}`);
         let allData = existingData ? JSON.parse(existingData) : {};
         
         // Update data for current month
         allData[monthYear] = currentFormData;
         
         // Save back to localStorage
-        localStorage.setItem(`userData_${userId}`, JSON.stringify(allData));
+        localStorage.setItem(`userData_${user.email.split('@')[0]}`, JSON.stringify(allData));
         
-        console.log(`✅ Data saved for user: ${userId}, month: ${monthYear}, entries: ${currentFormData.length}`);
+        console.log(`✅ Data saved for user: ${user.email.split('@')[0]}, month: ${monthYear}, entries: ${currentFormData.length}`);
         
         // Show save confirmation
         showNotification('Form data saved successfully!');
@@ -470,7 +324,7 @@ function showNotification(message) {
     }, 3000);
 }
 
-// Update the form date display - FIXED VERSION
+// Update the form date display
 function updateFormDate() {
     try {
         const monthSelect = document.getElementById('month-select');
@@ -478,7 +332,7 @@ function updateFormDate() {
         const formDateSpan = document.getElementById('form-date');
         
         if (!monthSelect || !yearInput || !formDateSpan) {
-            console.error('Date elements not found');
+            console.error('Date elements not found for updateFormDate');
             return;
         }
         
@@ -487,7 +341,7 @@ function updateFormDate() {
         
         // Validate
         if (isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) {
-            console.error('Invalid month index:', monthIndex);
+            console.error('Invalid month index:', monthSelect.value);
             return;
         }
         
@@ -755,7 +609,7 @@ function calculateTotal() {
         `${totalHours}:${remainingMinutes.toString().padStart(2, '0')}`;
 }
 
-// Generate PDF - SINGLE VERSION (removed duplicate)
+// Generate PDF
 function generatePDF() {
     if (!window.jspdf) {
         alert('PDF library not loaded. Please check your internet connection.');
@@ -941,7 +795,6 @@ function saveForm() {
     saveUserData();
 }
 
-// FIXED logout function
 function logout() {
     console.log('Logging out...');
     
@@ -955,27 +808,10 @@ function logout() {
     }
     
     // Clear ALL localStorage data
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('employeeName');
-    localStorage.removeItem('lastViewedMonth');
-    localStorage.removeItem('lastViewedYear');
+    localStorage.clear();
     
-    // Clear any user-specific data
-    const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-        try {
-            const user = JSON.parse(currentUser);
-            if (user.email) {
-                const username = user.username || user.email.split('@')[0];
-                localStorage.removeItem(`userData_${username}`);
-            }
-        } catch (e) {
-            console.log('Error clearing user data:', e);
-        }
-    }
-    
-    // Force redirect with cache busting
-    window.location.href = 'auth.html?t=' + new Date().getTime();
+    // Simple redirect with cache busting
+    window.location.href = 'auth.html?logout=' + new Date().getTime();
 }
 
 // Add event listener for Escape key to close modal
@@ -992,3 +828,73 @@ window.onclick = function(event) {
         closeModal();
     }
 };
+
+// Emergency data recovery function
+function recoverLostData() {
+    console.log('🔍 Attempting data recovery...');
+    
+    // Get current user
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        alert('Please log in first');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    const username = user.email.split('@')[0];
+    
+    // Look for data with any possible key
+    const allKeys = Object.keys(localStorage);
+    const userDataKeys = allKeys.filter(key => 
+        key.includes('userData_') || 
+        key.includes('forms_') || 
+        key.includes('broilerForms')
+    );
+    
+    console.log('Found potential data keys:', userDataKeys);
+    
+    let recoveredData = null;
+    let recoveredKey = null;
+    
+    for (const key of userDataKeys) {
+        try {
+            const data = localStorage.getItem(key);
+            if (data) {
+                const parsed = JSON.parse(data);
+                
+                // If it's an array of forms, we found our data
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].date) {
+                    recoveredData = { '0-2025': parsed }; // Convert to new format
+                    recoveredKey = key;
+                    break;
+                }
+                // If it's an object with month keys
+                else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    // Check if any value is an array of forms
+                    for (const monthKey in parsed) {
+                        if (Array.isArray(parsed[monthKey]) && parsed[monthKey].length > 0) {
+                            recoveredData = parsed;
+                            recoveredKey = key;
+                            console.log(`Found data in month: ${monthKey}`);
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.log(`Error parsing ${key}:`, e.message);
+        }
+    }
+    
+    if (recoveredData) {
+        // Save with correct user key
+        localStorage.setItem(`userData_${username}`, JSON.stringify(recoveredData));
+        
+        alert(`✅ Recovered data from ${recoveredKey}! Refreshing page...`);
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
+    } else {
+        alert('❌ No data found to recover.');
+    }
+}
