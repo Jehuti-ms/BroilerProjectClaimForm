@@ -1,6 +1,11 @@
 // SIMPLE Broiler Claim Form - NO ERRORS
 console.log('Simple App starting...');
 
+console.log('app.js loading...');
+console.log('Current page:', window.location.href);
+console.log('localStorage.currentUser:', localStorage.getItem('currentUser'));
+console.log('Firebase auth state:', auth.currentUser);
+
 // Basic data
 let currentFormData = [];
 const monthNames = ["January", "February", "March", "April", "May", "June",
@@ -8,49 +13,47 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 ];
 
 // Check authentication - SIMPLE VERSION
+// Check authentication - UPDATED to handle Firebase state
 function checkAuth() {
     console.log('Checking auth...');
     
-    // Check for user in localStorage
+    // Check for user in localStorage FIRST
     const userData = localStorage.getItem('currentUser');
-    if (!userData) {
-        console.log('No user, going to auth page');
-        window.location.href = 'auth.html';
-        return false;
+    if (userData) {
+        console.log('User found in localStorage');
+        return true;
     }
     
-    try {
-        const user = JSON.parse(userData);
-        console.log('User found:', user.email);
-        
-        // Get display name - use signup name OR email
-        const displayName = user.employeeName || user.name || user.email || 'User';
-        
-        // Update user display (logged in user)
-        const userDisplay = document.getElementById('user-display');
-        if (userDisplay) {
-            userDisplay.textContent = displayName;
-            userDisplay.title = `Logged in: ${displayName}`;
-        }
-        
-        // Set employee name input (who claim is for)
-        // Load from saved claim recipient name if exists
-        const nameInput = document.getElementById('employee-name');
-        if (nameInput) {
-            const savedClaimName = localStorage.getItem('claimEmployeeName') || displayName;
-            nameInput.value = savedClaimName;
+    // If no localStorage, check Firebase auth state
+    console.log('No localStorage user, checking Firebase...');
+    
+    // Return a promise since Firebase check is async
+    return new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+            unsubscribe(); // Clean up listener
             
-            // Update claim for display in header
-            updateClaimForDisplay(savedClaimName);
-        }
-        
-        return true;
-    } catch (error) {
-        console.log('Auth error, redirecting:', error);
-        window.location.href = 'auth.html';
-        return false;
-    }
+            if (firebaseUser) {
+                console.log('User found in Firebase:', firebaseUser.email);
+                
+                // Save to localStorage for next time
+                const userInfo = {
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    employeeName: firebaseUser.displayName || 'User',
+                    username: firebaseUser.email.split('@')[0]
+                };
+                
+                localStorage.setItem('currentUser', JSON.stringify(userInfo));
+                resolve(true);
+            } else {
+                console.log('No user found anywhere, redirecting to auth');
+                window.location.href = 'auth.html';
+                resolve(false);
+            }
+        });
+    });
 }
+
 // Save current month
 function saveCurrentMonth() {
     const monthSelect = document.getElementById('month-select');
@@ -414,12 +417,15 @@ function checkAuth() {
 
 // ================== Initialization ===================
 // Initialize when page loads
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('DOM loaded');
     
-    if (checkAuth()) {
+    const isAuthenticated = await checkAuth();
+    
+    if (isAuthenticated) {
         initializeApp();
     }
+    // Note: checkAuth() handles redirect to auth.html if not authenticated
 });
 
 // Initialize app
