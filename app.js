@@ -1227,7 +1227,7 @@ function showNotification(message, type = 'success') {
 }
 
 // ========= Simple Data Recovery Function =============
-/*function recoverLostData() {
+function recoverLostData() {
     console.log('🔍 Searching for lost data...');
     
     // Get current user
@@ -1336,10 +1336,10 @@ function showNotification(message, type = 'success') {
         console.error('Recovery error:', error);
         alert('Error during recovery. Check console for details.');
     }
-} */
+} 
 
 // Emergency data recovery function
-function recoverLostData() {
+/*function recoverLostData() {
     console.log('🔍 Attempting data recovery...');
     
     // Get current user
@@ -1427,5 +1427,5 @@ function recoverLostData() {
             }
         }
     }
-}
+} */
 
