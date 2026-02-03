@@ -52,38 +52,79 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Initialize app
 function initializeApp() {
-    console.log('Initializing app...');
+    console.log('initializeApp called');
     
-    // Set current date
+    // Set current month/year
     const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Get elements
     const monthSelect = document.getElementById('month-select');
     const yearInput = document.getElementById('year-input');
     
-    monthSelect.value = now.getMonth();
-    yearInput.value = now.getFullYear();
+    // Ensure elements exist
+    if (!monthSelect || !yearInput) {
+        console.error('Month or year elements not found');
+        return;
+    }
     
-    // Update form date
+    // Load last viewed month from localStorage or use current
+    const lastMonth = localStorage.getItem('lastViewedMonth');
+    const lastYear = localStorage.getItem('lastViewedYear');
+    
+    if (lastMonth !== null && lastYear !== null) {
+        // Parse and validate stored values
+        const storedMonth = parseInt(lastMonth);
+        const storedYear = parseInt(lastYear);
+        
+        if (!isNaN(storedMonth) && storedMonth >= 0 && storedMonth <= 11 &&
+            !isNaN(storedYear) && storedYear >= 2000 && storedYear <= 2100) {
+            monthSelect.value = storedMonth;
+            yearInput.value = storedYear;
+        } else {
+            // Invalid stored values, use current
+            monthSelect.value = currentMonth;
+            yearInput.value = currentYear;
+            saveCurrentMonth();
+        }
+    } else {
+        // No stored values, use current
+        monthSelect.value = currentMonth;
+        yearInput.value = currentYear;
+        saveCurrentMonth();
+    }
+    
+    // Add event listeners for date controls
+    monthSelect.addEventListener('change', function() {
+        console.log('Month changed to:', this.value);
+        updateFormDate();
+        saveCurrentMonth();
+        loadUserData();
+    });
+    
+    yearInput.addEventListener('change', function() {
+        console.log('Year changed to:', this.value);
+        updateFormDate();
+        saveCurrentMonth();
+        loadUserData();
+    });
+    
+    // Initial update of form date
     updateFormDate();
     
-    // Setup event listeners
-    setupListeners();
+    // Set up name auto-save
+    setupNameAutoSave();
     
-    // Load data
+    // Load user data
     loadUserData();
-
-    // AutoSync
-    initAutoSync();
-}
-
-// Update form date
-function updateFormDate() {
-    try {
-        const month = document.getElementById('month-select').value;
-        const year = document.getElementById('year-input').value;
-        document.getElementById('form-date').textContent = `${monthNames[month]} ${year}`;
-    } catch (error) {
-        console.log('Error updating date:', error);
+    
+    // Initialize auto-sync if needed
+    if (typeof initAutoSync === 'function') {
+        initAutoSync();
     }
+    
+    console.log('App initialized. Current month:', monthSelect.value, 'Year:', yearInput.value);
 }
 
 // Setup all listeners
