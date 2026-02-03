@@ -70,6 +70,9 @@ function initializeApp() {
     
     // Load data
     loadUserData();
+
+    // AutoSync
+    initAutoSync();
 }
 
 // Update form date
@@ -354,3 +357,945 @@ window.onclick = function(e) {
     const modal = document.getElementById('entry-modal');
     if (e.target === modal) closeModal();
 };
+
+// ==================== UTILITIES =====================
+
+// ==================== CALCULATE TOTAL ====================
+function calculateTotal() {
+    console.log('Calculating total hours...');
+    
+    const rows = document.querySelectorAll('#time-table tbody tr');
+    let totalMinutes = 0;
+    
+    rows.forEach(row => {
+        const hoursText = row.cells[4].textContent;
+        if (hoursText && hoursText !== '') {
+            const [hours, minutes] = hoursText.split(':').map(Number);
+            if (!isNaN(hours)) totalMinutes += hours * 60;
+            if (!isNaN(minutes)) totalMinutes += minutes;
+        }
+    });
+    
+    const totalHours = Math.floor(totalMinutes / 60);
+    const remainingMinutes = totalMinutes % 60;
+    
+    const totalDisplay = `${totalHours}:${remainingMinutes.toString().padStart(2, '0')}`;
+    document.getElementById('total-hours').textContent = totalDisplay;
+    
+    showNotification(`Total calculated: ${totalDisplay} hours`);
+    return totalDisplay;
+}
+
+// ==================== GENERATE PDF ====================
+function generatePDF() {
+    console.log('Generating PDF...');
+    
+    // Check if jsPDF is loaded
+    if (!window.jspdf) {
+        alert('PDF library not loaded. Please ensure you have internet connection.');
+        // Load jsPDF dynamically
+        loadPDFLibrary().then(() => generatePDF());
+        return;
+    }
+    
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        
+        // Get data
+        const month = document.getElementById('month-select').value;
+        const year = document.getElementById('year-input').value;
+        const employeeName = document.getElementById('employee-name').value;
+        const totalHours = document.getElementById('total-hours').textContent;
+        
+        // Header
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Grantley Adams Memorial School', 105, 20, { align: 'center' });
+        
+        doc.setFontSize(16);
+        doc.text('Broiler Production Project', 105, 30, { align: 'center' });
+        
+        doc.setFontSize(14);
+        doc.text('Claim Form', 105, 40, { align: 'center' });
+        
+        doc.setFontSize(12);
+        doc.text(`${monthNames[month]} ${year}`, 105, 50, { align: 'center' });
+        
+        // Employee Info
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Employee: ${employeeName}`, 20, 65);
+        
+        // Create table data
+        const tableData = [];
+        const rows = document.querySelectorAll('#time-table tbody tr');
+        
+        rows.forEach(row => {
+            const date = row.cells[0].textContent;
+            const amPm = row.cells[1].textContent;
+            const timeIn = row.cells[2].textContent;
+            const timeOut = row.cells[3].textContent;
+            const hours = row.cells[4].textContent;
+            
+            if (date && date !== '') {
+                tableData.push([date, amPm, timeIn, timeOut, hours]);
+            }
+        });
+        
+        // Add table if we have data
+        if (tableData.length > 0 && jsPDF.API.autoTable) {
+            doc.autoTable({
+                startY: 75,
+                head: [['Date', 'AM/PM', 'Time IN', 'Time OUT', 'Hours']],
+                body: tableData,
+                theme: 'grid',
+                styles: { 
+                    fontSize: 10, 
+                    cellPadding: 3,
+                    textColor: [0, 0, 0]
+                },
+                headStyles: { 
+                    fillColor: [220, 220, 220],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold'
+                },
+                margin: { left: 20, right: 20 }
+            });
+            
+            // Add total hours
+            const finalY = doc.lastAutoTable.finalY + 10;
+            doc.text(`Total Hours: ${totalHours}`, 160, finalY);
+            
+            // Add signature areas
+            const signatureY = finalY + 25;
+            
+            doc.text('Signature Claimant:', 25, signatureY);
+            doc.line(25, signatureY + 5, 75, signatureY + 5);
+            
+            doc.text('Signature HOD:', 85, signatureY);
+            doc.line(85, signatureY + 5, 135, signatureY + 5);
+            
+            doc.text('Signature Principal:', 145, signatureY);
+            doc.line(145, signatureY + 5, 185, signatureY + 5);
+        } else {
+            doc.text('No entries found', 20, 75);
+        }
+        
+        // Set document properties
+        doc.setProperties({
+            title: `Broiler Claim Form - ${monthNames[month]} ${year}`,
+            subject: 'Employee Time Claim',
+            author: 'Grantley Adams Memorial School',
+            keywords: 'broiler, claim, form, timesheet'
+        });
+        
+        // Save the PDF
+        const filename = `Broiler_Claim_${monthNames[month]}_${year}_${employeeName.replace(/\s+/g, '_')}.pdf`;
+        doc.save(filename);
+        
+        showNotification('PDF generated successfully!');
+        
+    } catch (error) {
+        console.error('PDF generation error:', error);
+        alert('Error generating PDF. Please try again.');
+    }
+}
+
+// Load PDF library dynamically
+function loadPDFLibrary() {
+    return new Promise((resolve, reject) => {
+        if (window.jspdf) {
+            resolve();
+            return;
+        }
+        
+        // Load jsPDF
+        const script1 = document.createElement('script');
+        script1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        
+        // Load autoTable plugin
+        const script2 = document.createElement('script');
+        script2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js';
+        
+        script1.onload = () => {
+            script2.onload = () => resolve();
+            document.head.appendChild(script2);
+        };
+        
+        script1.onerror = reject;
+        document.head.appendChild(script1);
+    });
+}
+
+// ==================== PRINT FORM ====================
+function printForm() {
+    console.log('Printing form...');
+    
+    // Create a print-friendly window
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+        alert('Please allow popups to print the form.');
+        return;
+    }
+    
+    // Get data
+    const month = document.getElementById('month-select').value;
+    const year = document.getElementById('year-input').value;
+    const employeeName = document.getElementById('employee-name').value;
+    const totalHours = document.getElementById('total-hours').textContent;
+    
+    // Get table data
+    let tableRows = '';
+    const rows = document.querySelectorAll('#time-table tbody tr');
+    
+    rows.forEach(row => {
+        const date = row.cells[0].textContent;
+        const amPm = row.cells[1].textContent;
+        const timeIn = row.cells[2].textContent;
+        const timeOut = row.cells[3].textContent;
+        const hours = row.cells[4].textContent;
+        
+        if (date && date !== '') {
+            tableRows += `
+                <tr>
+                    <td>${date}</td>
+                    <td>${amPm}</td>
+                    <td>${timeIn}</td>
+                    <td>${timeOut}</td>
+                    <td>${hours}</td>
+                </tr>
+            `;
+        }
+    });
+    
+    // Create print document
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Broiler Claim Form - ${monthNames[month]} ${year}</title>
+            <style>
+                @media print {
+                    @page { margin: 20mm; }
+                    body { font-family: Arial, sans-serif; margin: 0; }
+                }
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .header { text-align: center; margin-bottom: 30px; }
+                .header h1 { margin: 0; font-size: 24px; }
+                .header h2 { margin: 5px 0; font-size: 18px; font-style: italic; }
+                .info { margin: 20px 0; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { border: 1px solid #000; padding: 8px; text-align: center; }
+                th { background-color: #f2f2f2; font-weight: bold; }
+                .total { text-align: right; font-weight: bold; font-size: 16px; margin: 20px 0; }
+                .signature-section { display: flex; justify-content: space-between; margin-top: 60px; }
+                .signature-box { width: 30%; }
+                .signature-line { border-top: 2px solid #000; margin-top: 40px; padding-top: 5px; }
+                .no-print { display: none; }
+                .footer { margin-top: 50px; font-size: 12px; color: #666; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Grantley Adams Memorial School</h1>
+                <h2>Broiler Production Project</h2>
+                <h2>Claim Form - ${monthNames[month]} ${year}</h2>
+            </div>
+            
+            <div class="info">
+                <div><strong>Employee:</strong> ${employeeName}</div>
+                <div><strong>Period:</strong> ${monthNames[month]} ${year}</div>
+            </div>
+            
+            ${tableRows ? `
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>AM/PM</th>
+                        <th>Time IN</th>
+                        <th>Time OUT</th>
+                        <th>Hours</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+            
+            <div class="total">
+                Total Hours: ${totalHours}
+            </div>
+            ` : '<p>No entries to display</p>'}
+            
+            <div class="signature-section">
+                <div class="signature-box">
+                    <div>Signature Claimant:</div>
+                    <div class="signature-line"></div>
+                </div>
+                <div class="signature-box">
+                    <div>Signature HOD:</div>
+                    <div class="signature-line"></div>
+                </div>
+                <div class="signature-box">
+                    <div>Signature Principal:</div>
+                    <div class="signature-line"></div>
+                </div>
+            </div>
+            
+            <div class="footer">
+                Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+            </div>
+            
+            <script>
+                window.onload = function() {
+                    window.print();
+                    setTimeout(function() {
+                        window.close();
+                    }, 500);
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    showNotification('Opening print preview...');
+}
+
+// ==================== CLEAR FORM ====================
+function clearForm() {
+    if (confirm('Are you sure you want to clear ALL entries for this month?\nThis action cannot be undone.')) {
+        console.log('Clearing form...');
+        
+        const tableBody = document.querySelector('#time-table tbody');
+        if (tableBody) {
+            tableBody.innerHTML = '';
+        }
+        
+        currentFormData = [];
+        document.getElementById('total-hours').textContent = '0:00';
+        
+        // Clear from localStorage
+        const userData = localStorage.getItem('currentUser');
+        if (userData) {
+            try {
+                const user = JSON.parse(userData);
+                const username = user.email.split('@')[0];
+                const dataKey = `userData_${username}`;
+                
+                const month = document.getElementById('month-select').value;
+                const year = document.getElementById('year-input').value;
+                const monthYear = `${month}-${year}`;
+                
+                const existingData = localStorage.getItem(dataKey);
+                if (existingData) {
+                    const allData = JSON.parse(existingData);
+                    // Only clear current month
+                    allData[monthYear] = [];
+                    localStorage.setItem(dataKey, JSON.stringify(allData));
+                }
+            } catch (error) {
+                console.error('Error clearing from storage:', error);
+            }
+        }
+        
+        showNotification('Form cleared successfully');
+    }
+}
+
+// ==================== SAVE FORM ====================
+function saveForm() {
+    console.log('Saving form...');
+    
+    try {
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) {
+            alert('Please log in first');
+            return;
+        }
+        
+        const user = JSON.parse(userData);
+        const username = user.email.split('@')[0];
+        const dataKey = `userData_${username}`;
+        
+        // Get current month/year
+        const month = document.getElementById('month-select').value;
+        const year = document.getElementById('year-input').value;
+        const monthYear = `${month}-${year}`;
+        
+        // Get existing data
+        const existingData = localStorage.getItem(dataKey);
+        let allData = existingData ? JSON.parse(existingData) : {};
+        
+        // Update current month's data
+        allData[monthYear] = currentFormData;
+        
+        // Save back to localStorage
+        localStorage.setItem(dataKey, JSON.stringify(allData));
+        
+        // Also save to a backup key
+        localStorage.setItem(`${dataKey}_backup_${Date.now()}`, JSON.stringify(allData));
+        
+        console.log(`Form saved: ${currentFormData.length} entries for ${monthNames[month]} ${year}`);
+        
+        // Update last saved timestamp
+        localStorage.setItem('lastSaved', new Date().toISOString());
+        
+        showNotification('Form saved successfully!');
+        
+        // Auto-sync if enabled
+        if (localStorage.getItem('autoSyncEnabled') === 'true') {
+            syncToCloud();
+        }
+        
+    } catch (error) {
+        console.error('Save error:', error);
+        showNotification('Error saving form', 'error');
+    }
+}
+
+// ==================== SYNC TO CLOUD ====================
+function syncToCloud() {
+    console.log('Syncing to cloud...');
+    
+    // Show syncing status
+    const statusElement = document.getElementById('sync-status') || createSyncStatusElement();
+    statusElement.innerHTML = '<span style="color: #2196F3;">🔄 Syncing...</span>';
+    
+    try {
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) {
+            throw new Error('Not logged in');
+        }
+        
+        const user = JSON.parse(userData);
+        const username = user.email.split('@')[0];
+        const dataKey = `userData_${username}`;
+        
+        // Get all user data
+        const allData = localStorage.getItem(dataKey);
+        if (!allData) {
+            throw new Error('No data to sync');
+        }
+        
+        // Try Firebase sync first
+        if (window.firebase && window.firebase.firestore) {
+            syncToFirebase(username, JSON.parse(allData))
+                .then(success => {
+                    if (success) {
+                        // Firebase sync successful
+                        statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Synced to Firebase</span>';
+                        showNotification('Data synced to cloud!', 'success');
+                        
+                        // Update last sync time
+                        localStorage.setItem('lastCloudSync', new Date().toISOString());
+                        updateLastSyncDisplay();
+                    } else {
+                        // Fallback to localStorage backup
+                        fallbackCloudSync(username, allData, statusElement);
+                    }
+                })
+                .catch(error => {
+                    console.error('Firebase sync error:', error);
+                    fallbackCloudSync(username, allData, statusElement);
+                });
+        } else {
+            // Firebase not available, use fallback
+            fallbackCloudSync(username, allData, statusElement);
+        }
+        
+    } catch (error) {
+        console.error('Sync error:', error);
+        statusElement.innerHTML = `<span style="color: #f44336;">❌ ${error.message}</span>`;
+        showNotification('Sync failed: ' + error.message, 'error');
+    }
+}
+
+// Firebase sync function
+async function syncToFirebase(username, data) {
+    return new Promise((resolve, reject) => {
+        try {
+            if (!window.firebase || !window.firebase.firestore) {
+                resolve(false);
+                return;
+            }
+            
+            const db = firebase.firestore();
+            const userRef = db.collection('user_data').doc(username);
+            
+            userRef.set({
+                user_id: username,
+                data: data,
+                updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+                last_sync: new Date().toISOString(),
+                device: navigator.userAgent
+            }, { merge: true })
+            .then(() => {
+                console.log('✅ Firebase sync successful');
+                resolve(true);
+            })
+            .catch(error => {
+                console.error('Firebase set error:', error);
+                resolve(false);
+            });
+            
+        } catch (error) {
+            console.error('Firebase sync error:', error);
+            resolve(false);
+        }
+    });
+}
+
+// Fallback cloud sync (localStorage backup)
+function fallbackCloudSync(username, data, statusElement) {
+    try {
+        // Create cloud backup in localStorage
+        const cloudBackup = {
+            username: username,
+            data: JSON.parse(data),
+            timestamp: new Date().toISOString(),
+            source: 'local_backup'
+        };
+        
+        localStorage.setItem(`cloud_backup_${username}`, JSON.stringify(cloudBackup));
+        
+        // Also create a dated backup
+        const backupKey = `backup_${username}_${new Date().toISOString().split('T')[0]}`;
+        localStorage.setItem(backupKey, data);
+        
+        // Keep only last 7 backups
+        cleanupOldBackups(username);
+        
+        statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Backed up locally</span>';
+        showNotification('Data backed up locally', 'success');
+        
+        // Update last sync time
+        localStorage.setItem('lastCloudSync', new Date().toISOString());
+        updateLastSyncDisplay();
+        
+    } catch (error) {
+        console.error('Fallback sync error:', error);
+        statusElement.innerHTML = '<span style="color: #f44336;">❌ Backup failed</span>';
+        showNotification('Backup failed', 'error');
+    }
+}
+
+// Create sync status element if it doesn't exist
+function createSyncStatusElement() {
+    const userInfo = document.querySelector('.user-info');
+    if (!userInfo) return null;
+    
+    const statusElement = document.createElement('div');
+    statusElement.id = 'sync-status';
+    statusElement.style.marginLeft = '10px';
+    statusElement.style.fontSize = '12px';
+    userInfo.appendChild(statusElement);
+    
+    return statusElement;
+}
+
+// Update last sync display
+function updateLastSyncDisplay() {
+    const lastSync = localStorage.getItem('lastCloudSync');
+    const statusElement = document.getElementById('sync-status');
+    
+    if (statusElement && lastSync) {
+        const lastSyncDate = new Date(lastSync);
+        const now = new Date();
+        const diffHours = Math.floor((now - lastSyncDate) / (1000 * 60 * 60));
+        
+        let statusText = `Last sync: ${lastSyncDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        let color = '#666';
+        
+        if (diffHours < 1) {
+            color = '#4CAF50';
+            statusText += ' 🟢';
+        } else if (diffHours < 24) {
+            color = '#FF9800';
+            statusText += ' 🟡';
+        } else {
+            color = '#f44336';
+            statusText += ' 🔴';
+        }
+        
+        statusElement.innerHTML = `<span style="color: ${color}; font-size: 11px;">${statusText}</span>`;
+    }
+}
+
+// Cleanup old backups
+function cleanupOldBackups(username) {
+    const allKeys = Object.keys(localStorage);
+    const backupKeys = allKeys.filter(key => key.startsWith('backup_') || key.startsWith('cloud_backup_'));
+    
+    // Sort by timestamp (newest first)
+    backupKeys.sort((a, b) => {
+        const timeA = localStorage.getItem(a) ? JSON.parse(localStorage.getItem(a)).timestamp : '';
+        const timeB = localStorage.getItem(b) ? JSON.parse(localStorage.getItem(b)).timestamp : '';
+        return new Date(timeB) - new Date(timeA);
+    });
+    
+    // Remove old backups (keep only 7 most recent)
+    if (backupKeys.length > 7) {
+        for (let i = 7; i < backupKeys.length; i++) {
+            localStorage.removeItem(backupKeys[i]);
+        }
+    }
+}
+
+// ==================== AUTO-SYNC ====================
+let autoSyncInterval = null;
+const AUTO_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+function initAutoSync() {
+    console.log('Initializing auto-sync...');
+    
+    // Load auto-sync setting
+    const autoSyncEnabled = localStorage.getItem('autoSyncEnabled') === 'true';
+    
+    // Create auto-sync checkbox if it doesn't exist
+    if (!document.getElementById('auto-sync-checkbox')) {
+        createAutoSyncControl();
+    }
+    
+    // Set initial state
+    document.getElementById('auto-sync-checkbox').checked = autoSyncEnabled;
+    
+    // Start/stop auto-sync based on setting
+    if (autoSyncEnabled) {
+        startAutoSync();
+    } else {
+        stopAutoSync();
+    }
+    
+    // Update last sync display
+    updateLastSyncDisplay();
+}
+
+function createAutoSyncControl() {
+    // Add to user info section
+    const userInfo = document.querySelector('.user-info');
+    if (!userInfo) return;
+    
+    const autoSyncContainer = document.createElement('div');
+    autoSyncContainer.className = 'auto-sync-container';
+    autoSyncContainer.style.marginTop = '5px';
+    autoSyncContainer.style.fontSize = '11px';
+    
+    autoSyncContainer.innerHTML = `
+        <label>
+            <input type="checkbox" id="auto-sync-checkbox" onchange="toggleAutoSync(this.checked)">
+            Auto-sync every 5 min
+        </label>
+    `;
+    
+    userInfo.appendChild(autoSyncContainer);
+}
+
+function toggleAutoSync(enabled) {
+    console.log('Auto-sync:', enabled ? 'ENABLED' : 'DISABLED');
+    
+    localStorage.setItem('autoSyncEnabled', enabled.toString());
+    
+    if (enabled) {
+        startAutoSync();
+        showNotification('Auto-sync enabled', 'success');
+    } else {
+        stopAutoSync();
+        showNotification('Auto-sync disabled', 'info');
+    }
+}
+
+function startAutoSync() {
+    if (autoSyncInterval) {
+        clearInterval(autoSyncInterval);
+    }
+    
+    autoSyncInterval = setInterval(() => {
+        // Only sync if user is online and app is active
+        if (navigator.onLine && !document.hidden) {
+            console.log('Auto-sync triggered');
+            syncToCloud();
+        }
+    }, AUTO_SYNC_INTERVAL);
+    
+    console.log('Auto-sync started');
+}
+
+function stopAutoSync() {
+    if (autoSyncInterval) {
+        clearInterval(autoSyncInterval);
+        autoSyncInterval = null;
+    }
+    
+    console.log('Auto-sync stopped');
+}
+
+// Sync from cloud (load data)
+function syncFromCloud() {
+    console.log('Loading from cloud...');
+    
+    const statusElement = document.getElementById('sync-status') || createSyncStatusElement();
+    statusElement.innerHTML = '<span style="color: #2196F3;">🔄 Loading from cloud...</span>';
+    
+    try {
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) {
+            throw new Error('Not logged in');
+        }
+        
+        const user = JSON.parse(userData);
+        const username = user.email.split('@')[0];
+        
+        // Try Firebase first
+        if (window.firebase && window.firebase.firestore) {
+            loadFromFirebase(username)
+                .then(cloudData => {
+                    if (cloudData) {
+                        // Save to localStorage
+                        const dataKey = `userData_${username}`;
+                        localStorage.setItem(dataKey, JSON.stringify(cloudData.data));
+                        
+                        // Reload the data
+                        loadUserData();
+                        
+                        statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Loaded from Firebase</span>';
+                        showNotification('Data loaded from cloud!', 'success');
+                    } else {
+                        // Try fallback
+                        loadFromBackup(username, statusElement);
+                    }
+                })
+                .catch(error => {
+                    console.error('Firebase load error:', error);
+                    loadFromBackup(username, statusElement);
+                });
+        } else {
+            loadFromBackup(username, statusElement);
+        }
+        
+    } catch (error) {
+        console.error('Load from cloud error:', error);
+        statusElement.innerHTML = `<span style="color: #f44336;">❌ ${error.message}</span>`;
+        showNotification('Load failed: ' + error.message, 'error');
+    }
+}
+
+async function loadFromFirebase(username) {
+    return new Promise((resolve, reject) => {
+        try {
+            if (!window.firebase || !window.firebase.firestore) {
+                resolve(null);
+                return;
+            }
+            
+            const db = firebase.firestore();
+            const userRef = db.collection('user_data').doc(username);
+            
+            userRef.get()
+                .then(doc => {
+                    if (doc.exists) {
+                        console.log('✅ Loaded from Firebase');
+                        resolve(doc.data());
+                    } else {
+                        console.log('No Firebase data found');
+                        resolve(null);
+                    }
+                })
+                .catch(error => {
+                    console.error('Firebase get error:', error);
+                    resolve(null);
+                });
+                
+        } catch (error) {
+            console.error('Firebase load error:', error);
+            resolve(null);
+        }
+    });
+}
+
+function loadFromBackup(username, statusElement) {
+    try {
+        const backupKey = `cloud_backup_${username}`;
+        const backupData = localStorage.getItem(backupKey);
+        
+        if (backupData) {
+            const parsed = JSON.parse(backupData);
+            
+            // Save to main storage
+            const dataKey = `userData_${username}`;
+            localStorage.setItem(dataKey, JSON.stringify(parsed.data));
+            
+            // Reload the data
+            loadUserData();
+            
+            statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Loaded from backup</span>';
+            showNotification('Data loaded from backup', 'success');
+        } else {
+            statusElement.innerHTML = '<span style="color: #FF9800;">ℹ️ No cloud data found</span>';
+            showNotification('No cloud data available', 'info');
+        }
+        
+    } catch (error) {
+        console.error('Backup load error:', error);
+        statusElement.innerHTML = '<span style="color: #f44336;">❌ Backup load failed</span>';
+        showNotification('Backup load failed', 'error');
+    }
+}
+
+// ==================== NOTIFICATION FUNCTION ====================
+function showNotification(message, type = 'success') {
+    // Remove existing notifications
+    const existing = document.querySelectorAll('.notification');
+    existing.forEach(n => n.remove());
+    
+    // Create notification
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    // Style based on type
+    const colors = {
+        success: '#4CAF50',
+        error: '#f44336',
+        info: '#2196F3',
+        warning: '#FF9800'
+    };
+    
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${colors[type] || colors.success};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 5px;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        animation: slideIn 0.3s ease;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
+// Add to your initializeApp() function:f
+// initAutoSync();
+// ========= Simple Data Recovery Function =============
+function recoverLostData() {
+    console.log('🔍 Searching for lost data...');
+    
+    // Get current user
+    const userData = localStorage.getItem('currentUser');
+    if (!userData) {
+        alert('Please log in first');
+        return;
+    }
+    
+    try {
+        const user = JSON.parse(userData);
+        const username = user.email.split('@')[0];
+        
+        console.log('Looking for data for user:', username);
+        
+        // Try different possible keys
+        const possibleKeys = [
+            `userData_${username}`,
+            `userData_${username.toLowerCase()}`,
+            'userData_demo',
+            'broilerForms',
+            'forms',
+            'userData_test'
+        ];
+        
+        let foundData = null;
+        let foundKey = null;
+        
+        for (const key of possibleKeys) {
+            const data = localStorage.getItem(key);
+            if (data) {
+                console.log(`Found data with key: ${key}`);
+                try {
+                    const parsed = JSON.parse(data);
+                    
+                    // Check if it's valid data
+                    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].date) {
+                        // Convert array to object format
+                        const month = document.getElementById('month-select').value;
+                        const year = document.getElementById('year-input').value;
+                        const monthYear = `${month}-${year}`;
+                        
+                        const convertedData = {};
+                        convertedData[monthYear] = parsed;
+                        
+                        foundData = convertedData;
+                        foundKey = key;
+                        break;
+                    } else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                        // Already in object format
+                        foundData = parsed;
+                        foundKey = key;
+                        break;
+                    }
+                } catch (e) {
+                    console.log(`Error parsing ${key}:`, e);
+                }
+            }
+        }
+        
+        if (foundData) {
+            // Save with correct key
+            localStorage.setItem(`userData_${username}`, JSON.stringify(foundData));
+            
+            alert(`✅ Recovered data from ${foundKey}! Page will reload.`);
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            if (confirm('No data found. Create sample data?')) {
+                const month = document.getElementById('month-select').value;
+                const year = document.getElementById('year-input').value;
+                const monthYear = `${month}-${year}`;
+                
+                // Create sample data structure
+                const sampleData = [
+                    {
+                        date: `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`,
+                        amPm: 'AM',
+                        inTime: '08:00',
+                        outTime: '12:00',
+                        hours: '4:00'
+                    },
+                    {
+                        date: `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`,
+                        amPm: 'PM',
+                        inTime: '13:00',
+                        outTime: '17:00',
+                        hours: '4:00'
+                    }
+                ];
+                
+                const allData = {};
+                allData[monthYear] = sampleData;
+                
+                localStorage.setItem(`userData_${username}`, JSON.stringify(allData));
+                
+                alert('✅ Created sample data! Page will reload.');
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Recovery error:', error);
+        alert('Error during recovery. Check console for details.');
+    }
+}
+
