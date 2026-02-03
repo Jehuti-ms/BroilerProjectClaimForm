@@ -103,6 +103,7 @@ body {
 }
 
 /* User Info - Positioned absolutely on right for desktop */
+/* User Info - Positioned absolutely on right for desktop */
 .user-info {
     position: absolute; /* Changed from static to absolute */
     top: 15px;
@@ -113,15 +114,26 @@ body {
     padding: 10px 15px;
     margin: 0;
     width: auto;
-    min-width: 180px;
+    min-width: 200px;
 }
 
 .user-display {
-    font-weight: 600;
     font-size: 14px;
     margin-bottom: 8px;
-    cursor: pointer;
     color: var(--primary-color);
+}
+
+.welcome-text {
+    font-weight: 500;
+    color: #666;
+}
+
+.username {
+    font-weight: 600;
+    color: var(--accent-color);
+    display: block;
+    margin-top: 2px;
+    word-break: break-word;
 }
 
 .sync-status {
@@ -136,17 +148,16 @@ body {
 }
 
 .logout-btn {
-    padding: 8px 20px;
+    padding: 6px 15px;
     background: var(--danger-color);
     color: white;
     border: none;
     border-radius: var(--radius);
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     transition: all 0.2s;
     width: 100%;
-    max-width: 200px;
 }
 
 .logout-btn:hover {
