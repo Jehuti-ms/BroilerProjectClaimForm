@@ -15,98 +15,77 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Grantley Adams Memorial School</h1>
-            <h2>Broiler Production Project</h2>
-            <!-- Show current month as form date -->
-            <h2>Claim Form - <span id="form-date"></span></h2>
-            <!-- Add a subtitle for report period -->
-            <h3>Reporting Period: <span id="report-period"></span></h3>
-            <div class="user-info">
-                <span id="user-display">Welcome, User</span>
-                <div id="sync-status"></div>
-                <button onclick="logout()" class="logout-btn">Logout</button>
-            </div>
-        </div>
-        </div>
-
-        <div class="date-controls">
-            <div>
-                <label for="month-select">Month:</label>
-                <select id="month-select">
-                    <option value="0">January</option>
-                    <option value="1">February</option>
-                    <option value="2">March</option>
-                    <option value="3">April</option>
-                    <option value="4">May</option>
-                    <option value="5">June</option>
-                    <option value="6">July</option>
-                    <option value="7">August</option>
-                    <option value="8">September</option>
-                    <option value="9" selected>October</option>
-                    <option value="10">November</option>
-                    <option value="11">December</option>
-                </select>
-                
-                <label for="year-input" style="margin-left: 15px;">Year:</label>
-                <input type="number" id="year-input" value="2025" min="2020" max="2030">
-            </div>
-            <button class="add-entry-btn" onclick="openModal()">Add New Entry</button>
-        </div>
-
-        <div class="employee-info">
-            <label for="employee-name">Employee Name:</label>
-            <input type="text" id="employee-name" placeholder="Enter your full name">
-        </div>
-
-        <div class="form-section">
-            <table id="time-table">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Am/Pm</th>
-                        <th>Time IN</th>
-                        <th>Time OUT</th>
-                        <th>Hours</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Rows will be added dynamically -->
-                </tbody>
-            </table>
-            <div class="total-hours">
-                Total Hours: <span id="total-hours">0:00</span>
-            </div>
-        </div>
-
-        <div class="signature-section">
-            <div class="signature-box">
-                <div>Signature Claimant:</div>
-                <div class="signature-line"></div>
-            </div>
-            <div class="signature-box">
-                <div>Signature HOD:</div>
-                <div class="signature-line"></div>
-            </div>
-            <div class="signature-box">
-                <div>Signature Principal:</div>
-                <div class="signature-line"></div>
-            </div>
-        </div>
-
-        <div class="buttons no-print">
-        <div class="buttons">
-        <button onclick="calculateTotal()">Calculate Total</button>
-        <button onclick="generatePDF()" class="pdf-btn">Generate PDF</button>
-        <button onclick="printForm()" class="print-btn">Print Form</button>
-        <button onclick="clearForm()">Clear Form</button>
-        <button onclick="saveForm()" class="save-btn">Save Form</button>
-        <button onclick="syncToCloud()" class="sync-btn">Sync to Cloud</button>
-        <button onclick="recoverLostData()" class="recovery-btn" style="background-color: #FF9800;">Recover Data</button>
+    <div class="header">
+    <div class="header-titles">
+        <h1>Grantley Adams Memorial School</h1>
+        <h2>Broiler Production Project</h2>
+        <h2>Claim Form - <span id="form-date"></span></h2>
     </div>
+    
+    <div class="user-info">
+        <div class="user-info-row">
+            <span id="user-display">Welcome, User</span>
+        </div>
+        <div class="user-info-row">
+            <button onclick="logout()" class="logout-btn">Logout</button>
+        </div>
     </div>
+</div>
+    
+    <!-- Date Controls -->
+    <div class="date-controls">
+        <div>
+            <label for="month-select">Month:</label>
+            <select id="month-select">...</select>
+            
+            <label for="year-input">Year:</label>
+            <input type="number" id="year-input" value="2025" min="2020" max="2030">
+        </div>
+        
+        <button class="add-entry-btn" onclick="openModal()">➕ Add New Entry</button>
+    </div>
+    
+    <!-- Employee Info -->
+    <div class="employee-info">
+        <label for="employee-name">Employee Name:</label>
+        <input type="text" id="employee-name" placeholder="Enter your full name">
+    </div>
+    
+    <!-- Form Section -->
+    <div class="form-section">
+        <table id="time-table">...</table>
+        <div class="total-hours">
+            Total Hours: <span id="total-hours">0:00</span>
+        </div>
+    </div>
+    
+    <!-- Signature Section -->
+    <div class="signature-section">
+        <div class="signature-box">
+            <div>Signature Claimant:</div>
+            <div class="signature-line"></div>
+        </div>
+        <div class="signature-box">
+            <div>Signature HOD:</div>
+            <div class="signature-line"></div>
+        </div>
+        <div class="signature-box">
+            <div>Signature Principal:</div>
+            <div class="signature-line"></div>
+        </div>
+    </div>
+    
+    <!-- Buttons -->
+    <div class="buttons">
+        <button onclick="calculateTotal()">📊 Calculate Total</button>
+        <button onclick="generatePDF()" class="pdf-btn">📄 Generate PDF</button>
+        <button onclick="printForm()" class="print-btn">🖨️ Print Form</button>
+        <button onclick="clearForm()">🗑️ Clear Form</button>
+        <button onclick="saveForm()" class="save-btn">💾 Save Form</button>
+        <button onclick="syncToCloud()" class="sync-btn">☁️ Sync to Cloud</button>
+        <button onclick="recoverLostData()" class="recovery-btn" style="background-color: #FF9800;">🔍 Recover Data</button>
+    </div>
+</div>
 
     <!-- Modal for adding/editing entries -->
     <div id="entry-modal" class="modal">
