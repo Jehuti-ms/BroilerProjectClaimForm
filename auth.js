@@ -68,7 +68,8 @@ document.getElementById('login-form').addEventListener('submit', async function(
         // Save employee name separately
         localStorage.setItem('employeeName', employeeName);
         
-        // Redirect to main app - SIMPLE FIX
+        // Redirect to main app
+        console.log('Login successful, redirecting...');
         window.location.href = 'index.html';
         
     } catch (error) {
@@ -188,47 +189,74 @@ function getAuthErrorMessage(error) {
     }
 }
 
-// Check if user is already logged in - SIMPLE FIX
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Auth page loaded');
-    
-    // Simple auto-login check WITHOUT complex redirect logic
-    auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            console.log('User already logged in via Firebase:', user.email);
-            
-            // Just save user data but don't auto-redirect
-            // This prevents the bouncing loop
-            try {
-                const userDoc = await db.collection('users').doc(user.uid).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
+    // Check if user is already logged in - FIXED VERSION
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Auth page loaded');
+        
+        // Check if user is already logged in
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                console.log('User already logged in via Firebase:', user.email);
+                
+                try {
+                    // Get user data from Firestore
+                    const userDoc = await db.collection('users').doc(user.uid).get();
+                    let employeeName = '';
+                    
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        employeeName = userData.employeeName || user.displayName || 'User';
+                        
+                        // Save to localStorage
+                        localStorage.setItem('currentUser', JSON.stringify({
+                            uid: user.uid,
+                            email: user.email,
+                            employeeName: employeeName,
+                            username: user.email.split('@')[0]
+                        }));
+                        
+                        localStorage.setItem('employeeName', employeeName);
+                    } else {
+                        // Create user profile if it doesn't exist
+                        await db.collection('users').doc(user.uid).set({
+                            email: user.email,
+                            employeeName: 'User',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        
+                        // Save to localStorage
+                        localStorage.setItem('currentUser', JSON.stringify({
+                            uid: user.uid,
+                            email: user.email,
+                            employeeName: 'User',
+                            username: user.email.split('@')[0]
+                        }));
+                        
+                        localStorage.setItem('employeeName', 'User');
+                    }
+                    
+                        // Redirect to main app
+                        console.log('Registration successful, redirecting...');
+                        window.location.href = 'index.html';
+                    
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                    // Still redirect with basic info
                     localStorage.setItem('currentUser', JSON.stringify({
                         uid: user.uid,
                         email: user.email,
-                        employeeName: userData.employeeName || user.displayName || 'User',
+                        employeeName: user.displayName || 'User',
                         username: user.email.split('@')[0]
                     }));
                     
-                    if (userData.employeeName) {
-                        localStorage.setItem('employeeName', userData.employeeName);
-                    }
+                    window.location.href = 'index.html';
                 }
-            } catch (error) {
-                console.log('Using basic user data');
-                localStorage.setItem('currentUser', JSON.stringify({
-                    uid: user.uid,
-                    email: user.email,
-                    employeeName: user.displayName || 'User',
-                    username: user.email.split('@')[0]
-                }));
+            } else {
+                console.log('No user logged in');
+                localStorage.removeItem('currentUser');
+                localStorage.removeItem('employeeName');
             }
-            
-            // DON'T auto-redirect - let user click login button
-            console.log('User data saved, waiting for manual login');
-        } else {
-            console.log('No user logged in');
-            localStorage.removeItem('currentUser');
-        }
+        });
     });
-});
+        
