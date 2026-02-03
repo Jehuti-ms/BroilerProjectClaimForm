@@ -171,6 +171,14 @@ function getAuthErrorMessage(error) {
     }
 }
 
+// Store user info in localStorage for quick access
+localStorage.setItem('currentUser', JSON.stringify({
+    uid: user.uid,
+    email: user.email,
+    employeeName: employeeName,
+    username: user.email.split('@')[0]  // ← Add this
+}));
+
 // Check if user is already logged in
 document.addEventListener('DOMContentLoaded', function() {
     auth.onAuthStateChanged(async (user) => {
