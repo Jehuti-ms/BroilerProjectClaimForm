@@ -27,16 +27,17 @@
 <body>
     <!-- HEADER SECTION -->
     <div class="header">
-        <!-- School/Project Info -->
-        <div class="school-info">
-            <h1>Grantley Adams Memorial School</h1>
-            <h2>Broiler Production Project</h2>
+        <!-- Top Line: All elements on one line -->
+        <div class="header-top-line">
+            <span class="school-name">Grantley Adams Memorial School</span>
+            <span class="project-name">Broiler Production Project</span>
+            <span class="claim-title">Claim Form</span>
+            <span class="month-year" id="month-year-display">February 2026</span>
         </div>
         
-        <!-- Claim Form Title with Name -->
-        <div class="claim-form-title">
-            <h2 id="claim-form-heading">Claim Form for: <span id="employee-display">Employee Name</span></h2>
-            <h3 id="form-date">Month: <span id="month-display">February</span> | Year: <span id="year-display">2026</span></h3>
+        <!-- Employee Line -->
+        <div class="employee-line">
+            <span class="employee-label" id="employee-display">Employee: </span>
         </div>
         
         <!-- User Info -->
@@ -182,9 +183,9 @@
             const input = document.getElementById('employee-name');
             const display = document.getElementById('employee-display');
             if (input.value.trim() !== '') {
-                display.textContent = input.value;
+                display.textContent = 'Employee: ' + input.value;
             } else {
-                display.textContent = 'Employee Name';
+                display.textContent = 'Employee: ';
             }
         }
         
@@ -192,16 +193,14 @@
         function updateDateDisplay() {
             const monthSelect = document.getElementById('month-select');
             const yearInput = document.getElementById('year-input');
-            const monthDisplay = document.getElementById('month-display');
-            const yearDisplay = document.getElementById('year-display');
+            const display = document.getElementById('month-year-display');
             
             const months = [
                 'January', 'February', 'March', 'April', 'May', 'June',
                 'July', 'August', 'September', 'October', 'November', 'December'
             ];
             
-            monthDisplay.textContent = months[monthSelect.value];
-            yearDisplay.textContent = yearInput.value;
+            display.textContent = months[monthSelect.value] + ' ' + yearInput.value;
         }
         
         // Initialize displays on page load
