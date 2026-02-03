@@ -72,30 +72,34 @@ function updateFormDate() {
 }
 
 // Setup employee name field - this IS who the claim is for
+// ==================== EMPLOYEE NAME FIELD SETUP ====================
 function setupEmployeeNameField() {
     console.log('Setting up employee name field...');
-    console.log('Employee name input element exists:', !!document.getElementById('employee-name'));
     
-    const nameInput = document.getElementById('employee-name');
+    // Get the input field
+    const nameInput = document.getElementById('employee-name-input');
     if (!nameInput) {
-        console.error('CRITICAL: Employee name input not found!');
-        console.log('Available inputs:', document.querySelectorAll('input').length, 'inputs on page');
+        console.error('Employee name input field not found!');
         return;
     }
     
-    // Load previously saved CLAIM recipient name (separate from logged in user)
+    // Load previously saved claim recipient name
     const savedClaimName = localStorage.getItem('claimEmployeeName');
     if (savedClaimName && savedClaimName.trim() !== '') {
+        // Fill the input field with saved name
         nameInput.value = savedClaimName;
         console.log('Loaded saved claim recipient name:', savedClaimName);
         
-        // Update claim for display
-        updateClaimForDisplay(savedClaimName);
+        // Update the header display
+        updateEmployeeDisplayInHeader();
+    } else {
+        console.log('No saved claim recipient name found');
     }
     
-    // Auto-save with debouncing
+    // Add event listeners for auto-saving
     let saveTimeout;
     
+    // Auto-save on input (with debouncing)
     nameInput.addEventListener('input', function() {
         // Clear previous timeout
         if (saveTimeout) {
@@ -106,26 +110,58 @@ function setupEmployeeNameField() {
         saveTimeout = setTimeout(() => {
             saveClaimRecipientName(this.value);
         }, 1000);
+        
+        // Update header immediately for better UX
+        updateEmployeeDisplayInHeaderWithName(this.value);
     });
     
+    // Save on blur (when user leaves the field)
     nameInput.addEventListener('blur', function() {
         saveClaimRecipientName(this.value);
     });
+    
+    // Save on Enter key
+    nameInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            saveClaimRecipientName(this.value);
+            this.blur(); // Remove focus
+        }
+    });
+    
+    console.log('Employee name field setup complete');
 }
 
+// Helper function to update header immediately (without saving)
+function updateEmployeeDisplayInHeaderWithName(name) {
+    const display = document.getElementById('employee-display');
+    if (display) {
+        display.textContent = name.trim() || 'Employee Name';
+    }
+}
 // Save claim recipient name (separate from logged in user)
+// Save claim recipient name
 function saveClaimRecipientName(name) {
+    console.log('Saving claim recipient name:', name);
+    
     const trimmedName = name ? name.trim() : '';
     
-    // Save to separate key to avoid confusion
+    // Save to localStorage
     localStorage.setItem('claimEmployeeName', trimmedName);
-    console.log('Claim recipient name saved:', trimmedName);
     
-    // Update claim for display in header
-    updateClaimForDisplay(trimmedName);
+    // Update the header display
+    updateEmployeeDisplayInHeader();
+    
+    // Update document title
+    document.title = `Broiler Claim - ${trimmedName || 'Employee'}`;
+    
+    // Show notification if name is not empty
+    if (trimmedName !== '') {
+        showNotification(`Claim form updated for: ${trimmedName}`, 'success');
+    }
+    
+    console.log('Claim recipient name saved');
 }
 
-// Update "Claim for" display in header - ULTRA SIMPLE VERSION
 // Update "Claim for" display - SIMPLE TITLE UPDATE
 function updateClaimForDisplay(employeeName) {
     if (!employeeName || employeeName.trim() === '') return;
@@ -308,10 +344,10 @@ function getCurrentEmployeeName() {
     return savedName || 'Employee';
 }
 
+// Update header display from saved name
 function updateEmployeeDisplayInHeader() {
     console.log('Updating employee name in header...');
     
-    // Check if we have a saved claim recipient name
     const savedName = localStorage.getItem('claimEmployeeName');
     const display = document.getElementById('employee-display');
     
@@ -327,6 +363,14 @@ function updateEmployeeDisplayInHeader() {
         display.textContent = 'Employee Name';
         console.log('No saved name found, using default');
     }
+}
+
+// Update function for the "Update" button
+function updateClaimName() {
+    const nameInput = document.getElementById('employee-name-input');
+    if (!nameInput) return;
+    
+    saveClaimRecipientName(nameInput.value);
 }
 
 // Update the date display in the header
@@ -1001,6 +1045,10 @@ function generatePDF() {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(11);
         doc.text(`Total Hours: ${totalHours}`, pageWidth - margin, yPos, { align: 'right' });
+
+        // Get employee name from localStorage (not from input field directly)
+        const employeeName = localStorage.getItem('claimEmployeeName') || 
+        document.getElementById('employee-name-input')?.value || 'Employee Name';
         
         // Add signature section - Optimized for A4
         const signatureY = Math.min(yPos + 40, pageHeight - 50); // Ensure it fits on page
