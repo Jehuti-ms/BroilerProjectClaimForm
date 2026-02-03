@@ -38,7 +38,7 @@ function checkAuth() {
     }
 }
 
-// Save current month
+// Save current month to localStorage
 function saveCurrentMonth() {
     const monthSelect = document.getElementById('month-select');
     const yearInput = document.getElementById('year-input');
@@ -343,61 +343,59 @@ function getCurrentEmployeeName() {
     return savedName || 'Employee';
 }
 
-// Also update your checkAuth function to use the signup name properly
-// In your checkAuth() function, change lines 26-27 from:
-// const displayName = localStorage.getItem('employeeName') || user.employeeName || user.email || 'User';
-// document.getElementById('user-display').textContent = `Welcome, ${displayName}`;
-
 // To:
+// Check authentication - DEBUG VERSION
 function checkAuth() {
-    console.log('Checking auth...');
+    console.log('=== APP.JS CHECKAUTH CALLED ===');
+    console.log('URL:', window.location.href);
+    console.log('localStorage.currentUser:', localStorage.getItem('currentUser'));
     
-    // Check for user in localStorage
-    const userData = localStorage.getItem('currentUser');
-    if (!userData) {
-        console.log('No user, going to auth page');
-        window.location.href = 'auth.html';
-        return false;
-    }
-    
-    try {
-        const user = JSON.parse(userData);
-        console.log('User found:', user.email);
-        
-        // Get the name from signup (stored as employeeName during signup)
-        const signupName = user.employeeName || user.displayName || user.email || 'User';
-        
-        // Update user display (logged in user)
-        const userDisplay = document.getElementById('user-display');
-        if (userDisplay) {
-            userDisplay.textContent = signupName;
-            userDisplay.title = `Logged in as: ${signupName}\nClick to logout`;
-            userDisplay.style.cursor = 'pointer';
-            userDisplay.onclick = function() {
-                if (confirm('Are you sure you want to logout?')) {
-                    logout();
-                }
-            };
-        }
-        
-        // Set employee name input to saved claim recipient name (separate!)
-        const nameInput = document.getElementById('employee-name');
-        if (nameInput) {
-            const claimRecipientName = localStorage.getItem('employeeName') || '';
-            if (claimRecipientName) {
-                nameInput.value = claimRecipientName;
-                // Also update the claim for display
-                updateClaimForDisplay(claimRecipientName);
+    // Force a 5-second delay to see what happens
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const userData = localStorage.getItem('currentUser');
+            if (!userData) {
+                console.log('❌ NO USER DATA IN LOCALSTORAGE');
+                console.log('Full localStorage:', JSON.stringify(localStorage, null, 2));
+                console.log('Redirecting to auth.html...');
+                window.location.href = 'auth.html';
+                resolve(false);
+                return;
             }
-        }
-        
-        return true;
-    } catch (error) {
-        console.log('Auth error, redirecting:', error);
-        window.location.href = 'auth.html';
-        return false;
-    }
+            
+            try {
+                const user = JSON.parse(userData);
+                console.log('✅ USER FOUND:', user.email);
+                console.log('Will initialize app now...');
+                resolve(true);
+            } catch (error) {
+                console.log('❌ ERROR parsing user data:', error);
+                console.log('User data that failed:', userData);
+                window.location.href = 'auth.html';
+                resolve(false);
+            }
+        }, 5000); // 5 second delay
+    });
 }
+
+// Update your DOMContentLoaded to handle the promise
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('=== APP.JS DOM LOADED ===');
+    
+    const isAuthenticated = await checkAuth();
+    
+    if (isAuthenticated) {
+        console.log('Authentication successful, calling initializeApp...');
+        try {
+            initializeApp();
+        } catch (error) {
+            console.error('ERROR in initializeApp:', error);
+            alert('App error: ' + error.message);
+        }
+    } else {
+        console.log('Authentication failed - should have redirected already');
+    }
+});
 
 // ================== Initialization ===================
 // Initialize when page loads
