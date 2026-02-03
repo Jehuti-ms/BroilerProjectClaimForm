@@ -27,27 +27,29 @@
 <body>
     <!-- HEADER SECTION -->
     <div class="header">
-        <!-- School and Project Info -->
-        <div class="header-text">
-            <div class="school-project">
-                <h1>Grantley Adams Memorial School</h1>
-                <h2>Broiler Production Project</h2>
+        <div class="header-content">
+            <!-- School and Project Info - Centered -->
+            <div class="header-text">
+                <div class="school-project">
+                    <h1>Grantley Adams Memorial School</h1>
+                    <h2>Broiler Production Project</h2>
+                </div>
+                
+                <!-- Claim Form with Employee Name -->
+                <div class="claim-form-info">
+                    <h2 id="claim-form-heading">Claim Form for: <span id="employee-display">Jeoffery Knight</span></h2>
+                    <h3 id="form-date">Month: <span id="month-display">February</span>  Year: <span id="year-display">2026</span></h3>
+                </div>
             </div>
             
-            <!-- Claim Form with Employee Name -->
-            <div class="claim-form-info">
-                <h2 id="claim-form-heading">Claim Form for: <span id="employee-display">Jeoffery Knight</span></h2>
-                <h3 id="form-date">Month: <span id="month-display">February</span>  Year: <span id="year-display">2026</span></h3>
+            <!-- User Info -->
+            <div class="user-info">
+                <span id="user-display">Welcome, User</span>
+                <div class="sync-status">
+                    <span>Auto-sync every 5 min</span>
+                </div>
+                <button onclick="logout()" class="logout-btn">Logout</button>
             </div>
-        </div>
-        
-        <!-- User Info -->
-        <div class="user-info">
-            <span id="user-display">Welcome, User</span>
-            <div class="sync-status">
-                <span>Auto-sync every 5 min</span>
-            </div>
-            <button onclick="logout()" class="logout-btn">Logout</button>
         </div>
     </div>
     
@@ -63,25 +65,27 @@
         
         <!-- Date Controls with Add New Entry button on the right -->
         <div class="date-controls-row">
-            <div class="date-selectors">
-                <label for="month-select">Month:</label>
-                <select id="month-select" onchange="updateDateDisplay()">
-                    <option value="0">January</option>
-                    <option value="1" selected>February</option>
-                    <option value="2">March</option>
-                    <option value="3">April</option>
-                    <option value="4">May</option>
-                    <option value="5">June</option>
-                    <option value="6">July</option>
-                    <option value="7">August</option>
-                    <option value="8">September</option>
-                    <option value="9">October</option>
-                    <option value="10">November</option>
-                    <option value="11">December</option>
-                </select>
-                
-                <label for="year-input" style="margin-left: 15px;">Year:</label>
-                <input type="number" id="year-input" value="2026" min="2000" max="2100" onchange="updateDateDisplay()">
+            <div class="date-controls-container">
+                <div class="date-selectors">
+                    <label for="month-select">Month:</label>
+                    <select id="month-select" onchange="updateDateDisplay()">
+                        <option value="0">January</option>
+                        <option value="1" selected>February</option>
+                        <option value="2">March</option>
+                        <option value="3">April</option>
+                        <option value="4">May</option>
+                        <option value="5">June</option>
+                        <option value="6">July</option>
+                        <option value="7">August</option>
+                        <option value="8">September</option>
+                        <option value="9">October</option>
+                        <option value="10">November</option>
+                        <option value="11">December</option>
+                    </select>
+                    
+                    <label for="year-input">Year:</label>
+                    <input type="number" id="year-input" value="2026" min="2000" max="2100" onchange="updateDateDisplay()">
+                </div>
             </div>
             
             <!-- Add New Entry button on the right -->
