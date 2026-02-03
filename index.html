@@ -37,15 +37,15 @@
                 
                 <!-- Claim Form with Employee Name -->
                 <div class="claim-form-info">
-                    <h2 id="claim-form-heading">Claim Form for: <span id="employee-display">Jeoffery Knight</span></h2>
-                    <h3 id="form-date">Month: <span id="month-display">February</span>  Year: <span id="year-display">2026</span></h3>
+                    <h2 id="claim-form-heading">Claim Form for: <span id="employee-display">Employee Name</span></h2>
+                    <h3 id="form-date-display">Month: <span id="month-display">February</span>  Year: <span id="year-display">2026</span></h3>
                 </div>
             </div>
             
             <!-- User Info -->
             <div class="user-info">
                 <span id="user-display">Welcome, User</span>
-                <div class="sync-status">
+                <div class="sync-status" id="sync-status">
                     <span>Auto-sync every 5 min</span>
                 </div>
                 <button onclick="logout()" class="logout-btn">Logout</button>
@@ -60,7 +60,7 @@
         <!-- Employee Input Section -->
         <div class="employee-input-section">
             <label for="employee-name">Employee Name:</label>
-            <input type="text" id="employee-name" placeholder="Enter your full name" oninput="updateEmployeeDisplay()">
+            <input type="text" id="employee-name" placeholder="Enter your full name">
         </div>
         
         <!-- Date Controls with Add New Entry button on the right -->
@@ -68,7 +68,7 @@
             <div class="date-controls-container">
                 <div class="date-selectors">
                     <label for="month-select">Month:</label>
-                    <select id="month-select" onchange="updateDateDisplay()">
+                    <select id="month-select">
                         <option value="0">January</option>
                         <option value="1" selected>February</option>
                         <option value="2">March</option>
@@ -84,12 +84,12 @@
                     </select>
                     
                     <label for="year-input">Year:</label>
-                    <input type="number" id="year-input" value="2026" min="2000" max="2100" onchange="updateDateDisplay()">
+                    <input type="number" id="year-input" value="2026" min="2000" max="2100">
                 </div>
             </div>
             
             <!-- Add New Entry button on the right -->
-            <button class="add-entry-btn" onclick="openModal()">Add New Entry</button>
+            <button onclick="openModal()" class="add-entry-btn">Add New Entry</button>
         </div>
         
         <!-- Form Section -->
@@ -106,7 +106,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <!-- Entries will be added here dynamically -->
+                    <!-- Entries will be added here dynamically by app.js -->
                 </tbody>
             </table>
             <div class="total-hours">
@@ -143,7 +143,7 @@
         </div>
     </div>
     
-    <!-- Modal for adding/editing entries -->
+    <!-- Modal for adding/editing entries - HIDDEN BY DEFAULT -->
     <div id="entry-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -180,39 +180,6 @@
 
     <script src="firebase-config.js"></script>
     <script src="app.js"></script>
-    <script>
-        // Function to update the displayed employee name
-        function updateEmployeeDisplay() {
-            const input = document.getElementById('employee-name');
-            const display = document.getElementById('employee-display');
-            if (input.value.trim() !== '') {
-                display.textContent = input.value;
-            } else {
-                display.textContent = 'Jeoffery Knight';
-            }
-        }
-        
-        // Function to update the displayed month/year
-        function updateDateDisplay() {
-            const monthSelect = document.getElementById('month-select');
-            const yearInput = document.getElementById('year-input');
-            const monthDisplay = document.getElementById('month-display');
-            const yearDisplay = document.getElementById('year-display');
-            
-            const months = [
-                'January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December'
-            ];
-            
-            monthDisplay.textContent = months[monthSelect.value];
-            yearDisplay.textContent = yearInput.value;
-        }
-        
-        // Initialize displays on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            updateEmployeeDisplay();
-            updateDateDisplay();
-        });
-    </script>
+    <!-- No extra JavaScript needed - all functions are in app.js -->
 </body>
 </html>
