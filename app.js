@@ -14,44 +14,28 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 
 // Check authentication - SIMPLE VERSION
 // Check authentication - UPDATED to handle Firebase state
+// Check authentication - SIMPLE DEBUG VERSION
 function checkAuth() {
-    console.log('Checking auth...');
+    console.log('=== CHECKING AUTH ===');
+    console.log('Current URL:', window.location.href);
+    console.log('localStorage.currentUser:', localStorage.getItem('currentUser'));
     
-    // Check for user in localStorage FIRST
     const userData = localStorage.getItem('currentUser');
-    if (userData) {
-        console.log('User found in localStorage');
-        return true;
+    if (!userData) {
+        console.log('❌ NO USER DATA - Redirecting to auth.html');
+        window.location.href = 'auth.html';
+        return false;
     }
     
-    // If no localStorage, check Firebase auth state
-    console.log('No localStorage user, checking Firebase...');
-    
-    // Return a promise since Firebase check is async
-    return new Promise((resolve) => {
-        const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
-            unsubscribe(); // Clean up listener
-            
-            if (firebaseUser) {
-                console.log('User found in Firebase:', firebaseUser.email);
-                
-                // Save to localStorage for next time
-                const userInfo = {
-                    uid: firebaseUser.uid,
-                    email: firebaseUser.email,
-                    employeeName: firebaseUser.displayName || 'User',
-                    username: firebaseUser.email.split('@')[0]
-                };
-                
-                localStorage.setItem('currentUser', JSON.stringify(userInfo));
-                resolve(true);
-            } else {
-                console.log('No user found anywhere, redirecting to auth');
-                window.location.href = 'auth.html';
-                resolve(false);
-            }
-        });
-    });
+    try {
+        const user = JSON.parse(userData);
+        console.log('✅ USER FOUND:', user.email);
+        return true;
+    } catch (error) {
+        console.log('❌ ERROR parsing user data:', error);
+        window.location.href = 'auth.html';
+        return false;
+    }
 }
 
 // Save current month
