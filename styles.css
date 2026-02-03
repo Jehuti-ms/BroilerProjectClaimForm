@@ -396,7 +396,7 @@ body {
 }
 
 /* Signature Section - Optimized for PDF */
-.signature-section {
+/*.signature-section {
     display: flex;
     flex-direction: column;
     gap: 25px;
@@ -435,6 +435,28 @@ body {
     right: 0;
     height: 40px;
     border-bottom: 1px solid var(--border-color);
+} */
+
+/* Signature Section */
+.signature-section {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #ccc;
+}
+
+.signature-box {
+    flex: 1;
+    margin: 0 10px;
+    text-align: center;
+}
+
+.signature-line {
+    height: 2px;
+    background-color: #000;
+    margin-top: 40px;
+    width: 100%;
 }
 
 /* Action Buttons */
