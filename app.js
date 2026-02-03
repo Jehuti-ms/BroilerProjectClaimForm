@@ -181,15 +181,138 @@ function saveCurrentMonth() {
 }
 
 // Load user data for current month
+// Load user data for current month
 function loadUserData(username) {
-    const userData = localStorage.getItem(`userData_${username}`);
+    // First try with username parameter
+    if (username) {
+        const userData = localStorage.getItem(`userData_${username}`);
+        if (userData) {
+            console.log(`✅ Loaded data for username: ${username}`);
+            const allData = JSON.parse(userData);
+            loadCurrentMonthData(allData);
+            return;
+        }
+    }
     
-    if (userData) {
-        const allData = JSON.parse(userData);
-        loadCurrentMonthData(allData);
+    // If not found, try with current user's uid/email
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+        try {
+            const user = JSON.parse(currentUser);
+            // Try multiple possible keys
+            const possibleKeys = [
+                `userData_${user.uid}`,
+                `userData_${user.email}`,
+                `userData_${user.email.split('@')[0]}`
+            ];
+            
+            for (const key of possibleKeys) {
+                const userData = localStorage.getItem(key);
+                if (userData) {
+                    console.log(`✅ Loaded data from key: ${key}`);
+                    const allData = JSON.parse(userData);
+                    loadCurrentMonthData(allData);
+                    return;
+                }
+            }
+        } catch (error) {
+            console.error('Error loading user data:', error);
+        }
+    }
+    
+    // If no data found, load sample data for current month
+    console.log('ℹ️ No saved data found, loading sample or empty data');
+    loadCurrentMonthData();
+}
+
+// Emergency data recovery function
+function recoverLostData() {
+    console.log('🔍 Attempting data recovery...');
+    
+    // Get current user
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        alert('Please log in first');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    
+    // Look for data with any possible key
+    const allKeys = Object.keys(localStorage);
+    const userDataKeys = allKeys.filter(key => 
+        key.includes('userData_') || 
+        key.includes('forms_') || 
+        key.includes('broilerForms')
+    );
+    
+    console.log('Found potential data keys:', userDataKeys);
+    
+    let recoveredData = null;
+    let recoveredKey = null;
+    
+    for (const key of userDataKeys) {
+        try {
+            const data = localStorage.getItem(key);
+            if (data) {
+                const parsed = JSON.parse(data);
+                console.log(`Checking ${key}:`, typeof parsed, Array.isArray(parsed) ? `array with ${parsed.length} items` : 'object');
+                
+                // If it's an array of forms, we found our data
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].date) {
+                    recoveredData = parsed;
+                    recoveredKey = key;
+                    break;
+                }
+                // If it's an object with month keys
+                else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    // Check if any value is an array of forms
+                    for (const monthKey in parsed) {
+                        if (Array.isArray(parsed[monthKey]) && parsed[monthKey].length > 0) {
+                            recoveredData = parsed;
+                            recoveredKey = key;
+                            console.log(`Found data in month: ${monthKey}`);
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.log(`Error parsing ${key}:`, e.message);
+        }
+    }
+    
+    if (recoveredData) {
+        // Save with correct user key
+        const userId = user.uid || user.email.split('@')[0];
+        localStorage.setItem(`userData_${userId}`, JSON.stringify(recoveredData));
+        
+        alert(`✅ Recovered data from ${recoveredKey}! Refreshing page...`);
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
     } else {
-        // For new users, check if we should load sample data
-        loadCurrentMonthData();
+        // Create backup sample data
+        if (confirm('No data found. Create sample data for this month?')) {
+            const month = parseInt(document.getElementById('month-select').value);
+            const year = document.getElementById('year-input').value;
+            
+            if (month == 9 && year == 2025) { // October 2025
+                const userId = user.uid || user.email.split('@')[0];
+                const monthYear = `${month}-${year}`;
+                
+                const allData = {};
+                allData[monthYear] = sampleData;
+                
+                localStorage.setItem(`userData_${userId}`, JSON.stringify(allData));
+                alert('Sample data created! Refreshing...');
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                alert('Can only create sample data for October 2025. Please switch to October 2025 first.');
+            }
+        }
     }
 }
 
@@ -221,29 +344,43 @@ function loadCurrentMonthData(allData = null) {
 }
 
 // Save user data
+// Save user data
 function saveUserData() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
+        console.error('No current user found');
         return;
     }
     
-    const user = JSON.parse(currentUser);
-    const month = parseInt(document.getElementById('month-select').value);
-    const year = document.getElementById('year-input').value;
-    const monthYear = `${month}-${year}`;
-    
-    // Get existing user data
-    const existingData = localStorage.getItem(`userData_${user.username}`);
-    let allData = existingData ? JSON.parse(existingData) : {};
-    
-    // Update data for current month
-    allData[monthYear] = currentFormData;
-    
-    // Save back to localStorage
-    localStorage.setItem(`userData_${user.username}`, JSON.stringify(allData));
-    
-    // Show save confirmation
-    showNotification('Form data saved successfully!');
+    try {
+        const user = JSON.parse(currentUser);
+        
+        // Get user identifier - prefer uid, fallback to email username
+        const userId = user.uid || user.email.split('@')[0];
+        
+        const month = parseInt(document.getElementById('month-select').value);
+        const year = document.getElementById('year-input').value;
+        const monthYear = `${month}-${year}`;
+        
+        // Get existing user data
+        const existingData = localStorage.getItem(`userData_${userId}`);
+        let allData = existingData ? JSON.parse(existingData) : {};
+        
+        // Update data for current month
+        allData[monthYear] = currentFormData;
+        
+        // Save back to localStorage
+        localStorage.setItem(`userData_${userId}`, JSON.stringify(allData));
+        
+        console.log(`✅ Data saved for user: ${userId}, month: ${monthYear}, entries: ${currentFormData.length}`);
+        
+        // Show save confirmation
+        showNotification('Form data saved successfully!');
+        
+    } catch (error) {
+        console.error('Error saving user data:', error);
+        showNotification('Error saving data!');
+    }
 }
 
 // Show notification
