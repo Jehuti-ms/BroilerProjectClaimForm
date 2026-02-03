@@ -74,10 +74,12 @@ function updateFormDate() {
 // Setup employee name field - this IS who the claim is for
 function setupEmployeeNameField() {
     console.log('Setting up employee name field...');
+    console.log('Employee name input element exists:', !!document.getElementById('employee-name'));
     
     const nameInput = document.getElementById('employee-name');
     if (!nameInput) {
-        console.log('Employee name input not found');
+        console.error('CRITICAL: Employee name input not found!');
+        console.log('Available inputs:', document.querySelectorAll('input').length, 'inputs on page');
         return;
     }
     
