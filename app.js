@@ -23,14 +23,25 @@ function checkAuth() {
         const user = JSON.parse(userData);
         console.log('User found:', user.email);
         
-        // Update display
-        const displayName = localStorage.getItem('employeeName') || user.employeeName || user.email || 'User';
-        document.getElementById('user-display').textContent = `Welcome, ${displayName}`;
+        // Get display name - use signup name OR email
+        const displayName = user.employeeName || user.name || user.email || 'User';
         
-        // Set employee name
+        // Update user display (logged in user)
+        const userDisplay = document.getElementById('user-display');
+        if (userDisplay) {
+            userDisplay.textContent = displayName;
+            userDisplay.title = `Logged in: ${displayName}`;
+        }
+        
+        // Set employee name input (who claim is for)
+        // Load from saved claim recipient name if exists
         const nameInput = document.getElementById('employee-name');
-        if (displayName) {
-            nameInput.value = displayName;
+        if (nameInput) {
+            const savedClaimName = localStorage.getItem('claimEmployeeName') || displayName;
+            nameInput.value = savedClaimName;
+            
+            // Update claim for display in header
+            updateClaimForDisplay(savedClaimName);
         }
         
         return true;
@@ -40,7 +51,6 @@ function checkAuth() {
         return false;
     }
 }
-
 // Save current month
 function saveCurrentMonth() {
     const monthSelect = document.getElementById('month-select');
@@ -110,14 +120,14 @@ function setupEmployeeNameField() {
         return;
     }
     
-    // Load previously saved employee name (for claims)
-    const savedEmployeeName = localStorage.getItem('employeeName');
-    if (savedEmployeeName && savedEmployeeName.trim() !== '') {
-        nameInput.value = savedEmployeeName;
-        console.log('Loaded saved employee name:', savedEmployeeName);
+    // Load previously saved CLAIM recipient name (separate from logged in user)
+    const savedClaimName = localStorage.getItem('claimEmployeeName');
+    if (savedClaimName && savedClaimName.trim() !== '') {
+        nameInput.value = savedClaimName;
+        console.log('Loaded saved claim recipient name:', savedClaimName);
         
         // Update claim for display
-        updateClaimForDisplay(savedEmployeeName);
+        updateClaimForDisplay(savedClaimName);
     }
     
     // Auto-save with debouncing
@@ -131,13 +141,69 @@ function setupEmployeeNameField() {
         
         // Set new timeout (save after 1 second of inactivity)
         saveTimeout = setTimeout(() => {
-            saveEmployeeName(this.value);
+            saveClaimRecipientName(this.value);
         }, 1000);
     });
     
     nameInput.addEventListener('blur', function() {
-        saveEmployeeName(this.value);
+        saveClaimRecipientName(this.value);
     });
+}
+
+// Save claim recipient name (separate from logged in user)
+function saveClaimRecipientName(name) {
+    const trimmedName = name ? name.trim() : '';
+    
+    // Save to separate key to avoid confusion
+    localStorage.setItem('claimEmployeeName', trimmedName);
+    console.log('Claim recipient name saved:', trimmedName);
+    
+    // Update claim for display in header
+    updateClaimForDisplay(trimmedName);
+}
+
+// Simple update claim for display
+function updateClaimForDisplay(employeeName) {
+    if (!employeeName || employeeName.trim() === '') return;
+    
+    // Look for existing claim for display
+    let claimDisplay = document.getElementById('claim-for-display');
+    
+    if (!claimDisplay) {
+        // Create it in the header area
+        const header = document.querySelector('header') || 
+                       document.querySelector('.app-header') ||
+                       document.querySelector('h1')?.parentElement ||
+                       document.body;
+        
+        if (header) {
+            claimDisplay = document.createElement('div');
+            claimDisplay.id = 'claim-for-display';
+            claimDisplay.className = 'claim-for-display';
+            claimDisplay.style.cssText = `
+                text-align: center;
+                font-size: 18px;
+                font-weight: bold;
+                margin: 10px 0 20px 0;
+                color: #2c3e50;
+                padding: 5px;
+                background-color: #f8f9fa;
+                border-radius: 5px;
+            `;
+            
+            // Insert after the main title or at top
+            const title = header.querySelector('h1');
+            if (title) {
+                title.insertAdjacentElement('afterend', claimDisplay);
+            } else {
+                header.insertBefore(claimDisplay, header.firstChild);
+            }
+        }
+    }
+    
+    if (claimDisplay) {
+        claimDisplay.textContent = `Claim Form for: ${employeeName}`;
+    }
 }
 
 // Save employee name (who the claim is for)
