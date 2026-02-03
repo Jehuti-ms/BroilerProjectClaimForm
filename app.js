@@ -53,6 +53,226 @@ function saveCurrentMonth() {
     }
 }
 
+// Update form date display
+function updateFormDate() {
+    console.log('Updating form date display...');
+    
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    const formDateElement = document.getElementById('form-date-display');
+    
+    if (!monthSelect || !yearInput) {
+        console.log('Month/year elements not found');
+        return;
+    }
+    
+    const month = parseInt(monthSelect.value);
+    const year = parseInt(yearInput.value);
+    
+    if (isNaN(month) || isNaN(year)) {
+        console.log('Invalid month or year values');
+        return;
+    }
+    
+    // Validate month range (0-11 for JavaScript months)
+    if (month < 0 || month > 11) {
+        console.log('Month out of range:', month);
+        monthSelect.value = new Date().getMonth(); // Reset to current month
+        return;
+    }
+    
+    // Validate year range
+    const currentYear = new Date().getFullYear();
+    if (year < 2000 || year > currentYear + 5) {
+        console.log('Year out of range:', year);
+        yearInput.value = currentYear; // Reset to current year
+        return;
+    }
+    
+    // Update display if element exists
+    if (formDateElement) {
+        formDateElement.textContent = `${monthNames[month]} ${year}`;
+    }
+    
+    // Update document title
+    const employeeName = document.getElementById('employee-name')?.value || 'Claim Form';
+    document.title = `Broiler Claim - ${monthNames[month]} ${year} - ${employeeName}`;
+    
+    console.log(`Date display updated: ${monthNames[month]} ${year}`);
+}
+
+// Setup employee name field (claim recipient, NOT the logged in user)
+function setupEmployeeNameField() {
+    console.log('Setting up employee name field...');
+    
+    const nameInput = document.getElementById('employee-name');
+    if (!nameInput) {
+        console.log('Employee name input not found');
+        return;
+    }
+    
+    // Load previously saved employee name (for claims)
+    const savedEmployeeName = localStorage.getItem('broilerClaimEmployeeName');
+    if (savedEmployeeName && savedEmployeeName.trim() !== '') {
+        nameInput.value = savedEmployeeName;
+        console.log('Loaded saved claim recipient name:', savedEmployeeName);
+    }
+    
+    // Auto-save with debouncing
+    let saveTimeout;
+    
+    nameInput.addEventListener('input', function() {
+        // Clear previous timeout
+        if (saveTimeout) {
+            clearTimeout(saveTimeout);
+        }
+        
+        // Set new timeout (save after 1 second of inactivity)
+        saveTimeout = setTimeout(() => {
+            saveClaimEmployeeName(this.value);
+        }, 1000);
+    });
+    
+    nameInput.addEventListener('blur', function() {
+        saveClaimEmployeeName(this.value);
+    });
+    
+    // Update welcome message to show logged in user, not claim recipient
+    updateUserWelcomeMessage();
+}
+
+// Save claim recipient's name (separate from logged in user)
+function saveClaimEmployeeName(name) {
+    const trimmedName = name ? name.trim() : '';
+    
+    // Only save if not empty
+    if (trimmedName === '') {
+        console.log('Empty employee name, not saving');
+        return;
+    }
+    
+    localStorage.setItem('broilerClaimEmployeeName', trimmedName);
+    console.log('Claim recipient name saved:', trimmedName);
+    
+    // Update any display that shows this name
+    updateClaimRecipientDisplays(trimmedName);
+}
+
+// Update displays for claim recipient (not logged in user)
+function updateClaimRecipientDisplays(name) {
+    // Look for elements that should show the claim recipient
+    const recipientDisplays = document.querySelectorAll('[data-claim-recipient]');
+    recipientDisplays.forEach(element => {
+        element.textContent = name;
+    });
+    
+    // Update document title
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    if (monthSelect && yearInput) {
+        const month = parseInt(monthSelect.value);
+        const year = parseInt(yearInput.value);
+        document.title = `Broiler Claim - ${monthNames[month]} ${year} - ${name}`;
+    }
+}
+
+// Update welcome message to show logged in user
+function updateUserWelcomeMessage() {
+    const userData = localStorage.getItem('currentUser');
+    if (!userData) return;
+    
+    try {
+        const user = JSON.parse(userData);
+        const userDisplay = document.getElementById('user-display');
+        
+        if (userDisplay) {
+            // Show logged in user's name/email
+            const loggedInUser = user.name || user.displayName || user.email || 'User';
+            userDisplay.textContent = `Logged in as: ${loggedInUser}`;
+            userDisplay.title = `Email: ${user.email || 'Not provided'}`;
+        }
+        
+        // Add a separate display for claim recipient if needed
+        createClaimRecipientDisplay();
+        
+    } catch (error) {
+        console.log('Error updating welcome message:', error);
+    }
+}
+
+// Create a separate display for claim recipient
+function createClaimRecipientDisplay() {
+    // Check if display already exists
+    if (document.getElementById('claim-recipient-display')) {
+        return;
+    }
+    
+    const userInfo = document.querySelector('.user-info');
+    if (!userInfo) return;
+    
+    const recipientDiv = document.createElement('div');
+    recipientDiv.id = 'claim-recipient-display';
+    recipientDiv.className = 'claim-recipient-info';
+    recipientDiv.style.marginTop = '5px';
+    recipientDiv.style.fontSize = '12px';
+    recipientDiv.style.color = '#666';
+    
+    const savedName = localStorage.getItem('broilerClaimEmployeeName') || '[Not set]';
+    recipientDiv.innerHTML = `Claim for: <strong>${savedName}</strong>`;
+    
+    userInfo.appendChild(recipientDiv);
+}
+
+// Setup date validation
+function setupDateValidation() {
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (!monthSelect || !yearInput) return;
+    
+    // Add validation on change
+    monthSelect.addEventListener('change', validateDateInputs);
+    yearInput.addEventListener('change', validateDateInputs);
+    yearInput.addEventListener('blur', validateDateInputs);
+}
+
+// Validate date inputs
+function validateDateInputs() {
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (!monthSelect || !yearInput) return;
+    
+    const currentYear = new Date().getFullYear();
+    let year = parseInt(yearInput.value);
+    
+    // Validate year range (allow past years for historical data)
+    if (isNaN(year) || year < 2020 || year > currentYear + 1) {
+        year = currentYear;
+        yearInput.value = currentYear;
+        console.log('Year reset to:', currentYear);
+    }
+    
+    // Month is validated by select (0-11), but ensure it's a number
+    const month = parseInt(monthSelect.value);
+    if (isNaN(month) || month < 0 || month > 11) {
+        monthSelect.value = new Date().getMonth();
+        console.log('Month reset to current month');
+    }
+}
+
+// Get current claim recipient name
+function getCurrentClaimRecipient() {
+    const nameInput = document.getElementById('employee-name');
+    if (nameInput && nameInput.value.trim() !== '') {
+        return nameInput.value.trim();
+    }
+    
+    const savedName = localStorage.getItem('broilerClaimEmployeeName');
+    return savedName || 'Employee';
+}
+
+// ================== Initialization ===================
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded');
@@ -121,6 +341,12 @@ function initializeApp() {
         saveCurrentMonth();
         loadUserData();
     });
+
+    // Add date validation
+    setupDateValidation();
+    
+    // Validate initial date inputs
+    validateDateInputs();
     
     // Initial update of form date
     updateFormDate();
@@ -129,7 +355,7 @@ function initializeApp() {
     saveCurrentMonth();
     
     // Set up name auto-save
-    setupNameAutoSave();
+    setupEmployeeNameField();
     
     // Load user data
     loadUserData();
