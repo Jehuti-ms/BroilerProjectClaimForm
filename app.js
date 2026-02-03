@@ -12,32 +12,6 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
 
-// Check authentication - SIMPLE VERSION
-// Check authentication - UPDATED to handle Firebase state
-// Check authentication - SIMPLE DEBUG VERSION
-function checkAuth() {
-    console.log('=== CHECKING AUTH ===');
-    console.log('Current URL:', window.location.href);
-    console.log('localStorage.currentUser:', localStorage.getItem('currentUser'));
-    
-    const userData = localStorage.getItem('currentUser');
-    if (!userData) {
-        console.log('❌ NO USER DATA - Redirecting to auth.html');
-        window.location.href = 'auth.html';
-        return false;
-    }
-    
-    try {
-        const user = JSON.parse(userData);
-        console.log('✅ USER FOUND:', user.email);
-        return true;
-    } catch (error) {
-        console.log('❌ ERROR parsing user data:', error);
-        window.location.href = 'auth.html';
-        return false;
-    }
-}
-
 // Save current month to localStorage
 function saveCurrentMonth() {
     const monthSelect = document.getElementById('month-select');
@@ -147,73 +121,6 @@ function saveClaimRecipientName(name) {
     
     // Update claim for display in header
     updateClaimForDisplay(trimmedName);
-}
-
-// Simple update claim for display
-function updateClaimForDisplay(employeeName) {
-    if (!employeeName || employeeName.trim() === '') return;
-    
-    // Look for existing claim for display
-    let claimDisplay = document.getElementById('claim-for-display');
-    
-    if (!claimDisplay) {
-        // Create it in the header area
-        const header = document.querySelector('header') || 
-                       document.querySelector('.app-header') ||
-                       document.querySelector('h1')?.parentElement ||
-                       document.body;
-        
-        if (header) {
-            claimDisplay = document.createElement('div');
-            claimDisplay.id = 'claim-for-display';
-            claimDisplay.className = 'claim-for-display';
-            claimDisplay.style.cssText = `
-                text-align: center;
-                font-size: 18px;
-                font-weight: bold;
-                margin: 10px 0 20px 0;
-                color: #2c3e50;
-                padding: 5px;
-                background-color: #f8f9fa;
-                border-radius: 5px;
-            `;
-            
-            // Insert after the main title or at top
-            const title = header.querySelector('h1');
-            if (title) {
-                title.insertAdjacentElement('afterend', claimDisplay);
-            } else {
-                header.insertBefore(claimDisplay, header.firstChild);
-            }
-        }
-    }
-    
-    if (claimDisplay) {
-        claimDisplay.textContent = `Claim Form for: ${employeeName}`;
-    }
-}
-
-// Save employee name (who the claim is for)
-function saveEmployeeName(name) {
-    const trimmedName = name ? name.trim() : '';
-    
-    // Only save if not empty
-    if (trimmedName === '') {
-        console.log('Empty employee name, not saving');
-        return;
-    }
-    
-    localStorage.setItem('employeeName', trimmedName);
-    console.log('Employee name saved:', trimmedName);
-    
-    // Update claim for display in header
-    updateClaimForDisplay(trimmedName);
-    
-    // Also update any welcome message that might show this
-    const userDisplay = document.getElementById('user-display');
-    if (userDisplay) {
-        userDisplay.textContent = `Welcome, ${trimmedName}`;
-    }
 }
 
 // Update "Claim for" display in header
@@ -343,8 +250,7 @@ function getCurrentEmployeeName() {
     return savedName || 'Employee';
 }
 
-// To:
-// Check authentication - DEBUG VERSION
+// Check Authentication
 function checkAuth() {
     console.log('=== APP.JS CHECKAUTH CALLED ===');
     console.log('URL:', window.location.href);
@@ -398,18 +304,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 // ================== Initialization ===================
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('DOM loaded');
-    
-    const isAuthenticated = await checkAuth();
-    
-    if (isAuthenticated) {
-        initializeApp();
-    }
-    // Note: checkAuth() handles redirect to auth.html if not authenticated
-});
-
 // Initialize app
 function initializeApp() {
     console.log('initializeApp called');
