@@ -45,28 +45,25 @@ body {
     padding: 0 15px;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    align-items: center; /* Added: Center all content */
+    gap: 10px;
 }
 
-.header-text {
-    text-align: center;
-    order: 1;
-}
-
-/* School and Project Info - Better wrapping */
+/* School and Project Info - Centered */
 .school-project {
-    margin-bottom: 10px;
+    text-align: center;
+    margin-bottom: 5px;
+    width: 100%; /* Added: Full width for proper centering */
 }
 
 .school-name {
-    font-size: clamp(18px, 4vw, 24px);
+    font-size: clamp(18px, 4vw, 22px);
     font-weight: 700;
     color: var(--primary-color);
     line-height: 1.2;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     word-break: break-word;
     hyphens: auto;
-    padding: 0 10px;
 }
 
 .project-name {
@@ -76,12 +73,13 @@ body {
     font-style: italic;
     line-height: 1.2;
     word-break: break-word;
-    padding: 0 10px;
 }
 
-/* Claim Form Info - Better wrapping */
-.claim-form-info {
-    margin-top: 10px;
+/* Claim Form Title with Employee Name - Centered */
+.claim-form-title {
+    text-align: center;
+    margin: 5px 0;
+    width: 100%; /* Added: Full width for proper centering */
 }
 
 .claim-title {
@@ -91,37 +89,31 @@ body {
     line-height: 1.3;
     margin-bottom: 5px;
     word-break: break-word;
-    padding: 0 10px;
 }
 
 #employee-display {
     font-weight: 700;
     color: var(--accent-color);
-    display: inline-block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-.claim-date {
-    font-size: clamp(14px, 3vw, 16px);
+.month-year {
+    font-size: clamp(14px, 3vw, 18px);
     color: var(--secondary-color);
     font-weight: 500;
-    padding: 0 10px;
 }
 
-#month-display, #year-display {
-    font-weight: 600;
-}
-
-/* User Info - Better mobile positioning */
+/* User Info - Positioned absolutely on right for desktop */
 .user-info {
-    order: 2;
-    text-align: center;
-    padding: 12px;
+    position: absolute; /* Changed from static to absolute */
+    top: 15px;
+    right: 15px;
+    text-align: right;
     background: var(--light-bg);
     border-radius: var(--radius);
-    margin: 0 15px;
+    padding: 10px 15px;
+    margin: 0;
+    width: auto;
+    min-width: 180px;
 }
 
 .user-display {
@@ -162,6 +154,13 @@ body {
     transform: translateY(-1px);
 }
 
+/* Separator */
+.separator {
+    border: none;
+    border-top: 2px solid var(--border-color);
+    margin: 0;
+}
+
 /* ============== MAIN CONTENT ============== */
 .main-container {
     max-width: 1200px;
@@ -169,17 +168,36 @@ body {
     padding: 20px 15px;
 }
 
-/* Form Controls */
-.form-controls {
-    background: white;
-    padding: 20px;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
+/* Action Button */
+.action-bar {
+    text-align: right;
     margin-bottom: 20px;
 }
 
+.add-entry-btn {
+    padding: 12px 24px;
+    background: var(--success-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.add-entry-btn:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+/* Employee Input Section */
 .employee-input-section {
-    margin-bottom: 20px;
+    margin: 15px 0;
+    padding: 15px;
+    background: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
 }
 
 .employee-input-section label {
@@ -206,10 +224,12 @@ body {
 }
 
 /* Date Controls */
-.date-controls-row {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+.date-controls {
+    margin: 15px 0;
+    padding: 15px;
+    background: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
 }
 
 .date-selectors {
@@ -241,32 +261,13 @@ body {
     width: 100px;
 }
 
-.add-entry-btn {
-    padding: 12px 24px;
-    background: var(--success-color);
-    color: white;
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 15px;
-    font-weight: 600;
-    transition: all 0.2s;
-    text-align: center;
-    width: 100%;
-}
-
-.add-entry-btn:hover {
-    background: #218838;
-    transform: translateY(-1px);
-}
-
 /* Form Section with sticky table */
 .form-section {
     background: white;
     padding: 20px;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    margin-bottom: 20px;
+    margin: 20px 0;
 }
 
 .table-container {
@@ -365,7 +366,10 @@ body {
     flex-direction: column;
     gap: 25px;
     margin-top: 30px;
-    padding-top: 25px;
+    padding: 25px;
+    background: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
     border-top: 2px solid var(--border-color);
 }
 
@@ -586,30 +590,21 @@ body {
 /* Tablet and larger phones (768px and up) */
 @media (min-width: 768px) {
     .header-content {
-        flex-direction: row;
-        align-items: flex-start;
-        justify-content: space-between;
-    }
-    
-    .header-text {
-        text-align: left;
-        flex: 1;
-        max-width: 70%;
-    }
-    
-    .school-project,
-    .claim-form-info {
-        padding: 0;
+        flex-direction: column;
+        gap: 15px;
+        position: relative; /* Added for user-info positioning */
+        min-height: 140px; /* Added to accommodate user-info */
     }
     
     .user-info {
-        position: static;
-        order: 2;
-        background: none;
-        padding: 0;
-        margin: 0;
+        position: absolute;
+        top: 15px;
+        right: 15px;
         text-align: right;
-        min-width: 200px;
+        background: var(--light-bg);
+        padding: 10px 15px;
+        margin: 0;
+        width: auto;
     }
     
     .user-display,
@@ -622,28 +617,25 @@ body {
         min-width: 100px;
     }
     
-    .date-controls-row {
-        flex-direction: row;
-        align-items: center;
+    /* Keep everything else centered */
+    .school-project,
+    .claim-form-title {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* For mobile, keep user info below header */
+@media (max-width: 767px) {
+    .user-info {
+        position: static; /* Back to normal flow on mobile */
+        text-align: center;
+        margin-top: 15px;
+        width: 100%;
     }
     
-    .add-entry-btn {
-        width: auto;
-        min-width: 150px;
-    }
-    
-    .signature-section {
-        flex-direction: row;
-        gap: 20px;
-    }
-    
-    .form-row {
-        flex-direction: row;
-    }
-    
-    .notification {
-        left: auto;
-        right: 20px;
+    .header-content {
+        min-height: auto;
     }
 }
 
@@ -659,18 +651,18 @@ body {
     }
     
     .school-name {
-        font-size: 26px;
+        font-size: 24px;
     }
     
     .project-name {
-        font-size: 22px;
+        font-size: 20px;
     }
     
     .claim-title {
         font-size: 22px;
     }
     
-    .claim-date {
+    .month-year {
         font-size: 18px;
     }
     
