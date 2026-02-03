@@ -126,99 +126,98 @@ function saveClaimRecipientName(name) {
 }
 
 // Update "Claim for" display in header - ULTRA SIMPLE VERSION
+// Update "Claim for" display - SIMPLE TITLE UPDATE
 function updateClaimForDisplay(employeeName) {
-    if (!employeeName || employeeName.trim() === '') {
-        console.log('Empty employee name, not updating display');
-        return;
-    }
+    if (!employeeName || employeeName.trim() === '') return;
     
-    console.log('Updating claim display for:', employeeName);
+    console.log('Adding employee name to title:', employeeName);
     
-    // Remove any existing claim display first
-    const oldDisplay = document.getElementById('claim-for-display');
-    if (oldDisplay) {
-        oldDisplay.remove();
-        console.log('Removed old claim display');
-    }
+    // Find ALL h2 elements
+    const h2Elements = document.querySelectorAll('h2');
+    let updated = false;
     
-    // Create new display element
-    const claimDisplay = document.createElement('div');
-    claimDisplay.id = 'claim-for-display';
-    claimDisplay.className = 'claim-for-display';
-    claimDisplay.textContent = `Claim Form for: ${employeeName}`;
-    
-    // Simple styling
-    claimDisplay.style.cssText = `
-        text-align: center;
-        font-size: 18px;
-        font-weight: bold;
-        margin: 15px auto;
-        color: #2c3e50;
-        padding: 12px;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        max-width: 600px;
-        border: 1px solid #ddd;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    `;
-    
-    // Try to find the best place to put it
-    let container = null;
-    
-    // Try common container elements
-    const possibleContainers = [
-        document.querySelector('header'),
-        document.querySelector('.header-container'),
-        document.querySelector('.app-header'),
-        document.querySelector('.container'),
-        document.querySelector('main'),
-        document.querySelector('#app'),
-        document.querySelector('body')
-    ];
-    
-    for (const possibleContainer of possibleContainers) {
-        if (possibleContainer) {
-            container = possibleContainer;
-            console.log('Found container:', container.tagName, container.className || container.id);
+    // Look for any h2 that contains "Claim Form" or similar
+    for (const h2 of h2Elements) {
+        const text = h2.textContent;
+        
+        // Check if this is the claim form title
+        if (text.includes('Claim Form') || text.includes('-') || 
+            text.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/)) {
+            
+            // Extract the month/year part if it exists
+            const monthYearMatch = text.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/);
+            const monthYear = monthYearMatch ? monthYearMatch[0] : '';
+            
+            // Update the title
+            if (monthYear) {
+                h2.textContent = `Claim Form for: ${employeeName} - ${monthYear}`;
+            } else {
+                h2.textContent = `Claim Form for: ${employeeName}`;
+            }
+            
+            // Style it
+            h2.style.textAlign = 'center';
+            h2.style.margin = '10px 0 20px 0';
+            h2.style.color = '#2c3e50';
+            
+            updated = true;
+            console.log('Updated h2 title:', h2.textContent);
             break;
         }
     }
     
-    if (!container) {
-        container = document.body;
-        console.log('Using body as container');
+    // If no h2 was found/updated, create one
+    if (!updated) {
+        createClaimTitle(employeeName);
     }
     
-    // SAFELY insert the display - try different methods
-    try {
-        // Method 1: Try to insert after the main heading
-        const h1 = container.querySelector('h1');
-        if (h1 && h1.parentNode === container) {
-            if (h1.nextSibling) {
-                container.insertBefore(claimDisplay, h1.nextSibling);
-            } else {
-                container.appendChild(claimDisplay);
-            }
-            console.log('Inserted after h1');
+    // Update document title
+    document.title = `Broiler Claim - ${employeeName}`;
+}
+
+function createClaimTitle(employeeName) {
+    // Get month/year
+    let monthYear = '';
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (monthSelect && yearInput) {
+        const month = parseInt(monthSelect.value);
+        const year = parseInt(yearInput.value);
+        if (!isNaN(month) && !isNaN(year)) {
+            const monthNames = ["January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"];
+            monthYear = ` - ${monthNames[month]} ${year}`;
         }
-        // Method 2: Try to insert at the beginning of a specific section
-        else if (container.id === 'app' || container.className.includes('container')) {
-            container.insertBefore(claimDisplay, container.firstChild);
-            console.log('Inserted at beginning of container');
-        }
-        // Method 3: Just append to the container
-        else {
-            container.appendChild(claimDisplay);
-            console.log('Appended to container');
-        }
-    } catch (error) {
-        console.error('Error inserting claim display:', error);
-        // Last resort: prepend to body
-        document.body.insertBefore(claimDisplay, document.body.firstChild);
-        console.log('Used last resort: prepended to body');
     }
     
-    console.log('Claim display updated successfully');
+    // Create the title
+    const title = document.createElement('h2');
+    title.id = 'claim-form-title';
+    title.textContent = `Claim Form for: ${employeeName}${monthYear}`;
+    title.style.cssText = `
+        text-align: center;
+        font-size: 1.5em;
+        margin: 10px 0 20px 0;
+        color: #2c3e50;
+        font-weight: normal;
+    `;
+    
+    // Insert after h1 or at top of app
+    const h1 = document.querySelector('h1');
+    const app = document.getElementById('app');
+    
+    if (h1 && h1.nextSibling) {
+        h1.parentNode.insertBefore(title, h1.nextSibling);
+    } else if (h1) {
+        h1.parentNode.appendChild(title);
+    } else if (app) {
+        app.insertBefore(title, app.firstChild);
+    } else {
+        document.body.insertBefore(title, document.body.firstChild);
+    }
+    
+    console.log('Created new claim title');
 }
 
 // Update user display to show logged in user (discreetly)
