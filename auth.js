@@ -192,7 +192,7 @@ function getAuthErrorMessage(error) {
     // Check if user is already logged in - FIXED VERSION
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Auth page loaded');
-    
+    /*
     // Check if user is already logged in
     auth.onAuthStateChanged(async (user) => {
         if (user) {
@@ -257,5 +257,5 @@ document.addEventListener('DOMContentLoaded', function() {
             localStorage.removeItem('currentUser');
             localStorage.removeItem('employeeName');
         }
-    });
+    });  */
 });
