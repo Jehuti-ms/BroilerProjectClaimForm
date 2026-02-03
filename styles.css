@@ -1,4 +1,4 @@
-/* Reset and base styles */
+ /* Reset and base styles */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -23,59 +23,70 @@ body {
 }
 
 /* Header section */
-/* Professional header layout */
-/* HEADER STYLING - PDF FORMAT */
+/* HEADER STYLING */
 .header {
     padding: 20px;
     position: relative;
-    border-bottom: 1px solid #ccc;
+    border-bottom: 1px solid #eee;
 }
 
-/* Top line - all elements on one line */
-.header-top-line {
+.header-text {
     text-align: center;
-    font-size: 16px;
-    font-weight: bold;
     margin-bottom: 10px;
 }
 
-.header-top-line span {
-    margin: 0 10px;
+/* School and Project Info */
+.school-project {
+    margin-bottom: 10px;
 }
 
-.school-name {
+.school-project h1 {
+    font-size: 20px;
+    font-weight: bold;
+    margin: 0 0 5px 0;
+    color: #2c3e50;
+}
+
+.school-project h2 {
     font-size: 18px;
-}
-
-.project-name {
-    font-size: 16px;
+    font-weight: bold;
+    margin: 0;
+    color: #34495e;
     font-style: italic;
 }
 
-.claim-title {
-    font-size: 16px;
+/* Claim Form Info */
+.claim-form-info {
+    margin-top: 15px;
 }
 
-.month-year {
-    font-size: 16px;
-}
-
-/* Employee line */
-.employee-line {
-    text-align: center;
-    font-size: 14px;
+#claim-form-heading {
+    font-size: 18px;
     font-weight: bold;
-    margin: 10px 0;
+    margin: 0 0 5px 0;
+    color: #2c3e50;
 }
 
-.employee-label {
-    padding: 5px 0;
+#employee-display {
+    font-weight: bold;
+    color: #e74c3c;
 }
 
-/* User info in top right */
+#form-date {
+    font-size: 16px;
+    font-weight: normal;
+    margin: 0;
+    color: #34495e;
+}
+
+#month-display, #year-display {
+    font-weight: bold;
+}
+
+/* User Info */
 .user-info {
     position: absolute;
-    top: 10px;
+    top: 20px;
     right: 20px;
     text-align: right;
 }
@@ -84,29 +95,110 @@ body {
     display: block;
     font-weight: bold;
     font-size: 14px;
+    margin-bottom: 2px;
 }
 
 .sync-status {
     font-size: 12px;
-    color: #666;
-    margin: 2px 0;
+    color: #7f8c8d;
+    margin-bottom: 8px;
 }
 
 .logout-btn {
-    margin-top: 5px;
-    padding: 5px 15px;
-    background-color: #dc3545;
+    padding: 6px 15px;
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background-color 0.3s;
+}
+
+.logout-btn:hover {
+    background-color: #c0392b;
+}
+
+/* Separator line */
+.separator {
+    border: none;
+    border-top: 2px solid #ddd;
+    margin: 0 20px 20px 20px;
+}
+
+/* Main Container */
+.main-container {
+    padding: 0 20px 20px 20px;
+}
+
+/* Employee Input Section */
+.employee-input-section {
+    margin: 15px 0;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.employee-input-section label {
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.employee-input-section input {
+    padding: 8px;
+    width: 300px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Date Controls Row with Add New Entry button */
+.date-controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 15px 0;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.date-selectors {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.date-selectors label {
+    font-weight: bold;
+}
+
+.date-selectors select,
+.date-selectors input {
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Add New Entry button */
+.add-entry-btn {
+    padding: 8px 20px;
+    background-color: #28a745;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
+    font-weight: bold;
+    transition: background-color 0.3s;
+    white-space: nowrap;
 }
 
-.logout-btn:hover {
-    background-color: #c82333;
+.add-entry-btn:hover {
+    background-color: #218838;
 }
 
+/* Rest of your existing CSS for form-section, signature-section, buttons, etc. */
 /* Separator line */
 .separator {
     border: none;
