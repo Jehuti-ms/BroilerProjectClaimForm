@@ -1,3 +1,35 @@
+// DEBUG: Track what's happening
+console.log('=== AUTH.JS LOADING ===');
+console.log('Current URL:', window.location.href);
+console.log('localStorage.currentUser:', localStorage.getItem('currentUser'));
+
+// TEMPORARY: Add a button to clear everything
+if (!document.getElementById('debug-clear')) {
+    const debugBtn = document.createElement('button');
+    debugBtn.id = 'debug-clear';
+    debugBtn.textContent = 'DEBUG: Clear All & Restart';
+    debugBtn.style.cssText = `
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        background: #f44336;
+        color: white;
+        padding: 10px;
+        z-index: 9999;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    `;
+    debugBtn.onclick = function() {
+        localStorage.clear();
+        sessionStorage.clear();
+        console.log('DEBUG: All storage cleared');
+        alert('Storage cleared. Refreshing...');
+        location.reload();
+    };
+    document.body.appendChild(debugBtn);
+}
+
 // Authentication functions
 function showRegister() {
     document.getElementById('login-form').parentElement.style.display = 'none';
