@@ -68,8 +68,8 @@ document.getElementById('login-form').addEventListener('submit', async function(
         // Save employee name separately
         localStorage.setItem('employeeName', employeeName);
         
-        // Redirect to main app
-       safeRedirect('index.html');
+        // Redirect to main app - SIMPLE FIX
+        window.location.href = 'index.html';
         
     } catch (error) {
         console.error('Login error:', error);
@@ -128,8 +128,8 @@ document.getElementById('register-form').addEventListener('submit', async functi
         // Save employee name separately
         localStorage.setItem('employeeName', employeeName);
         
-        // Redirect to main app
-      safeRedirect('index.html');
+        // Redirect to main app - SIMPLE FIX
+        window.location.href = 'index.html';
         
     } catch (error) {
         console.error('Registration error:', error);
@@ -188,55 +188,47 @@ function getAuthErrorMessage(error) {
     }
 }
 
-// Check if user is already logged in - FIXED VERSION
+// Check if user is already logged in - SIMPLE FIX
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Auth page loaded');
     
-    // Only run auth state check on auth.html, not index.html
-    if (!window.location.pathname.includes('index.html')) {
-        auth.onAuthStateChanged(async (user) => {
-            console.log('Auth state changed on auth page. User:', user ? user.email : 'No user');
+    // Simple auto-login check WITHOUT complex redirect logic
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            console.log('User already logged in via Firebase:', user.email);
             
-            if (user) {
-                // User is already logged in, but check if we're already on index.html
-                if (!window.location.pathname.includes('index.html')) {
-                    console.log('User logged in, redirecting to index.html');
+            // Just save user data but don't auto-redirect
+            // This prevents the bouncing loop
+            try {
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    localStorage.setItem('currentUser', JSON.stringify({
+                        uid: user.uid,
+                        email: user.email,
+                        employeeName: userData.employeeName || user.displayName || 'User',
+                        username: user.email.split('@')[0]
+                    }));
                     
-                    try {
-                        const userDoc = await db.collection('users').doc(user.uid).get();
-                        if (userDoc.exists) {
-                            const userData = userDoc.data();
-                            localStorage.setItem('currentUser', JSON.stringify({
-                                uid: user.uid,
-                                email: user.email,
-                                employeeName: userData.employeeName || user.displayName || 'User',
-                                username: user.email.split('@')[0]
-                            }));
-                            
-                            if (userData.employeeName) {
-                                localStorage.setItem('employeeName', userData.employeeName);
-                            }
-                        }
-                    } catch (error) {
-                        console.log('Firestore read error, using auth data:', error);
-                        localStorage.setItem('currentUser', JSON.stringify({
-                            uid: user.uid,
-                            email: user.email,
-                            employeeName: user.displayName || 'User',
-                            username: user.email.split('@')[0]
-                        }));
+                    if (userData.employeeName) {
+                        localStorage.setItem('employeeName', userData.employeeName);
                     }
-                    
-                    // Add small delay to prevent immediate redirect loops
-                    setTimeout(() => {
-                       safeRedirect('index.html');
-                    }, 500);
                 }
-            } else {
-                console.log('No user logged in, staying on auth page');
-                // Clear any stale localStorage data
-                localStorage.removeItem('currentUser');
+            } catch (error) {
+                console.log('Using basic user data');
+                localStorage.setItem('currentUser', JSON.stringify({
+                    uid: user.uid,
+                    email: user.email,
+                    employeeName: user.displayName || 'User',
+                    username: user.email.split('@')[0]
+                }));
             }
-        });
-    }
+            
+            // DON'T auto-redirect - let user click login button
+            console.log('User data saved, waiting for manual login');
+        } else {
+            console.log('No user logged in');
+            localStorage.removeItem('currentUser');
+        }
+    });
 });
