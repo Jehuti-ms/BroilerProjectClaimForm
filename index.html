@@ -57,21 +57,15 @@
     <div class="header">
         <div class="header-content">
             <!-- School and Project Info -->
-            <div class="header-text">
-                <div class="school-project">
-                    <div class="school-name">Grantley Adams Memorial School</div>
-                    <div class="project-name">Broiler Production Project</div>
-                </div>
-                
-                <!-- Claim Form Info -->
-                <div class="claim-form-info">
-                    <div class="claim-title" id="claim-form-heading">
-                        Claim Form for: <span id="employee-display">Employee Name</span>
-                    </div>
-                    <div class="claim-date" id="form-date-display">
-                        <span id="month-display">February</span> <span id="year-display">2026</span>
-                    </div>
-                </div>
+            <div class="school-project">
+                <div class="school-name">Grantley Adams Memorial School</div>
+                <div class="project-name">Broiler Production Project</div>
+            </div>
+            
+            <!-- Claim Form Title with Employee Name -->
+            <div class="claim-form-title">
+                <div class="claim-title">Claim Form for: <span id="employee-display">Employee Name</span></div>
+                <div class="month-year" id="month-year-display">January 2026</div>
             </div>
             
             <!-- User Info -->
@@ -85,40 +79,42 @@
         </div>
     </div>
     
+    <hr class="separator">
+    
     <!-- MAIN CONTENT -->
     <div class="main-container">
-        <!-- Form Controls -->
-        <div class="form-controls">
-            <div class="employee-input-section">
-                <label for="employee-name">Employee Name:</label>
-                <input type="text" id="employee-name" placeholder="Enter your full name">
-            </div>
-            
-            <div class="date-controls-row">
-                <div class="date-controls-container">
-                    <div class="date-selectors">
-                        <label for="month-select">Month:</label>
-                        <select id="month-select">
-                            <option value="0">January</option>
-                            <option value="1" selected>February</option>
-                            <option value="2">March</option>
-                            <option value="3">April</option>
-                            <option value="4">May</option>
-                            <option value="5">June</option>
-                            <option value="6">July</option>
-                            <option value="7">August</option>
-                            <option value="8">September</option>
-                            <option value="9">October</option>
-                            <option value="10">November</option>
-                            <option value="11">December</option>
-                        </select>
-                        
-                        <label for="year-input">Year:</label>
-                        <input type="number" id="year-input" value="2026" min="2000" max="2100">
-                    </div>
-                </div>
+        <!-- Action Button -->
+        <div class="action-bar">
+            <button onclick="openModal()" class="add-entry-btn">Add New Entry</button>
+        </div>
+        
+        <!-- Employee Input Section -->
+        <div class="employee-input-section">
+            <label for="employee-name">Employee Name:</label>
+            <input type="text" id="employee-name" placeholder="Enter your full name">
+        </div>
+        
+        <!-- Date Controls -->
+        <div class="date-controls">
+            <div class="date-selectors">
+                <label for="month-select">Month:</label>
+                <select id="month-select">
+                    <option value="0" selected>January</option>
+                    <option value="1">February</option>
+                    <option value="2">March</option>
+                    <option value="3">April</option>
+                    <option value="4">May</option>
+                    <option value="5">June</option>
+                    <option value="6">July</option>
+                    <option value="7">August</option>
+                    <option value="8">September</option>
+                    <option value="9">October</option>
+                    <option value="10">November</option>
+                    <option value="11">December</option>
+                </select>
                 
-                <button onclick="openModal()" class="add-entry-btn">Add New Entry</button>
+                <label for="year-input">Year:</label>
+                <input type="number" id="year-input" value="2026" min="2000" max="2100">
             </div>
         </div>
         
@@ -212,5 +208,65 @@
 
     <script src="firebase-config.js"></script>
     <script src="app.js"></script>
+    <script>
+        // Update app.js functions to use correct IDs
+        function updateEmployeeDisplay() {
+            const input = document.getElementById('employee-name');
+            const display = document.getElementById('employee-display');
+            if (input && display) {
+                if (input.value.trim() !== '') {
+                    display.textContent = input.value;
+                } else {
+                    display.textContent = 'Employee Name';
+                }
+            }
+        }
+        
+        function updateDateDisplay() {
+            const monthSelect = document.getElementById('month-select');
+            const yearInput = document.getElementById('year-input');
+            const display = document.getElementById('month-year-display');
+            
+            if (monthSelect && yearInput && display) {
+                const months = [
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                ];
+                
+                const month = parseInt(monthSelect.value);
+                const year = parseInt(yearInput.value);
+                
+                if (!isNaN(month) && !isNaN(year)) {
+                    display.textContent = months[month] + ' ' + year;
+                }
+            }
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners for employee name
+            const nameInput = document.getElementById('employee-name');
+            if (nameInput) {
+                nameInput.addEventListener('input', updateEmployeeDisplay);
+                nameInput.addEventListener('change', updateEmployeeDisplay);
+            }
+            
+            // Add event listeners for date controls
+            const monthSelect = document.getElementById('month-select');
+            const yearInput = document.getElementById('year-input');
+            
+            if (monthSelect) {
+                monthSelect.addEventListener('change', updateDateDisplay);
+            }
+            if (yearInput) {
+                yearInput.addEventListener('change', updateDateDisplay);
+                yearInput.addEventListener('input', updateDateDisplay);
+            }
+            
+            // Initial update
+            updateEmployeeDisplay();
+            updateDateDisplay();
+        });
+    </script>
 </body>
 </html>
