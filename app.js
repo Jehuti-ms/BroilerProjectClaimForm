@@ -1,3 +1,10 @@
+// Debug: Track page loads and redirects
+console.log('=== PAGE LOAD DEBUG ===');
+console.log('Current page:', window.location.pathname);
+console.log('Has currentUser in localStorage?', !!localStorage.getItem('currentUser'));
+console.log('Has employeeName in localStorage?', !!localStorage.getItem('employeeName'));
+console.log('=== END DEBUG ===');
+
 // Global variables
 let currentEditingRow = null;
 let currentFormData = [];
@@ -76,6 +83,65 @@ function checkAuthentication() {
         
     } catch (error) {
         console.error('Authentication error:', error);
+        localStorage.removeItem('currentUser');
+        window.location.href = 'auth.html';
+    }
+}// Check if user is authenticated - FIXED VERSION
+function checkAuthentication() {
+    console.log('checkAuthentication called on:', window.location.pathname);
+    
+    // If we're on auth.html, don't check (let auth.js handle it)
+    if (window.location.pathname.includes('auth.html')) {
+        console.log('On auth page, skipping auth check');
+        return;
+    }
+    
+    const currentUser = localStorage.getItem('currentUser');
+    console.log('Current user in localStorage:', currentUser ? 'Exists' : 'None');
+    
+    if (!currentUser) {
+        console.log('No user found, redirecting to auth.html');
+        // Clear any stale data
+        localStorage.clear();
+        window.location.href = 'auth.html';
+        return;
+    }
+    
+    try {
+        const user = JSON.parse(currentUser);
+        console.log('User authenticated:', user.email);
+        
+        // Get saved employee name or use default
+        const savedName = localStorage.getItem('employeeName');
+        const displayName = savedName || user.employeeName || user.email || 'User';
+        
+        // Update welcome message IMMEDIATELY
+        const welcomeElement = document.getElementById('user-display');
+        if (welcomeElement) {
+            welcomeElement.textContent = `Welcome, ${displayName}`;
+            console.log('Welcome message set to:', welcomeElement.textContent);
+        }
+        
+        // Only pre-fill employee name if we have a saved name
+        const nameInput = document.getElementById('employee-name');
+        if (savedName && savedName.trim() !== '') {
+            nameInput.value = savedName;
+        } else {
+            nameInput.value = '';
+        }
+        
+        // Initialize app
+        initializeApp();
+        
+        // Load user data using email as username
+        if (user.email) {
+            const username = user.email.split('@')[0];
+            loadUserData(username);
+        }
+        
+    } catch (error) {
+        console.error('Authentication error:', error);
+        // Clear corrupted data and redirect
         localStorage.removeItem('currentUser');
         window.location.href = 'auth.html';
     }
