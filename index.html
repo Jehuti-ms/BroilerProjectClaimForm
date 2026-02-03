@@ -91,11 +91,14 @@
             <button onclick="openModal()" class="add-entry-btn">Add New Entry</button>
         </div>
 
-          <!-- Employee Input Section - USER ENTERS NAME HERE -->
+          <!-- Employee Input Section - Auto-save version -->
             <div class="employee-input-section">
                 <label for="employee-name-input">Employee Name for this claim:</label>
-                <input type="text" id="employee-name-input" placeholder="Enter employee name (e.g. Jeoffery Knight)">
-                <button onclick="updateClaimName()" class="update-name-btn">Update</button>
+                <input type="text" id="employee-name-input" 
+                       placeholder="Enter employee name (e.g. Jeoffery Knight)"
+                       oninput="updateEmployeeDisplayInHeaderWithName(this.value)"
+                       onblur="saveClaimRecipientName(this.value)">
+                <div class="hint">Name auto-saves as you type</div>
             </div>
         
         <!-- Date Controls -->
