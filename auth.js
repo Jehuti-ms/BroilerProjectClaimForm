@@ -188,47 +188,55 @@ function getAuthErrorMessage(error) {
     }
 }
 
-// Check if user is already logged in
+// Check if user is already logged in - FIXED VERSION
 document.addEventListener('DOMContentLoaded', function() {
-    // Debug: Check Firebase initialization
-    console.log('Auth.js loaded. Checking Firebase...');
-    console.log('Firebase auth available?', typeof auth !== 'undefined' ? 'Yes' : 'No');
+    console.log('Auth page loaded');
     
-    auth.onAuthStateChanged(async (user) => {
-        console.log('Auth state changed. User:', user ? user.email : 'No user');
-        
-        if (user) {
-            // User is signed in, redirect to main app
-            try {
-                const userDoc = await db.collection('users').doc(user.uid).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    localStorage.setItem('currentUser', JSON.stringify({
-                        uid: user.uid,
-                        email: user.email,
-                        employeeName: userData.employeeName || user.displayName || 'User',
-                        username: user.email.split('@')[0]
-                    }));
+    // Only run auth state check on auth.html, not index.html
+    if (!window.location.pathname.includes('index.html')) {
+        auth.onAuthStateChanged(async (user) => {
+            console.log('Auth state changed on auth page. User:', user ? user.email : 'No user');
+            
+            if (user) {
+                // User is already logged in, but check if we're already on index.html
+                if (!window.location.pathname.includes('index.html')) {
+                    console.log('User logged in, redirecting to index.html');
                     
-                    // Save employee name if available
-                    if (userData.employeeName) {
-                        localStorage.setItem('employeeName', userData.employeeName);
+                    try {
+                        const userDoc = await db.collection('users').doc(user.uid).get();
+                        if (userDoc.exists) {
+                            const userData = userDoc.data();
+                            localStorage.setItem('currentUser', JSON.stringify({
+                                uid: user.uid,
+                                email: user.email,
+                                employeeName: userData.employeeName || user.displayName || 'User',
+                                username: user.email.split('@')[0]
+                            }));
+                            
+                            if (userData.employeeName) {
+                                localStorage.setItem('employeeName', userData.employeeName);
+                            }
+                        }
+                    } catch (error) {
+                        console.log('Firestore read error, using auth data:', error);
+                        localStorage.setItem('currentUser', JSON.stringify({
+                            uid: user.uid,
+                            email: user.email,
+                            employeeName: user.displayName || 'User',
+                            username: user.email.split('@')[0]
+                        }));
                     }
                     
-                    console.log('Auto-login redirecting to index.html');
-                    window.location.href = 'index.html';
+                    // Add small delay to prevent immediate redirect loops
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 500);
                 }
-            } catch (error) {
-                console.error('Auto-login error:', error);
-                // Even if Firestore fails, try to use Firebase Auth data
-                localStorage.setItem('currentUser', JSON.stringify({
-                    uid: user.uid,
-                    email: user.email,
-                    employeeName: user.displayName || 'User',
-                    username: user.email.split('@')[0]
-                }));
-                window.location.href = 'index.html';
+            } else {
+                console.log('No user logged in, staying on auth page');
+                // Clear any stale localStorage data
+                localStorage.removeItem('currentUser');
             }
-        }
-    });
+        });
+    }
 });
