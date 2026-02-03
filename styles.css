@@ -249,6 +249,15 @@ body {
     transform: translateY(-1px);
 }
 
+/* Hint text */
+.hint {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+    width: 100%;
+    margin-top: 5px;
+}
+
 /* Date Controls */
 .date-controls {
     margin: 15px 0;
