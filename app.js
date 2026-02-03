@@ -41,6 +41,18 @@ function checkAuth() {
     }
 }
 
+// Save current month
+function saveCurrentMonth() {
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (monthSelect && yearInput) {
+        localStorage.setItem('lastViewedMonth', monthSelect.value);
+        localStorage.setItem('lastViewedYear', yearInput.value);
+        console.log('Saved month/year:', monthSelect.value, yearInput.value);
+    }
+}
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded');
@@ -112,6 +124,9 @@ function initializeApp() {
     
     // Initial update of form date
     updateFormDate();
+
+     // Save the current month selection
+    saveCurrentMonth();
     
     // Set up name auto-save
     setupNameAutoSave();
