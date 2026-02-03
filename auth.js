@@ -50,14 +50,23 @@ document.getElementById('login-form').addEventListener('submit', async function(
             await db.collection('users').doc(user.uid).update({
                 lastLogin: firebase.firestore.FieldValue.serverTimestamp()
             });
+            
+            // Use stored employee name if not provided
+            if (!employeeName && userDoc.data().employeeName) {
+                employeeName = userDoc.data().employeeName;
+            }
         }
         
-        // Store user info in localStorage for quick access
+        // Store user info in localStorage for quick access - FIXED
         localStorage.setItem('currentUser', JSON.stringify({
             uid: user.uid,
             email: user.email,
-            employeeName: employeeName
+            employeeName: employeeName,
+            username: user.email.split('@')[0]  // ← CRITICAL: Add username
         }));
+        
+        // Save employee name separately
+        localStorage.setItem('employeeName', employeeName);
         
         // Redirect to main app
         window.location.href = 'index.html';
@@ -108,12 +117,16 @@ document.getElementById('register-form').addEventListener('submit', async functi
             lastLogin: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        // Store user info in localStorage
+        // Store user info in localStorage - FIXED
         localStorage.setItem('currentUser', JSON.stringify({
             uid: user.uid,
             email: user.email,
-            employeeName: employeeName
+            employeeName: employeeName,
+            username: user.email.split('@')[0]  // ← CRITICAL: Add username
         }));
+        
+        // Save employee name separately
+        localStorage.setItem('employeeName', employeeName);
         
         // Redirect to main app
         window.location.href = 'index.html';
@@ -166,30 +179,53 @@ function getAuthErrorMessage(error) {
             return 'Password is too weak';
         case 'auth/network-request-failed':
             return 'Network error. Please check your connection';
+        case 'auth/invalid-api-key':
+            return 'Firebase configuration error. Please contact support.';
+        case 'auth/operation-not-allowed':
+            return 'Email/password login is not enabled. Please contact support.';
         default:
-            return 'An error occurred. Please try again';
+            return `Error: ${error.code}. Please try again`;
     }
 }
 
-// Store user info in localStorage for quick access
-localStorage.setItem('currentUser', JSON.stringify({
-    uid: user.uid,
-    email: user.email,
-    employeeName: employeeName,
-    username: user.email.split('@')[0]  // ← Add this
-}));
-
 // Check if user is already logged in
 document.addEventListener('DOMContentLoaded', function() {
+    // Debug: Check Firebase initialization
+    console.log('Auth.js loaded. Checking Firebase...');
+    console.log('Firebase auth available?', typeof auth !== 'undefined' ? 'Yes' : 'No');
+    
     auth.onAuthStateChanged(async (user) => {
+        console.log('Auth state changed. User:', user ? user.email : 'No user');
+        
         if (user) {
             // User is signed in, redirect to main app
-            const userDoc = await db.collection('users').doc(user.uid).get();
-            if (userDoc.exists) {
+            try {
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    localStorage.setItem('currentUser', JSON.stringify({
+                        uid: user.uid,
+                        email: user.email,
+                        employeeName: userData.employeeName || user.displayName || 'User',
+                        username: user.email.split('@')[0]
+                    }));
+                    
+                    // Save employee name if available
+                    if (userData.employeeName) {
+                        localStorage.setItem('employeeName', userData.employeeName);
+                    }
+                    
+                    console.log('Auto-login redirecting to index.html');
+                    window.location.href = 'index.html';
+                }
+            } catch (error) {
+                console.error('Auto-login error:', error);
+                // Even if Firestore fails, try to use Firebase Auth data
                 localStorage.setItem('currentUser', JSON.stringify({
                     uid: user.uid,
                     email: user.email,
-                    employeeName: userDoc.data().employeeName
+                    employeeName: user.displayName || 'User',
+                    username: user.email.split('@')[0]
                 }));
                 window.location.href = 'index.html';
             }
