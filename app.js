@@ -1226,10 +1226,8 @@ function showNotification(message, type = 'success') {
     }, 3000);
 }
 
-// Add to your initializeApp() function:f
-// initAutoSync();
 // ========= Simple Data Recovery Function =============
-function recoverLostData() {
+/*function recoverLostData() {
     console.log('🔍 Searching for lost data...');
     
     // Get current user
@@ -1337,6 +1335,97 @@ function recoverLostData() {
     } catch (error) {
         console.error('Recovery error:', error);
         alert('Error during recovery. Check console for details.');
+    }
+} */
+
+// Emergency data recovery function
+function recoverLostData() {
+    console.log('🔍 Attempting data recovery...');
+    
+    // Get current user
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        alert('Please log in first');
+        return;
+    }
+    
+    const user = JSON.parse(currentUser);
+    
+    // Look for data with any possible key
+    const allKeys = Object.keys(localStorage);
+    const userDataKeys = allKeys.filter(key => 
+        key.includes('userData_') || 
+        key.includes('forms_') || 
+        key.includes('broilerForms')
+    );
+    
+    console.log('Found potential data keys:', userDataKeys);
+    
+    let recoveredData = null;
+    let recoveredKey = null;
+    
+    for (const key of userDataKeys) {
+        try {
+            const data = localStorage.getItem(key);
+            if (data) {
+                const parsed = JSON.parse(data);
+                console.log(`Checking ${key}:`, typeof parsed, Array.isArray(parsed) ? `array with ${parsed.length} items` : 'object');
+                
+                // If it's an array of forms, we found our data
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].date) {
+                    recoveredData = parsed;
+                    recoveredKey = key;
+                    break;
+                }
+                // If it's an object with month keys
+                else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    // Check if any value is an array of forms
+                    for (const monthKey in parsed) {
+                        if (Array.isArray(parsed[monthKey]) && parsed[monthKey].length > 0) {
+                            recoveredData = parsed;
+                            recoveredKey = key;
+                            console.log(`Found data in month: ${monthKey}`);
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.log(`Error parsing ${key}:`, e.message);
+        }
+    }
+    
+    if (recoveredData) {
+        // Save with correct user key
+        const userId = user.uid || user.email.split('@')[0];
+        localStorage.setItem(`userData_${userId}`, JSON.stringify(recoveredData));
+        
+        alert(`✅ Recovered data from ${recoveredKey}! Refreshing page...`);
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
+    } else {
+        // Create backup sample data
+        if (confirm('No data found. Create sample data for this month?')) {
+            const month = parseInt(document.getElementById('month-select').value);
+            const year = document.getElementById('year-input').value;
+            
+            if (month == 9 && year == 2025) { // October 2025
+                const userId = user.uid || user.email.split('@')[0];
+                const monthYear = `${month}-${year}`;
+                
+                const allData = {};
+                allData[monthYear] = sampleData;
+                
+                localStorage.setItem(`userData_${userId}`, JSON.stringify(allData));
+                alert('Sample data created! Refreshing...');
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                alert('Can only create sample data for October 2025. Please switch to October 2025 first.');
+            }
+        }
     }
 }
 
