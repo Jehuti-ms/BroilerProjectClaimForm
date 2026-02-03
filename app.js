@@ -751,13 +751,13 @@ function calculateTotal() {
 }
 
 // ==================== GENERATE PDF ====================
+// ==================== GENERATE PDF - A4 OPTIMIZED ====================
 function generatePDF() {
-    console.log('Generating PDF...');
+    console.log('Generating A4 PDF...');
     
     // Check if jsPDF is loaded
     if (!window.jspdf) {
         alert('PDF library not loaded. Please ensure you have internet connection.');
-        // Load jsPDF dynamically
         loadPDFLibrary().then(() => generatePDF());
         return;
     }
@@ -766,33 +766,47 @@ function generatePDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
         
+        // Page dimensions
+        const pageWidth = 210; // A4 width in mm
+        const pageHeight = 297; // A4 height in mm
+        const margin = 15; // Margin in mm
+        
         // Get data
-        const month = document.getElementById('month-select').value;
-        const year = document.getElementById('year-input').value;
-        const employeeName = document.getElementById('employee-name').value;
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        const employeeName = document.getElementById('employee-name').value || 'Employee Name';
         const totalHours = document.getElementById('total-hours').textContent;
         
-        // Header
-        doc.setFontSize(18);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Grantley Adams Memorial School', 105, 20, { align: 'center' });
+        const month = parseInt(monthSelect.value);
+        const year = parseInt(yearInput.value);
+        const monthName = monthNames[month] || 'Month';
         
+        // Header section - Compact
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(16);
-        doc.text('Broiler Production Project', 105, 30, { align: 'center' });
+        doc.text('Grantley Adams Memorial School', pageWidth / 2, margin, { align: 'center' });
         
         doc.setFontSize(14);
-        doc.text('Claim Form', 105, 40, { align: 'center' });
+        doc.text('Broiler Production Project', pageWidth / 2, margin + 8, { align: 'center' });
         
         doc.setFontSize(12);
-        doc.text(`${monthNames[month]} ${year}`, 105, 50, { align: 'center' });
+        doc.text('Claim Form', pageWidth / 2, margin + 16, { align: 'center' });
         
-        // Employee Info
+        // Employee and date info
         doc.setFont('helvetica', 'normal');
-        doc.text(`Employee: ${employeeName}`, 20, 65);
+        doc.setFontSize(10);
+        doc.text(`Employee: ${employeeName}`, margin, margin + 25);
+        doc.text(`${monthName} ${year}`, pageWidth - margin, margin + 25, { align: 'right' });
         
-        // Create table data
+        // Line separator
+        doc.setLineWidth(0.5);
+        doc.line(margin, margin + 30, pageWidth - margin, margin + 30);
+        
+        // Get table data
         const tableData = [];
         const rows = document.querySelectorAll('#time-table tbody tr');
+        
+        let yPos = margin + 40; // Starting position for table
         
         rows.forEach(row => {
             const date = row.cells[0].textContent;
@@ -806,58 +820,101 @@ function generatePDF() {
             }
         });
         
-        // Add table if we have data
+        // Create table with autoTable
         if (tableData.length > 0 && jsPDF.API.autoTable) {
             doc.autoTable({
-                startY: 75,
+                startY: yPos,
                 head: [['Date', 'AM/PM', 'Time IN', 'Time OUT', 'Hours']],
                 body: tableData,
                 theme: 'grid',
                 styles: { 
-                    fontSize: 10, 
+                    fontSize: 9, 
                     cellPadding: 3,
-                    textColor: [0, 0, 0]
+                    textColor: [0, 0, 0],
+                    lineWidth: 0.1
                 },
                 headStyles: { 
                     fillColor: [220, 220, 220],
                     textColor: [0, 0, 0],
-                    fontStyle: 'bold'
+                    fontStyle: 'bold',
+                    fontSize: 10
                 },
-                margin: { left: 20, right: 20 }
+                margin: { left: margin, right: margin },
+                tableWidth: pageWidth - (margin * 2),
+                columnStyles: {
+                    0: { cellWidth: 30 }, // Date
+                    1: { cellWidth: 20 }, // AM/PM
+                    2: { cellWidth: 25 }, // Time IN
+                    3: { cellWidth: 25 }, // Time OUT
+                    4: { cellWidth: 20 }  // Hours
+                }
             });
             
-            // Add total hours
-            const finalY = doc.lastAutoTable.finalY + 10;
-            doc.text(`Total Hours: ${totalHours}`, 160, finalY);
-            
-            // Add signature areas
-            const signatureY = finalY + 25;
-            
-            doc.text('Signature Claimant:', 25, signatureY);
-            doc.line(25, signatureY + 5, 75, signatureY + 5);
-            
-            doc.text('Signature HOD:', 85, signatureY);
-            doc.line(85, signatureY + 5, 135, signatureY + 5);
-            
-            doc.text('Signature Principal:', 145, signatureY);
-            doc.line(145, signatureY + 5, 185, signatureY + 5);
+            // Update position after table
+            yPos = doc.lastAutoTable.finalY + 10;
         } else {
-            doc.text('No entries found', 20, 75);
+            doc.text('No entries found', margin, yPos);
+            yPos += 10;
         }
+        
+        // Add total hours
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(`Total Hours: ${totalHours}`, pageWidth - margin, yPos, { align: 'right' });
+        
+        // Add signature section - Optimized for A4
+        const signatureY = Math.min(yPos + 40, pageHeight - 50); // Ensure it fits on page
+        
+        // Add "Approved by:" text
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text('Approved by:', margin, signatureY);
+        
+        // Signature boxes
+        const boxWidth = 50;
+        const boxSpacing = 10;
+        const totalWidth = (boxWidth * 3) + (boxSpacing * 2);
+        const startX = (pageWidth - totalWidth) / 2;
+        
+        // Signature lines
+        const lineY = signatureY + 20;
+        
+        doc.setLineWidth(0.5);
+        
+        // Box 1: Claimant
+        doc.text('Signature Claimant:', startX, signatureY + 10);
+        doc.line(startX, lineY, startX + boxWidth, lineY);
+        
+        // Box 2: HOD
+        doc.text('Signature HOD:', startX + boxWidth + boxSpacing, signatureY + 10);
+        doc.line(startX + boxWidth + boxSpacing, lineY, startX + (boxWidth * 2) + boxSpacing, lineY);
+        
+        // Box 3: Principal
+        doc.text('Signature Principal:', startX + (boxWidth * 2) + (boxSpacing * 2), signatureY + 10);
+        doc.line(startX + (boxWidth * 2) + (boxSpacing * 2), lineY, startX + (boxWidth * 3) + (boxSpacing * 2), lineY);
+        
+        // Add date line at bottom
+        const currentDate = new Date().toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+        
+        doc.text(`Generated on: ${currentDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
         
         // Set document properties
         doc.setProperties({
-            title: `Broiler Claim Form - ${monthNames[month]} ${year}`,
-            subject: 'Employee Time Claim',
+            title: `Broiler Claim - ${employeeName} - ${monthName} ${year}`,
+            subject: 'Employee Time Claim Form',
             author: 'Grantley Adams Memorial School',
-            keywords: 'broiler, claim, form, timesheet'
+            keywords: 'broiler, chicken, claim, form, timesheet'
         });
         
         // Save the PDF
-        const filename = `Broiler_Claim_${monthNames[month]}_${year}_${employeeName.replace(/\s+/g, '_')}.pdf`;
+        const filename = `Broiler_Claim_${monthName}_${year}_${employeeName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
         doc.save(filename);
         
-        showNotification('PDF generated successfully!');
+        showNotification('A4 PDF generated successfully!');
         
     } catch (error) {
         console.error('PDF generation error:', error);
