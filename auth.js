@@ -69,7 +69,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
         localStorage.setItem('employeeName', employeeName);
         
         // Redirect to main app
-        window.location.href = 'index.html';
+       safeRedirect('index.html');
         
     } catch (error) {
         console.error('Login error:', error);
@@ -129,7 +129,7 @@ document.getElementById('register-form').addEventListener('submit', async functi
         localStorage.setItem('employeeName', employeeName);
         
         // Redirect to main app
-        window.location.href = 'index.html';
+      safeRedirect('index.html');
         
     } catch (error) {
         console.error('Registration error:', error);
@@ -229,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Add small delay to prevent immediate redirect loops
                     setTimeout(() => {
-                        window.location.href = 'index.html';
+                       safeRedirect('index.html');
                     }, 500);
                 }
             } else {
