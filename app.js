@@ -45,7 +45,7 @@ function checkAuthentication() {
     const currentUser = localStorage.getItem('currentUser');
     if (!currentUser) {
         console.log('No user found, redirecting to auth.html');
-        window.location.href = 'auth.html';
+        safeRedirect('auth.html');
         return;
     }
     
@@ -84,7 +84,7 @@ function checkAuthentication() {
     } catch (error) {
         console.error('Authentication error:', error);
         localStorage.removeItem('currentUser');
-        window.location.href = 'auth.html';
+        safeRedirect('auth.html');
     }
 }// Check if user is authenticated - FIXED VERSION
 function checkAuthentication() {
@@ -103,7 +103,7 @@ function checkAuthentication() {
         console.log('No user found, redirecting to auth.html');
         // Clear any stale data
         localStorage.clear();
-        window.location.href = 'auth.html';
+        safeRedirect('auth.html');
         return;
     }
     
@@ -143,7 +143,7 @@ function checkAuthentication() {
         console.error('Authentication error:', error);
         // Clear corrupted data and redirect
         localStorage.removeItem('currentUser');
-        window.location.href = 'auth.html';
+        safeRedirect('auth.html');
     }
 }
 
