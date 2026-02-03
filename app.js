@@ -123,43 +123,100 @@ function saveClaimRecipientName(name) {
     updateClaimForDisplay(trimmedName);
 }
 
-// Update "Claim for" display in header
+// Update "Claim for" display in header - ULTRA SIMPLE VERSION
 function updateClaimForDisplay(employeeName) {
-    // Look for existing claim for display
-    let claimDisplay = document.getElementById('claim-for-display');
+    if (!employeeName || employeeName.trim() === '') {
+        console.log('Empty employee name, not updating display');
+        return;
+    }
     
-    if (!claimDisplay) {
-        // Create it near the header
-        const header = document.querySelector('header') || 
-                       document.querySelector('.header') ||
-                       document.querySelector('h1')?.parentElement;
-        
-        if (header) {
-            claimDisplay = document.createElement('div');
-            claimDisplay.id = 'claim-for-display';
-            claimDisplay.className = 'claim-for-display';
-            claimDisplay.style.cssText = `
-                text-align: center;
-                font-size: 16px;
-                font-weight: bold;
-                margin: 5px 0 15px 0;
-                color: #333;
-            `;
-            
-            // Insert after the main title
-            const title = header.querySelector('h1');
-            if (title && title.nextSibling) {
-                header.insertBefore(claimDisplay, title.nextSibling);
-            } else {
-                header.appendChild(claimDisplay);
-            }
+    console.log('Updating claim display for:', employeeName);
+    
+    // Remove any existing claim display first
+    const oldDisplay = document.getElementById('claim-for-display');
+    if (oldDisplay) {
+        oldDisplay.remove();
+        console.log('Removed old claim display');
+    }
+    
+    // Create new display element
+    const claimDisplay = document.createElement('div');
+    claimDisplay.id = 'claim-for-display';
+    claimDisplay.className = 'claim-for-display';
+    claimDisplay.textContent = `Claim Form for: ${employeeName}`;
+    
+    // Simple styling
+    claimDisplay.style.cssText = `
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+        margin: 15px auto;
+        color: #2c3e50;
+        padding: 12px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        max-width: 600px;
+        border: 1px solid #ddd;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    `;
+    
+    // Try to find the best place to put it
+    let container = null;
+    
+    // Try common container elements
+    const possibleContainers = [
+        document.querySelector('header'),
+        document.querySelector('.header-container'),
+        document.querySelector('.app-header'),
+        document.querySelector('.container'),
+        document.querySelector('main'),
+        document.querySelector('#app'),
+        document.querySelector('body')
+    ];
+    
+    for (const possibleContainer of possibleContainers) {
+        if (possibleContainer) {
+            container = possibleContainer;
+            console.log('Found container:', container.tagName, container.className || container.id);
+            break;
         }
     }
     
-    if (claimDisplay) {
-        claimDisplay.textContent = `Claim for: ${employeeName}`;
-        claimDisplay.title = `Employee: ${employeeName}`;
+    if (!container) {
+        container = document.body;
+        console.log('Using body as container');
     }
+    
+    // SAFELY insert the display - try different methods
+    try {
+        // Method 1: Try to insert after the main heading
+        const h1 = container.querySelector('h1');
+        if (h1 && h1.parentNode === container) {
+            if (h1.nextSibling) {
+                container.insertBefore(claimDisplay, h1.nextSibling);
+            } else {
+                container.appendChild(claimDisplay);
+            }
+            console.log('Inserted after h1');
+        }
+        // Method 2: Try to insert at the beginning of a specific section
+        else if (container.id === 'app' || container.className.includes('container')) {
+            container.insertBefore(claimDisplay, container.firstChild);
+            console.log('Inserted at beginning of container');
+        }
+        // Method 3: Just append to the container
+        else {
+            container.appendChild(claimDisplay);
+            console.log('Appended to container');
+        }
+    } catch (error) {
+        console.error('Error inserting claim display:', error);
+        // Last resort: prepend to body
+        document.body.insertBefore(claimDisplay, document.body.firstChild);
+        console.log('Used last resort: prepended to body');
+    }
+    
+    console.log('Claim display updated successfully');
 }
 
 // Update user display to show logged in user (discreetly)
@@ -296,7 +353,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             initializeApp();
         } catch (error) {
             console.error('ERROR in initializeApp:', error);
-            alert('App error: ' + error.message);
+            // Show a user-friendly error instead of the technical one
+            alert('There was an error loading the application. Please refresh the page.');
+            console.log('Full error details:', error);
         }
     } else {
         console.log('Authentication failed - should have redirected already');
