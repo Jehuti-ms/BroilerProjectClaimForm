@@ -826,48 +826,66 @@ function updateClaimName() {
     saveClaimRecipientName(nameInput.value);
 }
 
-// Open modal to add entry
+// Open modal with better focus management
 function openModal() {
-    // Clear any editing
+    console.log('Opening modal...');
+    
+    // Clear editing state
     window.editingIndex = undefined;
-    const modalTitle = document.getElementById('modal-title');
-    if (modalTitle) {
-        modalTitle.textContent = 'Add New Entry';
-    }
+    document.getElementById('modal-title').textContent = 'Add New Time Entry';
     
     // Set today's date
     const today = new Date().toISOString().split('T')[0];
-    const entryDate = document.getElementById('entry-date');
-    if (entryDate) {
-        entryDate.value = today;
-    }
+    document.getElementById('entry-date').value = today;
     
-    // Set default values
-    const amPmSelect = document.getElementById('entry-am-pm');
-    const timeIn = document.getElementById('entry-time-in');
-    const timeOut = document.getElementById('entry-time-out');
-    
-    if (amPmSelect) amPmSelect.value = 'AM';
-    if (timeIn) timeIn.value = '';
-    if (timeOut) timeOut.value = '';
+    // Set default times
+    document.getElementById('entry-am-pm').value = 'AM';
+    document.getElementById('entry-time-in').value = '08:00';
+    document.getElementById('entry-time-out').value = '12:00';
     
     // Show modal
     const modal = document.getElementById('entry-modal');
-    if (modal) {
-        modal.style.display = 'block';
-    }
+    modal.style.display = 'block';
+    
+    // Focus on date field after a short delay
+    setTimeout(() => {
+        document.getElementById('entry-date').focus();
+    }, 50);
 }
 
-// Close modal
+// Close modal with smooth animation
 function closeModal() {
     console.log('Closing modal...');
     const modal = document.getElementById('entry-modal');
-    if (modal) {
+    
+    // Add fade-out animation
+    modal.style.animation = 'fadeOut 0.2s ease';
+    const content = modal.querySelector('.modal-content');
+    content.style.animation = 'slideOut 0.2s ease';
+    
+    setTimeout(() => {
         modal.style.display = 'none';
-    }
+        modal.style.animation = '';
+        content.style.animation = '';
+    }, 200);
+    
     window.editingIndex = undefined;
 }
 
+// Add these CSS animations for closing
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+    
+    @keyframes slideOut {
+        from { transform: translateY(0); opacity: 1; }
+        to { transform: translateY(-20px); opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
 // Save entry
 function saveEntry() {
     console.log('Saving entry...');
@@ -977,19 +995,48 @@ function formatTimeDisplay(timeStr) {
     return `${displayHour}:${m.padStart(2, '0')} ${ampm}`;
 }
 
-// Edit row
+// Edit row function for your HTML structure
 function editRow(index) {
     const entry = window.currentFormData[index];
+    if (!entry) return;
     
+    // Fill form with entry data
     document.getElementById('entry-date').value = entry.date;
     document.getElementById('entry-am-pm').value = entry.amPm;
     document.getElementById('entry-time-in').value = entry.inTime;
     document.getElementById('entry-time-out').value = entry.outTime;
     
+    // Set editing mode
     window.editingIndex = index;
-    document.getElementById('modal-title').textContent = 'Edit Entry';
-    document.getElementById('entry-modal').style.display = 'block';
+    document.getElementById('modal-title').textContent = 'Edit Time Entry';
+    
+    // Show modal
+    const modal = document.getElementById('entry-modal');
+    modal.style.display = 'block';
+    
+    // Focus on time in field
+    setTimeout(() => {
+        document.getElementById('entry-time-in').focus();
+    }, 50);
 }
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('entry-modal');
+    if (event.target === modal) {
+        closeModal();
+    }
+};
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('entry-modal');
+        if (modal.style.display === 'block') {
+            closeModal();
+        }
+    }
+});
 
 // Delete row
 function deleteRow(index) {
