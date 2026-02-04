@@ -4,7 +4,6 @@ console.log('Simple App starting...');
 console.log('app.js loading...');
 console.log('Current page:', window.location.href);
 console.log('localStorage.currentUser:', localStorage.getItem('currentUser'));
-console.log('Firebase auth state:', auth.currentUser);
 
 // Basic data
 let currentFormData = [];
@@ -24,54 +23,30 @@ function saveCurrentMonth() {
     }
 }
 
-// Update form date display
-function updateFormDate() {
-    console.log('Updating form date display...');
+// Update the date display in the header
+function updateDateDisplayInHeader() {
+    console.log('Updating date in header...');
     
     const monthSelect = document.getElementById('month-select');
     const yearInput = document.getElementById('year-input');
+    const display = document.getElementById('month-year-display');
     
-    if (!monthSelect || !yearInput) {
-        console.log('Month/year elements not found');
+    if (!monthSelect || !yearInput || !display) {
+        console.error('Date elements not found!');
         return;
     }
     
     const month = parseInt(monthSelect.value);
     const year = parseInt(yearInput.value);
     
-    if (isNaN(month) || isNaN(year)) {
-        console.log('Invalid month or year values');
-        return;
+    if (!isNaN(month) && month >= 0 && month <= 11 && !isNaN(year)) {
+        display.textContent = monthNames[month] + ' ' + year;
+        console.log('Updated date display:', display.textContent);
+    } else {
+        console.error('Invalid month or year values:', month, year);
     }
-    
-    // Validate month range (0-11 for JavaScript months)
-    if (month < 0 || month > 11) {
-        console.log('Month out of range:', month);
-        monthSelect.value = new Date().getMonth(); // Reset to current month
-        return;
-    }
-    
-    // Validate year range
-    const currentYear = new Date().getFullYear();
-    if (year < 2000 || year > currentYear + 5) {
-        console.log('Year out of range:', year);
-        yearInput.value = currentYear; // Reset to current year
-        return;
-    }
-    
-    // Update the date display in header if it exists
-    const dateDisplay = document.getElementById('form-date-display') || 
-                        document.getElementById('current-month-display') ||
-                        document.getElementById('header-date');
-    
-    if (dateDisplay) {
-        dateDisplay.textContent = `${monthNames[month]} ${year}`;
-    }
-    
-    console.log(`Date display updated: ${monthNames[month]} ${year}`);
 }
 
-// Setup employee name field - this IS who the claim is for
 // ==================== EMPLOYEE NAME FIELD SETUP ====================
 function setupEmployeeNameField() {
     console.log('Setting up employee name field...');
@@ -138,7 +113,7 @@ function updateEmployeeDisplayInHeaderWithName(name) {
         display.textContent = name.trim() || 'Employee Name';
     }
 }
-// Save claim recipient name (separate from logged in user)
+
 // Save claim recipient name
 function saveClaimRecipientName(name) {
     console.log('Saving claim recipient name:', name);
@@ -162,188 +137,6 @@ function saveClaimRecipientName(name) {
     console.log('Claim recipient name saved');
 }
 
-// Update "Claim for" display - SIMPLE TITLE UPDATE
-function updateClaimForDisplay(employeeName) {
-    if (!employeeName || employeeName.trim() === '') return;
-    
-    console.log('Adding employee name to title:', employeeName);
-    
-    // Find ALL h2 elements
-    const h2Elements = document.querySelectorAll('h2');
-    let updated = false;
-    
-    // Look for any h2 that contains "Claim Form" or similar
-    for (const h2 of h2Elements) {
-        const text = h2.textContent;
-        
-        // Check if this is the claim form title
-        if (text.includes('Claim Form') || text.includes('-') || 
-            text.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/)) {
-            
-            // Extract the month/year part if it exists
-            const monthYearMatch = text.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/);
-            const monthYear = monthYearMatch ? monthYearMatch[0] : '';
-            
-            // Update the title
-            if (monthYear) {
-                h2.textContent = `Claim Form for: ${employeeName} - ${monthYear}`;
-            } else {
-                h2.textContent = `Claim Form for: ${employeeName}`;
-            }
-            
-            // Style it
-            h2.style.textAlign = 'center';
-            h2.style.margin = '10px 0 20px 0';
-            h2.style.color = '#2c3e50';
-            
-            updated = true;
-            console.log('Updated h2 title:', h2.textContent);
-            break;
-        }
-    }
-    
-    // If no h2 was found/updated, create one
-    if (!updated) {
-        createClaimTitle(employeeName);
-    }
-    
-    // Update document title
-    document.title = `Broiler Claim - ${employeeName}`;
-}
-
-function createClaimTitle(employeeName) {
-    // Get month/year
-    let monthYear = '';
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    
-    if (monthSelect && yearInput) {
-        const month = parseInt(monthSelect.value);
-        const year = parseInt(yearInput.value);
-        if (!isNaN(month) && !isNaN(year)) {
-            const monthNames = ["January", "February", "March", "April", "May", "June",
-                "July", "August", "September", "October", "November", "December"];
-            monthYear = ` - ${monthNames[month]} ${year}`;
-        }
-    }
-    
-    // Create the title
-    const title = document.createElement('h2');
-    title.id = 'claim-form-title';
-    title.textContent = `Claim Form for: ${employeeName}${monthYear}`;
-    title.style.cssText = `
-        text-align: center;
-        font-size: 1.5em;
-        margin: 10px 0 20px 0;
-        color: #2c3e50;
-        font-weight: normal;
-    `;
-    
-    // Insert after h1 or at top of app
-    const h1 = document.querySelector('h1');
-    const app = document.getElementById('app');
-    
-    if (h1 && h1.nextSibling) {
-        h1.parentNode.insertBefore(title, h1.nextSibling);
-    } else if (h1) {
-        h1.parentNode.appendChild(title);
-    } else if (app) {
-        app.insertBefore(title, app.firstChild);
-    } else {
-        document.body.insertBefore(title, document.body.firstChild);
-    }
-    
-    console.log('Created new claim title');
-}
-
-// Update user display to show logged in user (discreetly)
-function updateUserDisplay() {
-    const userData = localStorage.getItem('currentUser');
-    if (!userData) return;
-    
-    try {
-        const user = JSON.parse(userData);
-        const userDisplay = document.getElementById('user-display');
-        
-        if (userDisplay) {
-            // Get the name from signup or use email
-            const displayName = user.employeeName || user.displayName || user.email || 'User';
-            
-            // Show it discreetly - maybe as a tooltip or small text
-            userDisplay.textContent = displayName;
-            userDisplay.title = `Logged in as: ${displayName}\nClick to logout`;
-            userDisplay.style.cursor = 'pointer';
-            
-            // Add logout on click
-            userDisplay.onclick = function() {
-                if (confirm('Are you sure you want to logout?')) {
-                    logout();
-                }
-            };
-        }
-        
-    } catch (error) {
-        console.log('Error updating user display:', error);
-    }
-}
-
-// Setup date validation
-function setupDateValidation() {
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    
-    if (!monthSelect || !yearInput) return;
-    
-    // Add validation on change
-    monthSelect.addEventListener('change', function() {
-        validateDateInputs();
-        updateFormDate();
-    });
-    
-    yearInput.addEventListener('change', function() {
-        validateDateInputs();
-        updateFormDate();
-    });
-    
-    yearInput.addEventListener('blur', validateDateInputs);
-}
-
-// Validate date inputs
-function validateDateInputs() {
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    
-    if (!monthSelect || !yearInput) return;
-    
-    const currentYear = new Date().getFullYear();
-    let year = parseInt(yearInput.value);
-    
-    // Validate year range
-    if (isNaN(year) || year < 2020 || year > currentYear + 1) {
-        year = currentYear;
-        yearInput.value = currentYear;
-        console.log('Year reset to:', currentYear);
-    }
-    
-    // Month validation
-    const month = parseInt(monthSelect.value);
-    if (isNaN(month) || month < 0 || month > 11) {
-        monthSelect.value = new Date().getMonth();
-        console.log('Month reset to current month');
-    }
-}
-
-// Get current employee name (who claim is for)
-function getCurrentEmployeeName() {
-    const nameInput = document.getElementById('employee-name');
-    if (nameInput && nameInput.value.trim() !== '') {
-        return nameInput.value.trim();
-    }
-    
-    const savedName = localStorage.getItem('employeeName');
-    return savedName || 'Employee';
-}
-
 // Update header display from saved name
 function updateEmployeeDisplayInHeader() {
     console.log('Updating employee name in header...');
@@ -365,42 +158,18 @@ function updateEmployeeDisplayInHeader() {
     }
 }
 
-// Update function for the "Update" button
-function updateClaimName() {
-    const nameInput = document.getElementById('employee-name-input');
-    if (!nameInput) return;
-    
-    saveClaimRecipientName(nameInput.value);
+// ==================== REMOVE DUPLICATE FUNCTIONS ====================
+// REMOVE OR COMMENT OUT THESE DUPLICATE FUNCTIONS THAT CREATE DUPLICATE HEADERS:
+
+/*
+function updateClaimForDisplay(employeeName) {
+    // THIS FUNCTION CREATES DUPLICATE HEADERS - REMOVE IT
 }
 
-// Update the date display in the header
-function updateDateDisplayInHeader() {
-    console.log('Updating date in header...');
-    
-    const monthSelect = document.getElementById('month-select');
-    const yearInput = document.getElementById('year-input');
-    const display = document.getElementById('month-year-display');
-    
-    if (!monthSelect || !yearInput || !display) {
-        console.error('Date elements not found!');
-        return;
-    }
-    
-    const months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    const month = parseInt(monthSelect.value);
-    const year = parseInt(yearInput.value);
-    
-    if (!isNaN(month) && month >= 0 && month <= 11 && !isNaN(year)) {
-        display.textContent = months[month] + ' ' + year;
-        console.log('Updated date display:', display.textContent);
-    } else {
-        console.error('Invalid month or year values:', month, year);
-    }
+function createClaimTitle(employeeName) {
+    // THIS FUNCTION CREATES DUPLICATE HEADERS - REMOVE IT
 }
+*/
 
 // Update the logged-in user display
 function updateLoggedInUserDisplay() {
@@ -464,14 +233,19 @@ function setupDateControls() {
     monthSelect.addEventListener('change', function() {
         console.log('Month changed to:', this.value);
         updateDateDisplayInHeader();
-        // Also update any other date-dependent functions
-        loadUserData(); // If you have this function
+        saveCurrentMonth();
+        if (typeof loadUserData === 'function') {
+            loadUserData();
+        }
     });
     
     yearInput.addEventListener('change', function() {
         console.log('Year changed to:', this.value);
         updateDateDisplayInHeader();
-        loadUserData(); // If you have this function
+        saveCurrentMonth();
+        if (typeof loadUserData === 'function') {
+            loadUserData();
+        }
     });
     
     console.log('Date controls setup complete');
@@ -491,7 +265,6 @@ function setupHeader() {
     
     console.log('Header setup complete');
 }
-
 
 // Check Authentication
 function checkAuth() {
@@ -597,35 +370,32 @@ function initializeApp() {
     // Add event listeners for date controls
     monthSelect.addEventListener('change', function() {
         console.log('Month changed to:', this.value);
-        updateFormDate();
+        updateDateDisplayInHeader();
         saveCurrentMonth();
-        loadUserData();
+        if (typeof loadUserData === 'function') {
+            loadUserData();
+        }
     });
     
     yearInput.addEventListener('change', function() {
         console.log('Year changed to:', this.value);
-        updateFormDate();
+        updateDateDisplayInHeader();
         saveCurrentMonth();
-        loadUserData();
+        if (typeof loadUserData === 'function') {
+            loadUserData();
+        }
     });
 
-    // Add date validation
-    setupDateValidation();
-    
-    // Validate initial date inputs
-    validateDateInputs();
-    
-    // Initial update of form date
-    updateFormDate();
-
-     // Save the current month selection
-    saveCurrentMonth();
+    // Setup header
+    setupHeader();
     
     // Set up name auto-save
     setupEmployeeNameField();
     
-    // Load user data
-    loadUserData();
+    // Load user data if function exists
+    if (typeof loadUserData === 'function') {
+        loadUserData();
+    }
     
     // Initialize auto-sync if needed
     if (typeof initAutoSync === 'function') {
@@ -635,314 +405,16 @@ function initializeApp() {
     console.log('App initialized. Current month:', monthSelect.value, 'Year:', yearInput.value);
 }
 
-// Setup all listeners
-function setupListeners() {
-    // Month/year changes
-    document.getElementById('month-select').addEventListener('change', updateFormDate);
-    document.getElementById('year-input').addEventListener('change', updateFormDate);
-    
-    // Employee name auto-save
-    const nameInput = document.getElementById('employee-name');
-    nameInput.addEventListener('change', function() {
-        localStorage.setItem('employeeName', this.value);
-        document.getElementById('user-display').textContent = `Welcome, ${this.value}`;
-    });
-}
-
-// Load user data
-function loadUserData() {
-    const userData = localStorage.getItem('currentUser');
-    if (!userData) return;
-    
-    try {
-        const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
-        const dataKey = `userData_${username}`;
-        
-        const savedData = localStorage.getItem(dataKey);
-        if (savedData) {
-            const allData = JSON.parse(savedData);
-            
-            // Get current month
-            const month = document.getElementById('month-select').value;
-            const year = document.getElementById('year-input').value;
-            const monthYear = `${month}-${year}`;
-            
-            if (allData[monthYear]) {
-                currentFormData = allData[monthYear];
-                renderTable();
-            }
-        }
-    } catch (error) {
-        console.log('Error loading data:', error);
-    }
-}
-
-// Save data
-function saveData() {
-    const userData = localStorage.getItem('currentUser');
-    if (!userData) return;
-    
-    try {
-        const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
-        const dataKey = `userData_${username}`;
-        
-        // Get current month
-        const month = document.getElementById('month-select').value;
-        const year = document.getElementById('year-input').value;
-        const monthYear = `${month}-${year}`;
-        
-        // Get existing data
-        const existing = localStorage.getItem(dataKey);
-        let allData = existing ? JSON.parse(existing) : {};
-        
-        // Update current month
-        allData[monthYear] = currentFormData;
-        
-        // Save
-        localStorage.setItem(dataKey, JSON.stringify(allData));
-        console.log('Data saved');
-        
-        // Show notification
-        alert('Data saved successfully!');
-    } catch (error) {
-        console.log('Error saving:', error);
-        alert('Error saving data');
-    }
-}
-
-// Render table
-function renderTable() {
-    const tbody = document.querySelector('#time-table tbody');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    currentFormData.forEach((entry, index) => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${formatDateDisplay(entry.date)}</td>
-            <td>${entry.amPm}</td>
-            <td>${formatTimeDisplay(entry.inTime)}</td>
-            <td>${formatTimeDisplay(entry.outTime)}</td>
-            <td>${entry.hours}</td>
-            <td>
-                <button class="edit-btn" onclick="editRow(${index})">Edit</button>
-                <button class="delete-btn" onclick="deleteRow(${index})">Delete</button>
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
-    
-    calculateTotal();
-}
-
-// Format date for display
-function formatDateDisplay(dateStr) {
-    if (!dateStr) return '';
-    if (dateStr.includes('-')) {
-        const [y, m, d] = dateStr.split('-');
-        return `${d}/${m}/${y}`;
-    }
-    return dateStr;
-}
-
-// Format time for display
-function formatTimeDisplay(timeStr) {
-    if (!timeStr) return '';
-    const [h, m] = timeStr.split(':');
-    const hour = parseInt(h);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${m} ${ampm}`;
-}
-
-// Calculate hours
-function calculateHours(inTime, outTime) {
-    const [inH, inM] = inTime.split(':').map(Number);
-    const [outH, outM] = outTime.split(':').map(Number);
-    
-    let hours = outH - inH;
-    let minutes = outM - inM;
-    
-    if (minutes < 0) {
-        hours--;
-        minutes += 60;
-    }
-    
-    if (hours < 0) hours += 24;
-    
-    return `${hours}:${minutes.toString().padStart(2, '0')}`;
-}
-
-// Calculate total hours
-function calculateTotal() {
-    let total = 0;
-    
-    currentFormData.forEach(entry => {
-        if (entry.hours) {
-            const [h, m] = entry.hours.split(':').map(Number);
-            total += h * 60 + m;
-        }
-    });
-    
-    const hours = Math.floor(total / 60);
-    const minutes = total % 60;
-    
-    const totalElement = document.getElementById('total-hours');
-    if (totalElement) {
-        totalElement.textContent = `${hours}:${minutes.toString().padStart(2, '0')}`;
-    }
-}
-
-// Open modal to add entry
-function openModal() {
-    // Clear any editing
-    window.editingIndex = undefined;
-    document.getElementById('modal-title').textContent = 'Add New Entry';
-    
-    // Set today's date
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('entry-date').value = today;
-    document.getElementById('entry-am-pm').value = 'AM';
-    document.getElementById('entry-time-in').value = '';
-    document.getElementById('entry-time-out').value = '';
-    
-    document.getElementById('entry-modal').style.display = 'block';
-}
-
-// Close modal
-function closeModal() {
-    document.getElementById('entry-modal').style.display = 'none';
-    window.editingIndex = undefined;
-}
-
-// Save entry
-function saveEntry() {
-    const date = document.getElementById('entry-date').value;
-    const amPm = document.getElementById('entry-am-pm').value;
-    const inTime = document.getElementById('entry-time-in').value;
-    const outTime = document.getElementById('entry-time-out').value;
-    
-    if (!date || !inTime || !outTime) {
-        alert('Please fill all fields');
-        return;
-    }
-    
-    const hours = calculateHours(inTime, outTime);
-    const entry = { date, amPm, inTime, outTime, hours };
-    
-    if (window.editingIndex !== undefined) {
-        // Update existing
-        currentFormData[window.editingIndex] = entry;
-    } else {
-        // Add new
-        currentFormData.push(entry);
-    }
-    
-    renderTable();
-    saveData();
-    closeModal();
-}
-
-// Edit row
-function editRow(index) {
-    const entry = currentFormData[index];
-    
-    document.getElementById('entry-date').value = entry.date;
-    document.getElementById('entry-am-pm').value = entry.amPm;
-    document.getElementById('entry-time-in').value = entry.inTime;
-    document.getElementById('entry-time-out').value = entry.outTime;
-    
-    window.editingIndex = index;
-    document.getElementById('modal-title').textContent = 'Edit Entry';
-    document.getElementById('entry-modal').style.display = 'block';
-}
-
-// Delete row
-function deleteRow(index) {
-    if (confirm('Delete this entry?')) {
-        currentFormData.splice(index, 1);
-        renderTable();
-        saveData();
-    }
-}
-
-// Clear all entries
-function clearForm() {
-    if (confirm('Clear all entries for this month?')) {
-        currentFormData = [];
-        renderTable();
-        saveData();
-    }
-}
-
-// Logout
-function logout() {
-    console.log('Logging out...');
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('employeeName');
-    window.location.href = 'auth.html';
-}
-
-// Basic PDF
-function generatePDF() {
-    alert('PDF feature will be added later');
-}
-
-// Basic Print
-function printForm() {
-    alert('Print feature will be added later');
-}
-
-// Close modal with escape key
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeModal();
-});
-
-// Close modal when clicking outside
-window.onclick = function(e) {
-    const modal = document.getElementById('entry-modal');
-    if (e.target === modal) closeModal();
-};
-
-// ==================== UTILITIES =====================
-
-// ==================== CALCULATE TOTAL ====================
-function calculateTotal() {
-    console.log('Calculating total hours...');
-    
-    const rows = document.querySelectorAll('#time-table tbody tr');
-    let totalMinutes = 0;
-    
-    rows.forEach(row => {
-        const hoursText = row.cells[4].textContent;
-        if (hoursText && hoursText !== '') {
-            const [hours, minutes] = hoursText.split(':').map(Number);
-            if (!isNaN(hours)) totalMinutes += hours * 60;
-            if (!isNaN(minutes)) totalMinutes += minutes;
-        }
-    });
-    
-    const totalHours = Math.floor(totalMinutes / 60);
-    const remainingMinutes = totalMinutes % 60;
-    
-    const totalDisplay = `${totalHours}:${remainingMinutes.toString().padStart(2, '0')}`;
-    document.getElementById('total-hours').textContent = totalDisplay;
-    
-    showNotification(`Total calculated: ${totalDisplay} hours`);
-    return totalDisplay;
-}
-
-// ==================== GENERATE PDF - A4 OPTIMIZED ====================
+// ==================== FIXED PDF FUNCTION ====================
 function generatePDF() {
     console.log('Generating A4 PDF...');
     
     // Check if jsPDF is loaded
     if (!window.jspdf) {
         alert('PDF library not loaded. Please ensure you have internet connection.');
-        loadPDFLibrary().then(() => generatePDF());
+        if (typeof loadPDFLibrary === 'function') {
+            loadPDFLibrary().then(() => generatePDF());
+        }
         return;
     }
     
@@ -958,11 +430,16 @@ function generatePDF() {
         // Get data
         const monthSelect = document.getElementById('month-select');
         const yearInput = document.getElementById('year-input');
-        const employeeName = document.getElementById('employee-name').value || 'Employee Name';
-        const totalHours = document.getElementById('total-hours').textContent;
         
-        const month = parseInt(monthSelect.value);
-        const year = parseInt(yearInput.value);
+        // Get employee name from localStorage or input field
+        const employeeName = localStorage.getItem('claimEmployeeName') || 
+                            document.getElementById('employee-name-input')?.value || 
+                            'Employee Name';
+        
+        const totalHours = document.getElementById('total-hours')?.textContent || '0:00';
+        
+        const month = parseInt(monthSelect?.value || 0);
+        const year = parseInt(yearInput?.value || 2026);
         const monthName = monthNames[month] || 'Month';
         
         // Header section - Compact
@@ -993,11 +470,11 @@ function generatePDF() {
         let yPos = margin + 40; // Starting position for table
         
         rows.forEach(row => {
-            const date = row.cells[0].textContent;
-            const amPm = row.cells[1].textContent;
-            const timeIn = row.cells[2].textContent;
-            const timeOut = row.cells[3].textContent;
-            const hours = row.cells[4].textContent;
+            const date = row.cells[0]?.textContent;
+            const amPm = row.cells[1]?.textContent;
+            const timeIn = row.cells[2]?.textContent;
+            const timeOut = row.cells[3]?.textContent;
+            const hours = row.cells[4]?.textContent;
             
             if (date && date !== '') {
                 tableData.push([date, amPm, timeIn, timeOut, hours]);
@@ -1045,10 +522,6 @@ function generatePDF() {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(11);
         doc.text(`Total Hours: ${totalHours}`, pageWidth - margin, yPos, { align: 'right' });
-
-        // Get employee name from localStorage (not from input field directly)
-        const employeeName = localStorage.getItem('claimEmployeeName') || 
-        document.getElementById('employee-name-input')?.value || 'Employee Name';
         
         // Add signature section - Optimized for A4
         const signatureY = Math.min(yPos + 40, pageHeight - 50); // Ensure it fits on page
@@ -1110,33 +583,7 @@ function generatePDF() {
     }
 }
 
-// Load PDF library dynamically
-function loadPDFLibrary() {
-    return new Promise((resolve, reject) => {
-        if (window.jspdf) {
-            resolve();
-            return;
-        }
-        
-        // Load jsPDF
-        const script1 = document.createElement('script');
-        script1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-        
-        // Load autoTable plugin
-        const script2 = document.createElement('script');
-        script2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js';
-        
-        script1.onload = () => {
-            script2.onload = () => resolve();
-            document.head.appendChild(script2);
-        };
-        
-        script1.onerror = reject;
-        document.head.appendChild(script1);
-    });
-}
-
-// ==================== PRINT FORM ====================
+// ==================== FIXED PRINT FUNCTION ====================
 function printForm() {
     console.log('Printing form...');
     
@@ -1148,21 +595,34 @@ function printForm() {
     }
     
     // Get data
-    const month = document.getElementById('month-select').value;
-    const year = document.getElementById('year-input').value;
-    const employeeName = document.getElementById('employee-name').value;
-    const totalHours = document.getElementById('total-hours').textContent;
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (!monthSelect || !yearInput) {
+        alert('Cannot print: Month/Year not found');
+        return;
+    }
+    
+    const month = parseInt(monthSelect.value);
+    const year = parseInt(yearInput.value);
+    
+    // Get employee name from localStorage or input field
+    const employeeName = localStorage.getItem('claimEmployeeName') || 
+                        document.getElementById('employee-name-input')?.value || 
+                        'Employee Name';
+    
+    const totalHours = document.getElementById('total-hours')?.textContent || '0:00';
     
     // Get table data
     let tableRows = '';
     const rows = document.querySelectorAll('#time-table tbody tr');
     
     rows.forEach(row => {
-        const date = row.cells[0].textContent;
-        const amPm = row.cells[1].textContent;
-        const timeIn = row.cells[2].textContent;
-        const timeOut = row.cells[3].textContent;
-        const hours = row.cells[4].textContent;
+        const date = row.cells[0]?.textContent;
+        const amPm = row.cells[1]?.textContent;
+        const timeIn = row.cells[2]?.textContent;
+        const timeOut = row.cells[3]?.textContent;
+        const hours = row.cells[4]?.textContent;
         
         if (date && date !== '') {
             tableRows += `
@@ -1272,728 +732,199 @@ function printForm() {
     showNotification('Opening print preview...');
 }
 
-// ==================== CLEAR FORM ====================
-function clearForm() {
-    if (confirm('Are you sure you want to clear ALL entries for this month?\nThis action cannot be undone.')) {
-        console.log('Clearing form...');
-        
-        const tableBody = document.querySelector('#time-table tbody');
-        if (tableBody) {
-            tableBody.innerHTML = '';
-        }
-        
-        currentFormData = [];
-        document.getElementById('total-hours').textContent = '0:00';
-        
-        // Clear from localStorage
-        const userData = localStorage.getItem('currentUser');
-        if (userData) {
-            try {
-                const user = JSON.parse(userData);
-                const username = user.email.split('@')[0];
-                const dataKey = `userData_${username}`;
-                
-                const month = document.getElementById('month-select').value;
-                const year = document.getElementById('year-input').value;
-                const monthYear = `${month}-${year}`;
-                
-                const existingData = localStorage.getItem(dataKey);
-                if (existingData) {
-                    const allData = JSON.parse(existingData);
-                    // Only clear current month
-                    allData[monthYear] = [];
-                    localStorage.setItem(dataKey, JSON.stringify(allData));
-                }
-            } catch (error) {
-                console.error('Error clearing from storage:', error);
-            }
-        }
-        
-        showNotification('Form cleared successfully');
+// ==================== KEEP OTHER FUNCTIONS AS IS ====================
+// Keep all your existing functions like:
+// openModal, closeModal, saveEntry, calculateHours, renderTable, etc.
+// Just make sure you don't have duplicate function declarations
+
+// Open modal to add entry
+function openModal() {
+    // Clear any editing
+    window.editingIndex = undefined;
+    const modalTitle = document.getElementById('modal-title');
+    if (modalTitle) {
+        modalTitle.textContent = 'Add New Entry';
+    }
+    
+    // Set today's date
+    const today = new Date().toISOString().split('T')[0];
+    const entryDate = document.getElementById('entry-date');
+    if (entryDate) {
+        entryDate.value = today;
+    }
+    
+    // Set default values
+    const amPmSelect = document.getElementById('entry-am-pm');
+    const timeIn = document.getElementById('entry-time-in');
+    const timeOut = document.getElementById('entry-time-out');
+    
+    if (amPmSelect) amPmSelect.value = 'AM';
+    if (timeIn) timeIn.value = '';
+    if (timeOut) timeOut.value = '';
+    
+    // Show modal
+    const modal = document.getElementById('entry-modal');
+    if (modal) {
+        modal.style.display = 'block';
     }
 }
 
-// ==================== SAVE FORM ====================
-function saveForm() {
-    console.log('Saving form...');
-    
-    try {
-        const userData = localStorage.getItem('currentUser');
-        if (!userData) {
-            alert('Please log in first');
-            return;
-        }
-        
-        const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
-        const dataKey = `userData_${username}`;
-        
-        // Get current month/year
-        const month = document.getElementById('month-select').value;
-        const year = document.getElementById('year-input').value;
-        const monthYear = `${month}-${year}`;
-        
-        // Get existing data
-        const existingData = localStorage.getItem(dataKey);
-        let allData = existingData ? JSON.parse(existingData) : {};
-        
-        // Update current month's data
-        allData[monthYear] = currentFormData;
-        
-        // Save back to localStorage
-        localStorage.setItem(dataKey, JSON.stringify(allData));
-        
-        // Also save to a backup key
-        localStorage.setItem(`${dataKey}_backup_${Date.now()}`, JSON.stringify(allData));
-        
-        console.log(`Form saved: ${currentFormData.length} entries for ${monthNames[month]} ${year}`);
-        
-        // Update last saved timestamp
-        localStorage.setItem('lastSaved', new Date().toISOString());
-        
-        showNotification('Form saved successfully!');
-        
-        // Auto-sync if enabled
-        if (localStorage.getItem('autoSyncEnabled') === 'true') {
-            syncToCloud();
-        }
-        
-    } catch (error) {
-        console.error('Save error:', error);
-        showNotification('Error saving form', 'error');
+// Close modal
+function closeModal() {
+    console.log('Closing modal...');
+    const modal = document.getElementById('entry-modal');
+    if (modal) {
+        modal.style.display = 'none';
     }
+    window.editingIndex = undefined;
 }
 
-// ==================== SYNC TO CLOUD ====================
-function syncToCloud() {
-    console.log('Syncing to cloud...');
+// Save entry
+function saveEntry() {
+    console.log('Saving entry...');
     
-    // Show syncing status
-    const statusElement = document.getElementById('sync-status') || createSyncStatusElement();
-    statusElement.innerHTML = '<span style="color: #2196F3;">🔄 Syncing...</span>';
+    // Get form values
+    const date = document.getElementById('entry-date')?.value;
+    const amPm = document.getElementById('entry-am-pm')?.value;
+    const inTime = document.getElementById('entry-time-in')?.value;
+    const outTime = document.getElementById('entry-time-out')?.value;
     
-    try {
-        const userData = localStorage.getItem('currentUser');
-        if (!userData) {
-            throw new Error('Not logged in');
-        }
-        
-        const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
-        const dataKey = `userData_${username}`;
-        
-        // Get all user data
-        const allData = localStorage.getItem(dataKey);
-        if (!allData) {
-            throw new Error('No data to sync');
-        }
-        
-        // Try Firebase sync first
-        if (window.firebase && window.firebase.firestore) {
-            syncToFirebase(username, JSON.parse(allData))
-                .then(success => {
-                    if (success) {
-                        // Firebase sync successful
-                        statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Synced to Firebase</span>';
-                        showNotification('Data synced to cloud!', 'success');
-                        
-                        // Update last sync time
-                        localStorage.setItem('lastCloudSync', new Date().toISOString());
-                        updateLastSyncDisplay();
-                    } else {
-                        // Fallback to localStorage backup
-                        fallbackCloudSync(username, allData, statusElement);
-                    }
-                })
-                .catch(error => {
-                    console.error('Firebase sync error:', error);
-                    fallbackCloudSync(username, allData, statusElement);
-                });
-        } else {
-            // Firebase not available, use fallback
-            fallbackCloudSync(username, allData, statusElement);
-        }
-        
-    } catch (error) {
-        console.error('Sync error:', error);
-        statusElement.innerHTML = `<span style="color: #f44336;">❌ ${error.message}</span>`;
-        showNotification('Sync failed: ' + error.message, 'error');
-    }
-}
-
-// Firebase sync function
-async function syncToFirebase(username, data) {
-    return new Promise((resolve, reject) => {
-        try {
-            if (!window.firebase || !window.firebase.firestore) {
-                resolve(false);
-                return;
-            }
-            
-            const db = firebase.firestore();
-            const userRef = db.collection('user_data').doc(username);
-            
-            userRef.set({
-                user_id: username,
-                data: data,
-                updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-                last_sync: new Date().toISOString(),
-                device: navigator.userAgent
-            }, { merge: true })
-            .then(() => {
-                console.log('✅ Firebase sync successful');
-                resolve(true);
-            })
-            .catch(error => {
-                console.error('Firebase set error:', error);
-                resolve(false);
-            });
-            
-        } catch (error) {
-            console.error('Firebase sync error:', error);
-            resolve(false);
-        }
-    });
-}
-
-// Fallback cloud sync (localStorage backup)
-function fallbackCloudSync(username, data, statusElement) {
-    try {
-        // Create cloud backup in localStorage
-        const cloudBackup = {
-            username: username,
-            data: JSON.parse(data),
-            timestamp: new Date().toISOString(),
-            source: 'local_backup'
-        };
-        
-        localStorage.setItem(`cloud_backup_${username}`, JSON.stringify(cloudBackup));
-        
-        // Also create a dated backup
-        const backupKey = `backup_${username}_${new Date().toISOString().split('T')[0]}`;
-        localStorage.setItem(backupKey, data);
-        
-        // Keep only last 7 backups
-        cleanupOldBackups(username);
-        
-        statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Backed up locally</span>';
-        showNotification('Data backed up locally', 'success');
-        
-        // Update last sync time
-        localStorage.setItem('lastCloudSync', new Date().toISOString());
-        updateLastSyncDisplay();
-        
-    } catch (error) {
-        console.error('Fallback sync error:', error);
-        statusElement.innerHTML = '<span style="color: #f44336;">❌ Backup failed</span>';
-        showNotification('Backup failed', 'error');
-    }
-}
-
-// Create sync status element if it doesn't exist
-function createSyncStatusElement() {
-    const userInfo = document.querySelector('.user-info');
-    if (!userInfo) return null;
-    
-    const statusElement = document.createElement('div');
-    statusElement.id = 'sync-status';
-    statusElement.style.marginLeft = '10px';
-    statusElement.style.fontSize = '12px';
-    userInfo.appendChild(statusElement);
-    
-    return statusElement;
-}
-
-// Update last sync display
-function updateLastSyncDisplay() {
-    const lastSync = localStorage.getItem('lastCloudSync');
-    const statusElement = document.getElementById('sync-status');
-    
-    if (statusElement && lastSync) {
-        const lastSyncDate = new Date(lastSync);
-        const now = new Date();
-        const diffHours = Math.floor((now - lastSyncDate) / (1000 * 60 * 60));
-        
-        let statusText = `Last sync: ${lastSyncDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-        let color = '#666';
-        
-        if (diffHours < 1) {
-            color = '#4CAF50';
-            statusText += ' 🟢';
-        } else if (diffHours < 24) {
-            color = '#FF9800';
-            statusText += ' 🟡';
-        } else {
-            color = '#f44336';
-            statusText += ' 🔴';
-        }
-        
-        statusElement.innerHTML = `<span style="color: ${color}; font-size: 11px;">${statusText}</span>`;
-    }
-}
-
-// Cleanup old backups
-function cleanupOldBackups(username) {
-    const allKeys = Object.keys(localStorage);
-    const backupKeys = allKeys.filter(key => key.startsWith('backup_') || key.startsWith('cloud_backup_'));
-    
-    // Sort by timestamp (newest first)
-    backupKeys.sort((a, b) => {
-        const timeA = localStorage.getItem(a) ? JSON.parse(localStorage.getItem(a)).timestamp : '';
-        const timeB = localStorage.getItem(b) ? JSON.parse(localStorage.getItem(b)).timestamp : '';
-        return new Date(timeB) - new Date(timeA);
-    });
-    
-    // Remove old backups (keep only 7 most recent)
-    if (backupKeys.length > 7) {
-        for (let i = 7; i < backupKeys.length; i++) {
-            localStorage.removeItem(backupKeys[i]);
-        }
-    }
-}
-
-// ==================== AUTO-SYNC ====================
-let autoSyncInterval = null;
-const AUTO_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
-
-function initAutoSync() {
-    console.log('Initializing auto-sync...');
-    
-    // Load auto-sync setting
-    const autoSyncEnabled = localStorage.getItem('autoSyncEnabled') === 'true';
-    
-    // Create auto-sync checkbox if it doesn't exist
-    if (!document.getElementById('auto-sync-checkbox')) {
-        createAutoSyncControl();
-    }
-    
-    // Set initial state
-    document.getElementById('auto-sync-checkbox').checked = autoSyncEnabled;
-    
-    // Start/stop auto-sync based on setting
-    if (autoSyncEnabled) {
-        startAutoSync();
-    } else {
-        stopAutoSync();
-    }
-    
-    // Update last sync display
-    updateLastSyncDisplay();
-}
-
-function createAutoSyncControl() {
-    // Add to user info section
-    const userInfo = document.querySelector('.user-info');
-    if (!userInfo) return;
-    
-    const autoSyncContainer = document.createElement('div');
-    autoSyncContainer.className = 'auto-sync-container';
-    autoSyncContainer.style.marginTop = '5px';
-    autoSyncContainer.style.fontSize = '11px';
-    
-    autoSyncContainer.innerHTML = `
-        <label>
-            <input type="checkbox" id="auto-sync-checkbox" onchange="toggleAutoSync(this.checked)">
-            Auto-sync every 5 min
-        </label>
-    `;
-    
-    userInfo.appendChild(autoSyncContainer);
-}
-
-function toggleAutoSync(enabled) {
-    console.log('Auto-sync:', enabled ? 'ENABLED' : 'DISABLED');
-    
-    localStorage.setItem('autoSyncEnabled', enabled.toString());
-    
-    if (enabled) {
-        startAutoSync();
-        showNotification('Auto-sync enabled', 'success');
-    } else {
-        stopAutoSync();
-        showNotification('Auto-sync disabled', 'info');
-    }
-}
-
-function startAutoSync() {
-    if (autoSyncInterval) {
-        clearInterval(autoSyncInterval);
-    }
-    
-    autoSyncInterval = setInterval(() => {
-        // Only sync if user is online and app is active
-        if (navigator.onLine && !document.hidden) {
-            console.log('Auto-sync triggered');
-            syncToCloud();
-        }
-    }, AUTO_SYNC_INTERVAL);
-    
-    console.log('Auto-sync started');
-}
-
-function stopAutoSync() {
-    if (autoSyncInterval) {
-        clearInterval(autoSyncInterval);
-        autoSyncInterval = null;
-    }
-    
-    console.log('Auto-sync stopped');
-}
-
-// Sync from cloud (load data)
-function syncFromCloud() {
-    console.log('Loading from cloud...');
-    
-    const statusElement = document.getElementById('sync-status') || createSyncStatusElement();
-    statusElement.innerHTML = '<span style="color: #2196F3;">🔄 Loading from cloud...</span>';
-    
-    try {
-        const userData = localStorage.getItem('currentUser');
-        if (!userData) {
-            throw new Error('Not logged in');
-        }
-        
-        const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
-        
-        // Try Firebase first
-        if (window.firebase && window.firebase.firestore) {
-            loadFromFirebase(username)
-                .then(cloudData => {
-                    if (cloudData) {
-                        // Save to localStorage
-                        const dataKey = `userData_${username}`;
-                        localStorage.setItem(dataKey, JSON.stringify(cloudData.data));
-                        
-                        // Reload the data
-                        loadUserData();
-                        
-                        statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Loaded from Firebase</span>';
-                        showNotification('Data loaded from cloud!', 'success');
-                    } else {
-                        // Try fallback
-                        loadFromBackup(username, statusElement);
-                    }
-                })
-                .catch(error => {
-                    console.error('Firebase load error:', error);
-                    loadFromBackup(username, statusElement);
-                });
-        } else {
-            loadFromBackup(username, statusElement);
-        }
-        
-    } catch (error) {
-        console.error('Load from cloud error:', error);
-        statusElement.innerHTML = `<span style="color: #f44336;">❌ ${error.message}</span>`;
-        showNotification('Load failed: ' + error.message, 'error');
-    }
-}
-
-async function loadFromFirebase(username) {
-    return new Promise((resolve, reject) => {
-        try {
-            if (!window.firebase || !window.firebase.firestore) {
-                resolve(null);
-                return;
-            }
-            
-            const db = firebase.firestore();
-            const userRef = db.collection('user_data').doc(username);
-            
-            userRef.get()
-                .then(doc => {
-                    if (doc.exists) {
-                        console.log('✅ Loaded from Firebase');
-                        resolve(doc.data());
-                    } else {
-                        console.log('No Firebase data found');
-                        resolve(null);
-                    }
-                })
-                .catch(error => {
-                    console.error('Firebase get error:', error);
-                    resolve(null);
-                });
-                
-        } catch (error) {
-            console.error('Firebase load error:', error);
-            resolve(null);
-        }
-    });
-}
-
-function loadFromBackup(username, statusElement) {
-    try {
-        const backupKey = `cloud_backup_${username}`;
-        const backupData = localStorage.getItem(backupKey);
-        
-        if (backupData) {
-            const parsed = JSON.parse(backupData);
-            
-            // Save to main storage
-            const dataKey = `userData_${username}`;
-            localStorage.setItem(dataKey, JSON.stringify(parsed.data));
-            
-            // Reload the data
-            loadUserData();
-            
-            statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Loaded from backup</span>';
-            showNotification('Data loaded from backup', 'success');
-        } else {
-            statusElement.innerHTML = '<span style="color: #FF9800;">ℹ️ No cloud data found</span>';
-            showNotification('No cloud data available', 'info');
-        }
-        
-    } catch (error) {
-        console.error('Backup load error:', error);
-        statusElement.innerHTML = '<span style="color: #f44336;">❌ Backup load failed</span>';
-        showNotification('Backup load failed', 'error');
-    }
-}
-
-// ==================== NOTIFICATION FUNCTION ====================
-function showNotification(message, type = 'success') {
-    // Remove existing notifications
-    const existing = document.querySelectorAll('.notification');
-    existing.forEach(n => n.remove());
-    
-    // Create notification
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    
-    // Style based on type
-    const colors = {
-        success: '#4CAF50',
-        error: '#f44336',
-        info: '#2196F3',
-        warning: '#FF9800'
-    };
-    
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${colors[type] || colors.success};
-        color: white;
-        padding: 15px 20px;
-        border-radius: 5px;
-        z-index: 10000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        animation: slideIn 0.3s ease;
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Auto-remove after 3 seconds
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.remove();
-        }
-    }, 3000);
-}
-
-// ========= Simple Data Recovery Function =============
-function recoverLostData() {
-    console.log('🔍 Searching for lost data...');
-    
-    // Get current user
-    const userData = localStorage.getItem('currentUser');
-    if (!userData) {
-        alert('Please log in first');
+    if (!date || !inTime || !outTime) {
+        alert('Please fill all fields');
         return;
     }
     
-    try {
-        const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
-        
-        console.log('Looking for data for user:', username);
-        
-        // Try different possible keys
-        const possibleKeys = [
-            `userData_${username}`,
-            `userData_${username.toLowerCase()}`,
-            'userData_demo',
-            'broilerForms',
-            'forms',
-            'userData_test'
-        ];
-        
-        let foundData = null;
-        let foundKey = null;
-        
-        for (const key of possibleKeys) {
-            const data = localStorage.getItem(key);
-            if (data) {
-                console.log(`Found data with key: ${key}`);
-                try {
-                    const parsed = JSON.parse(data);
-                    
-                    // Check if it's valid data
-                    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].date) {
-                        // Convert array to object format
-                        const month = document.getElementById('month-select').value;
-                        const year = document.getElementById('year-input').value;
-                        const monthYear = `${month}-${year}`;
-                        
-                        const convertedData = {};
-                        convertedData[monthYear] = parsed;
-                        
-                        foundData = convertedData;
-                        foundKey = key;
-                        break;
-                    } else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
-                        // Already in object format
-                        foundData = parsed;
-                        foundKey = key;
-                        break;
-                    }
-                } catch (e) {
-                    console.log(`Error parsing ${key}:`, e);
-                }
-            }
-        }
-        
-        if (foundData) {
-            // Save with correct key
-            localStorage.setItem(`userData_${username}`, JSON.stringify(foundData));
-            
-            alert(`✅ Recovered data from ${foundKey}! Page will reload.`);
-            setTimeout(() => {
-                location.reload();
-            }, 1500);
-        } else {
-            if (confirm('No data found. Create sample data?')) {
-                const month = document.getElementById('month-select').value;
-                const year = document.getElementById('year-input').value;
-                const monthYear = `${month}-${year}`;
-                
-                // Create sample data structure
-                const sampleData = [
-                    {
-                        date: `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`,
-                        amPm: 'AM',
-                        inTime: '08:00',
-                        outTime: '12:00',
-                        hours: '4:00'
-                    },
-                    {
-                        date: `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`,
-                        amPm: 'PM',
-                        inTime: '13:00',
-                        outTime: '17:00',
-                        hours: '4:00'
-                    }
-                ];
-                
-                const allData = {};
-                allData[monthYear] = sampleData;
-                
-                localStorage.setItem(`userData_${username}`, JSON.stringify(allData));
-                
-                alert('✅ Created sample data! Page will reload.');
-                setTimeout(() => {
-                    location.reload();
-                }, 1500);
-            }
-        }
-        
-    } catch (error) {
-        console.error('Recovery error:', error);
-        alert('Error during recovery. Check console for details.');
-    }
-} 
-
-// Emergency data recovery function
-/*function recoverLostData() {
-    console.log('🔍 Attempting data recovery...');
+    // Calculate hours (simplified version)
+    const hours = calculateHours(inTime, outTime);
     
-    // Get current user
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        alert('Please log in first');
+    // Add to current form data
+    if (!window.currentFormData) {
+        window.currentFormData = [];
+    }
+    
+    const entry = { date, amPm, inTime, outTime, hours };
+    
+    if (window.editingIndex !== undefined) {
+        // Update existing
+        window.currentFormData[window.editingIndex] = entry;
+    } else {
+        // Add new
+        window.currentFormData.push(entry);
+    }
+    
+    // Render table and save
+    renderTable();
+    if (typeof saveData === 'function') {
+        saveData();
+    }
+    closeModal();
+}
+
+// Calculate hours
+function calculateHours(inTime, outTime) {
+    const [inH, inM] = inTime.split(':').map(Number);
+    const [outH, outM] = outTime.split(':').map(Number);
+    
+    let hours = outH - inH;
+    let minutes = outM - inM;
+    
+    if (minutes < 0) {
+        hours--;
+        minutes += 60;
+    }
+    
+    if (hours < 0) hours += 24;
+    
+    return `${hours}:${minutes.toString().padStart(2, '0')}`;
+}
+
+// Render table
+function renderTable() {
+    const tbody = document.querySelector('#time-table tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (!window.currentFormData || window.currentFormData.length === 0) {
         return;
     }
     
-    const user = JSON.parse(currentUser);
+    window.currentFormData.forEach((entry, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${formatDateDisplay(entry.date)}</td>
+            <td>${entry.amPm}</td>
+            <td>${formatTimeDisplay(entry.inTime)}</td>
+            <td>${formatTimeDisplay(entry.outTime)}</td>
+            <td>${entry.hours}</td>
+            <td>
+                <button class="edit-btn" onclick="editRow(${index})">Edit</button>
+                <button class="delete-btn" onclick="deleteRow(${index})">Delete</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
     
-    // Look for data with any possible key
-    const allKeys = Object.keys(localStorage);
-    const userDataKeys = allKeys.filter(key => 
-        key.includes('userData_') || 
-        key.includes('forms_') || 
-        key.includes('broilerForms')
-    );
-    
-    console.log('Found potential data keys:', userDataKeys);
-    
-    let recoveredData = null;
-    let recoveredKey = null;
-    
-    for (const key of userDataKeys) {
-        try {
-            const data = localStorage.getItem(key);
-            if (data) {
-                const parsed = JSON.parse(data);
-                console.log(`Checking ${key}:`, typeof parsed, Array.isArray(parsed) ? `array with ${parsed.length} items` : 'object');
-                
-                // If it's an array of forms, we found our data
-                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].date) {
-                    recoveredData = parsed;
-                    recoveredKey = key;
-                    break;
-                }
-                // If it's an object with month keys
-                else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
-                    // Check if any value is an array of forms
-                    for (const monthKey in parsed) {
-                        if (Array.isArray(parsed[monthKey]) && parsed[monthKey].length > 0) {
-                            recoveredData = parsed;
-                            recoveredKey = key;
-                            console.log(`Found data in month: ${monthKey}`);
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.log(`Error parsing ${key}:`, e.message);
-        }
-    }
-    
-    if (recoveredData) {
-        // Save with correct user key
-        const userId = user.uid || user.email.split('@')[0];
-        localStorage.setItem(`userData_${userId}`, JSON.stringify(recoveredData));
-        
-        alert(`✅ Recovered data from ${recoveredKey}! Refreshing page...`);
-        setTimeout(() => {
-            location.reload();
-        }, 1000);
-    } else {
-        // Create backup sample data
-        if (confirm('No data found. Create sample data for this month?')) {
-            const month = parseInt(document.getElementById('month-select').value);
-            const year = document.getElementById('year-input').value;
-            
-            if (month == 9 && year == 2025) { // October 2025
-                const userId = user.uid || user.email.split('@')[0];
-                const monthYear = `${month}-${year}`;
-                
-                const allData = {};
-                allData[monthYear] = sampleData;
-                
-                localStorage.setItem(`userData_${userId}`, JSON.stringify(allData));
-                alert('Sample data created! Refreshing...');
-                setTimeout(() => {
-                    location.reload();
-                }, 1000);
-            } else {
-                alert('Can only create sample data for October 2025. Please switch to October 2025 first.');
-            }
-        }
-    }
-} */
+    calculateTotal();
+}
 
+// Format date for display
+function formatDateDisplay(dateStr) {
+    if (!dateStr) return '';
+    if (dateStr.includes('-')) {
+        const [y, m, d] = dateStr.split('-');
+        return `${d}/${m}/${y}`;
+    }
+    return dateStr;
+}
+
+// Format time for display
+function formatTimeDisplay(timeStr) {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':');
+    const hour = parseInt(h);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${m.padStart(2, '0')} ${ampm}`;
+}
+
+// Edit row
+function editRow(index) {
+    const entry = window.currentFormData[index];
+    
+    document.getElementById('entry-date').value = entry.date;
+    document.getElementById('entry-am-pm').value = entry.amPm;
+    document.getElementById('entry-time-in').value = entry.inTime;
+    document.getElementById('entry-time-out').value = entry.outTime;
+    
+    window.editingIndex = index;
+    document.getElementById('modal-title').textContent = 'Edit Entry';
+    document.getElementById('entry-modal').style.display = 'block';
+}
+
+// Delete row
+function deleteRow(index) {
+    if (confirm('Delete this entry?')) {
+        window.currentFormData.splice(index, 1);
+        renderTable();
+        if (typeof saveData === 'function') {
+            saveData();
+        }
+    }
+}
+
+// ==================== UPDATE FUNCTION FOR THE "UPDATE" BUTTON ====================
+function updateClaimName() {
+    const nameInput = document.getElementById('employee-name-input');
+    if (!nameInput) return;
+    
+    saveClaimRecipientName(nameInput.value);
+}
+
+// Logout
+function logout() {
+    console.log('Logging out...');
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('employeeName');
+    window.location.href = 'auth.html';
+}
