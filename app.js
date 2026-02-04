@@ -2105,7 +2105,7 @@ function showNotification(message, type = 'success') {
 }
 
 // ========= Simple Data Recovery Function =============
-function recoverLostData() {
+/*function recoverLostData() {
     console.log('🔍 Searching for lost data...');
     
     // Get current user
@@ -2214,95 +2214,284 @@ function recoverLostData() {
         console.error('Recovery error:', error);
         alert('Error during recovery. Check console for details.');
     }
-} 
+} */
 
-// Emergency data recovery function
-/*function recoverLostData() {
-    console.log('🔍 Attempting data recovery...');
+async function recoverLostData() {
+    console.log('🔍 Attempting comprehensive data recovery...');
     
-    // Get current user
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        alert('Please log in first');
-        return;
-    }
-    
-    const user = JSON.parse(currentUser);
-    
-    // Look for data with any possible key
-    const allKeys = Object.keys(localStorage);
-    const userDataKeys = allKeys.filter(key => 
-        key.includes('userData_') || 
-        key.includes('forms_') || 
-        key.includes('broilerForms')
-    );
-    
-    console.log('Found potential data keys:', userDataKeys);
-    
-    let recoveredData = null;
-    let recoveredKey = null;
-    
-    for (const key of userDataKeys) {
-        try {
-            const data = localStorage.getItem(key);
-            if (data) {
-                const parsed = JSON.parse(data);
-                console.log(`Checking ${key}:`, typeof parsed, Array.isArray(parsed) ? `array with ${parsed.length} items` : 'object');
-                
-                // If it's an array of forms, we found our data
-                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].date) {
-                    recoveredData = parsed;
-                    recoveredKey = key;
-                    break;
-                }
-                // If it's an object with month keys
-                else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
-                    // Check if any value is an array of forms
-                    for (const monthKey in parsed) {
-                        if (Array.isArray(parsed[monthKey]) && parsed[monthKey].length > 0) {
-                            recoveredData = parsed;
-                            recoveredKey = key;
-                            console.log(`Found data in month: ${monthKey}`);
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.log(`Error parsing ${key}:`, e.message);
+    try {
+        // Get current user
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) {
+            alert('Please log in first');
+            return;
         }
-    }
-    
-    if (recoveredData) {
-        // Save with correct user key
-        const userId = user.uid || user.email.split('@')[0];
-        localStorage.setItem(`userData_${userId}`, JSON.stringify(recoveredData));
         
-        alert(`✅ Recovered data from ${recoveredKey}! Refreshing page...`);
-        setTimeout(() => {
-            location.reload();
-        }, 1000);
-    } else {
-        // Create backup sample data
-        if (confirm('No data found. Create sample data for this month?')) {
-            const month = parseInt(document.getElementById('month-select').value);
-            const year = document.getElementById('year-input').value;
+        const user = JSON.parse(userData);
+        const username = user.uid || user.email.split('@')[0];
+        
+        // Show recovery status
+        showNotification('Searching for lost data...', 'info');
+        
+        // ===== STEP 1: Check Firebase FIRST =====
+        let recoveredFromFirebase = false;
+        let firebaseData = null;
+        
+        if (window.firebase && window.firebase.firestore) {
+            console.log('Checking Firebase for data...');
             
-            if (month == 9 && year == 2025) { // October 2025
-                const userId = user.uid || user.email.split('@')[0];
+            try {
+                firebaseData = await recoverFromFirebase(username);
+                if (firebaseData) {
+                    recoveredFromFirebase = true;
+                    console.log('✅ Found data in Firebase');
+                }
+            } catch (firebaseError) {
+                console.error('Firebase recovery failed:', firebaseError);
+            }
+        }
+        
+        // ===== STEP 2: Check localStorage backups =====
+        let localStorageData = null;
+        if (!recoveredFromFirebase) {
+            console.log('Checking localStorage backups...');
+            localStorageData = recoverFromLocalStorage(username);
+        }
+        
+        // ===== STEP 3: Combine results =====
+        let recoveredData = null;
+        let source = '';
+        
+        if (recoveredFromFirebase && firebaseData) {
+            recoveredData = firebaseData;
+            source = 'Firebase Cloud';
+        } else if (localStorageData) {
+            recoveredData = localStorageData;
+            source = 'Local Backup';
+        }
+        
+        // ===== STEP 4: Process recovered data =====
+        if (recoveredData) {
+            // Save with correct user key
+            const userId = user.uid || user.email.split('@')[0];
+            localStorage.setItem(`userData_${userId}`, JSON.stringify(recoveredData));
+            
+            // Create additional backup
+            const timestamp = new Date().toISOString();
+            const backupKey = `recovery_backup_${userId}_${timestamp}`;
+            localStorage.setItem(backupKey, JSON.stringify({
+                data: recoveredData,
+                source: source,
+                timestamp: timestamp
+            }));
+            
+            alert(`✅ Recovered data from ${source}! Refreshing page...`);
+            showNotification(`Data recovered from ${source}`, 'success');
+            
+            // Reload the page
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+            
+        } else {
+            // No data found anywhere
+            console.log('No data found in Firebase or local backups');
+            
+            // Offer to create sample data
+            if (confirm('No data found in cloud or backups. Create sample data for this month?')) {
+                const month = document.getElementById('month-select')?.value || new Date().getMonth();
+                const year = document.getElementById('year-input')?.value || new Date().getFullYear();
                 const monthYear = `${month}-${year}`;
                 
-                const allData = {};
-                allData[monthYear] = sampleData;
+                const userId = user.uid || user.email.split('@')[0];
+                const sampleData = createSampleData(month, year);
                 
-                localStorage.setItem(`userData_${userId}`, JSON.stringify(allData));
-                alert('Sample data created! Refreshing...');
+                localStorage.setItem(`userData_${userId}`, JSON.stringify(sampleData));
+                
+                alert('✅ Created sample data! Refreshing...');
+                showNotification('Sample data created', 'success');
+                
                 setTimeout(() => {
                     location.reload();
-                }, 1000);
-            } else {
-                alert('Can only create sample data for October 2025. Please switch to October 2025 first.');
+                }, 1500);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Recovery error:', error);
+        alert('Error during recovery: ' + error.message);
+        showNotification('Recovery failed', 'error');
+    }
+}
+
+// ===== HELPER FUNCTIONS =====
+
+// Check Firebase for data
+async function recoverFromFirebase(username) {
+    return new Promise((resolve, reject) => {
+        try {
+            if (!window.firebase || !window.firebase.firestore) {
+                resolve(null);
+                return;
+            }
+            
+            const db = firebase.firestore();
+            
+            // Try multiple possible document locations
+            const possibleDocRefs = [
+                db.collection('user_data').doc(username),
+                db.collection('broiler_claims').doc(username),
+                db.collection('users').doc(username).collection('data').doc('broiler'),
+                db.collection('timesheets').doc(username)
+            ];
+            
+            let dataFound = false;
+            let attempts = 0;
+            const totalAttempts = possibleDocRefs.length;
+            
+            const tryNextDoc = () => {
+                if (attempts >= totalAttempts) {
+                    resolve(null);
+                    return;
+                }
+                
+                const docRef = possibleDocRefs[attempts];
+                attempts++;
+                
+                docRef.get().then(doc => {
+                    if (doc.exists) {
+                        console.log(`Found data at ${docRef.path}`);
+                        const data = doc.data();
+                        
+                        // Extract the form data
+                        let formData = null;
+                        
+                        if (data.data) {
+                            // Firebase format: { data: {...} }
+                            formData = data.data;
+                        } else if (Array.isArray(data.forms) || Array.isArray(data.entries)) {
+                            // Alternative formats
+                            formData = data.forms || data.entries;
+                        } else {
+                            // Try to use the whole document
+                            formData = data;
+                        }
+                        
+                        resolve(formData);
+                        dataFound = true;
+                    } else {
+                        if (attempts < totalAttempts) {
+                            tryNextDoc();
+                        } else {
+                            resolve(null);
+                        }
+                    }
+                }).catch(error => {
+                    console.error(`Error checking ${docRef.path}:`, error);
+                    if (attempts < totalAttempts) {
+                        tryNextDoc();
+                    } else {
+                        resolve(null);
+                    }
+                });
+            };
+            
+            tryNextDoc();
+            
+        } catch (error) {
+            console.error('Firebase recovery error:', error);
+            resolve(null);
+        }
+    });
+}
+
+// Check localStorage for backups
+function recoverFromLocalStorage(username) {
+    console.log('Searching localStorage for backups...');
+    
+    const allKeys = Object.keys(localStorage);
+    
+    // Look for various backup patterns
+    const backupPatterns = [
+        `userData_${username}`,
+        `userData_${username.toLowerCase()}`,
+        `cloud_backup_${username}`,
+        `backup_${username}_`,
+        'broilerForms',
+        'forms_',
+        'userData_demo',
+        'userData_test'
+    ];
+    
+    for (const pattern of backupPatterns) {
+        const matchingKeys = allKeys.filter(key => key.includes(pattern));
+        
+        for (const key of matchingKeys) {
+            try {
+                const data = localStorage.getItem(key);
+                if (!data) continue;
+                
+                const parsed = JSON.parse(data);
+                console.log(`Checking ${key}:`, typeof parsed);
+                
+                // Check if it contains valid form data
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].date) {
+                    // Array of form entries
+                    console.log(`✅ Found array data in ${key}: ${parsed.length} entries`);
+                    return parsed;
+                } else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    // Object with month keys
+                    for (const monthKey in parsed) {
+                        if (Array.isArray(parsed[monthKey]) && parsed[monthKey].length > 0) {
+                            console.log(`✅ Found object data in ${key}: ${parsed[monthKey].length} entries for ${monthKey}`);
+                            return parsed;
+                        }
+                    }
+                } else if (parsed.data && typeof parsed.data === 'object') {
+                    // Nested data structure
+                    console.log(`✅ Found nested data in ${key}`);
+                    return parsed.data;
+                }
+            } catch (e) {
+                console.log(`Error parsing ${key}:`, e.message);
             }
         }
     }
-} */
+    
+    return null;
+}
+
+// Create sample data
+function createSampleData(month, year) {
+    const monthYear = `${month}-${year}`;
+    const monthName = monthNames[month] || 'Month';
+    
+    const sampleData = [
+        {
+            date: `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`,
+            amPm: 'AM',
+            inTime: '08:00',
+            outTime: '12:00',
+            hours: '4:00'
+        },
+        {
+            date: `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`,
+            amPm: 'PM',
+            inTime: '13:00',
+            outTime: '17:00',
+            hours: '4:00'
+        },
+        {
+            date: `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-15`,
+            amPm: 'AM',
+            inTime: '07:30',
+            outTime: '11:45',
+            hours: '4:15'
+        }
+    ];
+    
+    const allData = {};
+    allData[monthYear] = sampleData;
+    
+    return allData;
+}
