@@ -6,7 +6,6 @@ console.log('Current page:', window.location.href);
 console.log('localStorage.currentUser:', localStorage.getItem('currentUser'));
 
 // Basic data
-let currentFormData = [];
 const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
