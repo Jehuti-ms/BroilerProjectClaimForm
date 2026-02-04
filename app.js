@@ -698,14 +698,7 @@ function printForm() {
     
     const month = parseInt(monthSelect.value);
     const year = parseInt(yearInput.value);
-    
-    // Get employee name from localStorage or input field
-    const employeeName = localStorage.getItem('claimEmployeeName') || 
-                        document.getElementById('employee-name-input')?.value || 
-                        'Employee Name';
-    
-    const totalHours = document.getElementById('total-hours')?.textContent || '0:00';
-    
+       
     // Get table data
     let tableRows = '';
     const rows = document.querySelectorAll('#time-table tbody tr');
@@ -1360,11 +1353,7 @@ function generatePDF() {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(11);
         doc.text(`Total Hours: ${totalHours}`, pageWidth - margin, yPos, { align: 'right' });
-
-        // Get employee name from localStorage (not from input field directly)
-        const employeeName = localStorage.getItem('claimEmployeeName') || 
-        document.getElementById('employee-name-input')?.value || 'Employee Name';
-        
+       
         // Add signature section - Optimized for A4
         const signatureY = Math.min(yPos + 40, pageHeight - 50); // Ensure it fits on page
         
