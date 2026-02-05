@@ -1935,6 +1935,493 @@ async function syncToCloud() {
     }
 }
 
+// ==================== FIREBASE DATA REPAIR FUNCTIONS ====================
+async function quickFirebaseCheck() {
+    console.log('=== QUICK FIREBASE CHECK ===');
+    
+    const userData = localStorage.getItem('currentUser');
+    if (!userData) {
+        alert('Please log in first');
+        return;
+    }
+    
+    const user = JSON.parse(userData);
+    const username = user.uid || user.email.split('@')[0];
+    
+    console.log('User UID:', user.uid);
+    console.log('User email:', user.email);
+    console.log('Username for lookup:', username);
+    
+    if (!window.firebase || !firebase.firestore) {
+        alert('Firebase not available');
+        return;
+    }
+    
+    const db = firebase.firestore();
+    
+    // Try both possible document IDs
+    const possibleIds = [
+        username, // UID
+        user.email.split('@')[0], // dmoseley
+        user.email // dmoseley@gams.edu.bb
+    ];
+    
+    for (const docId of possibleIds) {
+        console.log(`Checking document: ${docId}`);
+        const userRef = db.collection('user_data').doc(docId);
+        
+        try {
+            const doc = await userRef.get();
+            
+            if (doc.exists) {
+                const data = doc.data();
+                console.log(`✅ Found document with ID: ${docId}`);
+                console.log('Document data:', data);
+                
+                let message = `Firebase Data (found with ID: ${docId}):\n\n`;
+                
+                if (data.data) {
+                    message += `Data field type: ${typeof data.data}\n`;
+                    
+                    if (typeof data.data === 'string') {
+                        message += `⚠️ PROBLEM: Data is stored as string, not object!\n`;
+                        message += `Sample: ${data.data.substring(0, 100)}...\n\n`;
+                        message += `Click "Repair Firebase Data" to fix this.`;
+                    } else {
+                        message += `✅ Data is proper object\n`;
+                        message += `Months: ${Object.keys(data.data).join(', ')}\n`;
+                    }
+                } else {
+                    message += `❌ No data field found\n`;
+                }
+                
+                alert(message);
+                return;
+            } else {
+                console.log(`❌ No document with ID: ${docId}`);
+            }
+        } catch (error) {
+            console.error(`Error checking ${docId}:`, error);
+        }
+    }
+    
+    alert(`No Firebase data found for any of these IDs:\n${possibleIds.join('\n')}`);
+}
+
+async function repairFirebaseData() {
+    console.log('🔧 Attempting to repair Firebase data...');
+    
+    try {
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) {
+            alert('Please log in first');
+            return;
+        }
+        
+        const user = JSON.parse(userData);
+        
+        if (!window.firebase || !firebase.firestore) {
+            alert('Firebase not available');
+            return;
+        }
+        
+        const db = firebase.firestore();
+        
+        // Try both document IDs
+        const possibleIds = [
+            user.uid, // Kr2EAmQ97vP0gouIF0ULpj4EhB63
+            user.email.split('@')[0] // dmoseley
+        ];
+        
+        let targetDocId = null;
+        let firebaseData = null;
+        
+        // Find which document exists
+        for (const docId of possibleIds) {
+            const userRef = db.collection('user_data').doc(docId);
+            const doc = await userRef.get();
+            
+            if (doc.exists) {
+                targetDocId = docId;
+                firebaseData = doc.data();
+                console.log(`Found data in document: ${docId}`);
+                break;
+            }
+        }
+        
+        if (!targetDocId || !firebaseData) {
+            alert('No Firebase data found to repair');
+            return;
+        }
+        
+        console.log('Current Firebase data:', firebaseData);
+        
+        // Check if data field is a string (malformed)
+        if (typeof firebaseData.data === 'string') {
+            console.log('⚠️ Data field is a string, attempting to parse...');
+            
+            try {
+                // Try to parse the string
+                const fixedString = firebaseData.data
+                    .replace(/""/g, '"') // Replace "" with "
+                    .replace(/\\"/g, '"') // Replace \" with "
+                    .replace(/\\n/g, '')  // Remove \n
+                    .replace(/\\r/g, '')  // Remove \r
+                    .trim();
+                
+                console.log('Fixed string:', fixedString.substring(0, 200) + '...');
+                
+                // Try to parse
+                let parsedData;
+                
+                // Remove outer quotes if present
+                let jsonStr = fixedString;
+                if (jsonStr.startsWith('"') && jsonStr.endsWith('"')) {
+                    jsonStr = jsonStr.slice(1, -1);
+                }
+                
+                parsedData = JSON.parse(jsonStr);
+                console.log('✅ Successfully parsed data');
+                console.log('Parsed data:', parsedData);
+                
+                if (confirm(`Found ${Object.keys(parsedData).length} months of data in malformed format.\n\nRepair Firebase data in document ${targetDocId}?`)) {
+                    // Update Firebase with proper JSON
+                    const userRef = db.collection('user_data').doc(targetDocId);
+                    
+                    await userRef.set({
+                        user_id: user.uid,
+                        user_email: user.email,
+                        username: user.email.split('@')[0],
+                        data: parsedData, // Now proper JSON object
+                        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+                        last_repaired: new Date().toISOString(),
+                        repair_note: 'Fixed malformed JSON string'
+                    }, { merge: true });
+                    
+                    alert(`✅ Firebase data repaired in document ${targetDocId}!`);
+                    
+                    // Also save to localStorage with correct key
+                    const localStorageKey = `userData_${user.uid}`;
+                    localStorage.setItem(localStorageKey, JSON.stringify(parsedData));
+                    
+                    console.log('Saved to localStorage with key:', localStorageKey);
+                    
+                    // Reload the page
+                    setTimeout(() => location.reload(), 1000);
+                }
+                
+            } catch (parseError) {
+                console.error('Failed to parse data:', parseError);
+                console.error('Original string start:', firebaseData.data.substring(0, 200));
+                
+                // Try to manually extract data
+                const extracted = manuallyExtractData(firebaseData.data);
+                if (extracted) {
+                    if (confirm('Found data through manual extraction. Repair?')) {
+                        const userRef = db.collection('user_data').doc(targetDocId);
+                        await userRef.set({
+                            data: extracted,
+                            updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+                            repair_note: 'Manual extraction'
+                        }, { merge: true });
+                        
+                        alert('✅ Data repaired with manual extraction!');
+                        setTimeout(() => location.reload(), 1000);
+                    }
+                } else {
+                    alert('Could not parse the malformed data. Manual intervention required.');
+                }
+            }
+        } else {
+            console.log('✅ Data field is already a proper object');
+            alert('Firebase data appears to be in proper format already.');
+        }
+        
+    } catch (error) {
+        console.error('Repair error:', error);
+        alert('Error during repair: ' + error.message);
+    }
+}
+
+function manuallyExtractData(malformedString) {
+    console.log('Attempting manual extraction...');
+    
+    try {
+        // Look for patterns like "8-2025":[{...}]
+        const monthPattern = /"(\d+-\d+)":\s*\[/g;
+        const matches = [...malformedString.matchAll(monthPattern)];
+        
+        if (matches.length > 0) {
+            const result = {};
+            
+            matches.forEach((match, index) => {
+                const monthYear = match[1];
+                const start = match.index + match[0].length - 1; // Position after [
+                
+                // Find the closing bracket for this array
+                let bracketCount = 1;
+                let end = start;
+                
+                while (bracketCount > 0 && end < malformedString.length) {
+                    end++;
+                    if (malformedString[end] === '[') bracketCount++;
+                    if (malformedString[end] === ']') bracketCount--;
+                }
+                
+                if (end > start) {
+                    const arrayContent = malformedString.substring(start, end);
+                    // Try to parse individual entries
+                    const entryMatches = arrayContent.match(/{[^}]+}/g);
+                    if (entryMatches) {
+                        const entries = entryMatches.map(entryStr => {
+                            try {
+                                // Clean up the entry string
+                                const cleaned = entryStr
+                                    .replace(/""/g, '"')
+                                    .replace(/"(\w+)":/g, '"$1":') // Ensure proper keys
+                                    .replace(/:""/g, ':"') // Fix values
+                                    .replace(/",/g, '",');
+                                return JSON.parse(cleaned);
+                            } catch (e) {
+                                return null;
+                            }
+                        }).filter(entry => entry);
+                        
+                        result[monthYear] = entries;
+                    }
+                }
+            });
+            
+            console.log('Manually extracted:', result);
+            return Object.keys(result).length > 0 ? result : null;
+        }
+    } catch (error) {
+        console.error('Manual extraction failed:', error);
+    }
+    
+    return null;
+}
+
+async function forceCloudSync() {
+    console.log('=== FORCE CLOUD SYNC ===');
+    
+    const userData = localStorage.getItem('currentUser');
+    if (!userData) {
+        alert('Please log in first');
+        return;
+    }
+    
+    const user = JSON.parse(userData);
+    const userId = user.uid; // Use UID, not email
+    const localStorageKey = `userData_${userId}`;
+    
+    // Get local data
+    const localData = localStorage.getItem(localStorageKey);
+    if (!localData) {
+        alert('No local data to sync');
+        return;
+    }
+    
+    try {
+        const parsedData = JSON.parse(localData);
+        
+        if (!window.firebase || !firebase.firestore) {
+            alert('Firebase not available');
+            return;
+        }
+        
+        const db = firebase.firestore();
+        
+        // Save to both possible documents to ensure data is accessible
+        const docsToUpdate = [
+            { id: userId, note: 'uid_document' },
+            { id: user.email.split('@')[0], note: 'username_document' }
+        ];
+        
+        for (const docInfo of docsToUpdate) {
+            const userRef = db.collection('user_data').doc(docInfo.id);
+            
+            try {
+                await userRef.set({
+                    user_id: userId,
+                    user_email: user.email,
+                    username: user.email.split('@')[0],
+                    data: parsedData, // Proper JSON object
+                    updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+                    last_sync: new Date().toISOString(),
+                    sync_type: 'force_sync',
+                    format: 'proper_json',
+                    note: docInfo.note
+                }, { merge: true });
+                
+                console.log(`✅ Saved to ${docInfo.id} (${docInfo.note})`);
+            } catch (error) {
+                console.error(`Error saving to ${docInfo.id}:`, error);
+            }
+        }
+        
+        alert('✅ Force sync complete! Data saved to both UID and username documents.');
+        
+        // Update display
+        const statusElement = document.getElementById('sync-status') || createSyncStatusElement();
+        statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Force sync complete</span>';
+        updateLastSyncDisplay();
+        
+    } catch (error) {
+        console.error('Force sync error:', error);
+        alert('Error: ' + error.message);
+    }
+}
+
+// ==================== FIX DATA KEY MISMATCH ====================
+// Update your loadUserData function to use UID consistently
+function loadUserData() {
+    console.log('=== loadUserData() called ===');
+    
+    try {
+        // Get current user
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) {
+            console.log('No user found');
+            return;
+        }
+        
+        const user = JSON.parse(userData);
+        const userId = user.uid; // Use UID, not email username
+        console.log('Loading data for user UID:', userId);
+        
+        // Get current month/year
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        
+        if (!monthSelect || !yearInput) {
+            console.error('Month/Year elements not found');
+            return;
+        }
+        
+        const month = monthSelect.value;
+        const year = yearInput.value;
+        const monthYear = `${month}-${year}`;
+        console.log('Loading data for period:', monthYear);
+        
+        // Try multiple data sources in order
+        let loadedData = null;
+        
+        // 1. Try main storage with UID key
+        const dataKey = `userData_${userId}`;
+        const savedData = localStorage.getItem(dataKey);
+        
+        if (savedData) {
+            console.log('Found data in main storage with UID key');
+            try {
+                const allData = JSON.parse(savedData);
+                loadedData = allData[monthYear] || [];
+                console.log(`Loaded ${loadedData.length} entries from main storage`);
+            } catch (e) {
+                console.error('Error parsing main data:', e);
+                loadedData = [];
+            }
+        } else {
+            console.log('No data in main storage with UID key');
+            
+            // Try old username key for backward compatibility
+            const oldKey = `userData_${user.email.split('@')[0]}`;
+            const oldData = localStorage.getItem(oldKey);
+            if (oldData) {
+                console.log('Found data with old username key, migrating...');
+                try {
+                    const allData = JSON.parse(oldData);
+                    loadedData = allData[monthYear] || [];
+                    // Migrate to UID key
+                    localStorage.setItem(dataKey, oldData);
+                    console.log('Migrated data from username to UID key');
+                } catch (e) {
+                    console.error('Error migrating old data:', e);
+                }
+            }
+        }
+        
+        // 2. If no data, try recent backup
+        if (!loadedData || loadedData.length === 0) {
+            console.log('Trying backups...');
+            loadedData = tryLoadFromBackups(userId, monthYear);
+        }
+        
+        // Update global variable
+        window.currentFormData = loadedData || [];
+        console.log('Final currentFormData:', window.currentFormData);
+        
+        // Render table
+        renderTable();
+        
+        // Calculate total
+        calculateTotal();
+        
+        // Show notification if data loaded
+        if (window.currentFormData.length > 0) {
+            showNotification(`Loaded ${window.currentFormData.length} entries for ${monthNames[month]} ${year}`, 'success');
+        } else {
+            console.log('No data loaded for this period');
+        }
+        
+    } catch (error) {
+        console.error('Error in loadUserData:', error);
+        showNotification('Error loading data', 'error');
+    }
+}
+
+// Update tryLoadFromBackups to use UID
+function tryLoadFromBackups(userId, monthYear) {
+    const allKeys = Object.keys(localStorage);
+    
+    // Look for backup keys with UID first, then username
+    const username = localStorage.getItem('currentUser') ? 
+        JSON.parse(localStorage.getItem('currentUser')).email.split('@')[0] : '';
+    
+    const backupKeys = allKeys.filter(key => 
+        key.includes(userId) || 
+        key.includes(username) ||
+        key.includes('backup') || 
+        key.includes('cloud_backup')
+    ).sort().reverse(); // Newest first
+    
+    console.log('Backup keys found:', backupKeys);
+    
+    for (const key of backupKeys) {
+        try {
+            const data = localStorage.getItem(key);
+            if (!data) continue;
+            
+            const parsed = JSON.parse(data);
+            console.log(`Checking backup ${key}:`, typeof parsed);
+            
+            // Try different backup formats
+            let monthData = null;
+            
+            if (parsed.data && parsed.data[monthYear]) {
+                // Format: {data: {[monthYear]: [...]}}
+                monthData = parsed.data[monthYear];
+            } else if (parsed[monthYear]) {
+                // Format: {[monthYear]: [...]}
+                monthData = parsed[monthYear];
+            } else if (Array.isArray(parsed) && parsed[0] && parsed[0].date) {
+                // Direct array (old format)
+                monthData = parsed;
+            }
+            
+            if (monthData && monthData.length > 0) {
+                console.log(`✅ Found ${monthData.length} entries in backup ${key}`);
+                return monthData;
+            }
+        } catch (e) {
+            console.log(`Error parsing backup ${key}:`, e.message);
+        }
+    }
+    
+    console.log('No data found in backups');
+    return [];
+}
+
 // Test Firebase connection
 async function testFirebaseConnection() {
     return new Promise((resolve, reject) => {
@@ -1985,11 +2472,18 @@ async function syncToFirebase(username, data) {
             }
             
             const db = firebase.firestore();
-            const userRef = db.collection('user_data').doc(username);
+            
+            // Use the UID from localStorage
+            const userData = localStorage.getItem('currentUser');
+            const user = userData ? JSON.parse(userData) : null;
+            const userId = user ? user.uid : username;
+            
+            const userRef = db.collection('user_data').doc(userId);
             
             const syncData = {
-                user_id: username,
-                user_email: localStorage.getItem('currentUser') ? JSON.parse(localStorage.getItem('currentUser')).email : '',
+                user_id: userId,
+                user_email: user ? user.email : '',
+                username: user ? user.email.split('@')[0] : '',
                 data: data,
                 updated_at: firebase.firestore.FieldValue.serverTimestamp(),
                 last_sync: new Date().toISOString(),
@@ -2000,14 +2494,11 @@ async function syncToFirebase(username, data) {
             
             userRef.set(syncData, { merge: true })
             .then(() => {
-                console.log('✅ Firebase sync successful for', username);
-                console.log('Data saved:', syncData);
+                console.log('✅ Firebase sync successful for', userId);
                 resolve(true);
             })
             .catch(error => {
                 console.error('❌ Firebase set error:', error);
-                console.error('Error code:', error.code);
-                console.error('Error message:', error.message);
                 resolve(false);
             });
             
