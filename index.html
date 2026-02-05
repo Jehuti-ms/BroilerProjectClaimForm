@@ -223,6 +223,20 @@
         </svg>
     </button>
 
+    <!-- Add this to your emergency tools section -->
+        <div class="firebase-tools" style="margin-top: 10px; padding: 15px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 5px;">
+            <h4 style="margin: 0 0 10px 0; color: #0c5460;">☁️ Firebase Tools</h4>
+            <button onclick="quickFirebaseCheck()" style="background: #17a2b8; color: white; border: none; padding: 8px 15px; border-radius: 4px; margin-right: 10px; cursor: pointer;">
+                🔍 Check Firebase
+            </button>
+            <button onclick="repairFirebaseData()" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; margin-right: 10px; cursor: pointer;">
+                🔧 Repair Firebase Data
+            </button>
+            <button onclick="forceCloudSync()" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">
+                ☁️ Force Cloud Sync
+            </button>
+        </div>
+    
     <script src="firebase-config.js"></script>
     <script src="app.js"></script>
 </body>
