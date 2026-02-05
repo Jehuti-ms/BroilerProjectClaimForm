@@ -378,6 +378,13 @@ function initializeApp() {
         }
     });
 
+    // Load data
+    if (typeof loadUserData === 'function') {
+        setTimeout(() => {
+            loadUserData();
+        }, 1000); // Small delay to ensure DOM is ready
+    }
+    
     // Setup header
     setupHeader();
     
@@ -1144,66 +1151,208 @@ function showNotification(message, type = 'success') {
 }
 
 // ==================== SYNC FUNCTIONS (KEEP YOUR EXISTING ONES) ====================
-// Load user data
+// ==================== ENHANCED LOAD USER DATA ====================
 function loadUserData() {
-    const userData = localStorage.getItem('currentUser');
-    if (!userData) return;
+    console.log('=== loadUserData() called ===');
     
     try {
-        const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
-        const dataKey = `userData_${username}`;
-        
-        const savedData = localStorage.getItem(dataKey);
-        if (savedData) {
-            const allData = JSON.parse(savedData);
-            
-            // Get current month
-            const month = document.getElementById('month-select').value;
-            const year = document.getElementById('year-input').value;
-            const monthYear = `${month}-${year}`;
-            
-            if (allData[monthYear]) {
-                currentFormData = allData[monthYear];
-                renderTable();
-            }
+        // Get current user
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) {
+            console.log('No user found');
+            return;
         }
+        
+        const user = JSON.parse(userData);
+        const username = user.uid || user.email.split('@')[0];
+        console.log('Loading data for user:', username);
+        
+        // Get current month/year
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        
+        if (!monthSelect || !yearInput) {
+            console.error('Month/Year elements not found');
+            return;
+        }
+        
+        const month = monthSelect.value;
+        const year = yearInput.value;
+        const monthYear = `${month}-${year}`;
+        console.log('Loading data for period:', monthYear);
+        
+        // Try multiple data sources in order
+        let loadedData = null;
+        
+        // 1. Try main storage
+        const dataKey = `userData_${username}`;
+        const savedData = localStorage.getItem(dataKey);
+        
+        if (savedData) {
+            console.log('Found data in main storage');
+            try {
+                const allData = JSON.parse(savedData);
+                loadedData = allData[monthYear] || [];
+                console.log(`Loaded ${loadedData.length} entries from main storage`);
+            } catch (e) {
+                console.error('Error parsing main data:', e);
+                loadedData = [];
+            }
+        } else {
+            console.log('No data in main storage');
+        }
+        
+        // 2. If no data, try recent backup
+        if (!loadedData || loadedData.length === 0) {
+            console.log('Trying backups...');
+            loadedData = tryLoadFromBackups(username, monthYear);
+        }
+        
+        // 3. If still no data, check Firebase
+        if ((!loadedData || loadedData.length === 0) && window.firebase) {
+            console.log('Trying Firebase...');
+            // We'll try async Firebase load, but for now set empty
+            loadedData = loadedData || [];
+        }
+        
+        // Update global variable
+        window.currentFormData = loadedData || [];
+        console.log('Final currentFormData:', window.currentFormData);
+        
+        // Render table
+        renderTable();
+        
+        // Calculate total
+        calculateTotal();
+        
+        // Show notification if data loaded
+        if (window.currentFormData.length > 0) {
+            showNotification(`Loaded ${window.currentFormData.length} entries for ${monthNames[month]} ${year}`, 'success');
+        } else {
+            console.log('No data loaded for this period');
+        }
+        
     } catch (error) {
-        console.log('Error loading data:', error);
+        console.error('Error in loadUserData:', error);
+        showNotification('Error loading data', 'error');
     }
 }
 
+// Helper to try loading from backups
+function tryLoadFromBackups(username, monthYear) {
+    const allKeys = Object.keys(localStorage);
+    
+    // Look for backup keys
+    const backupKeys = allKeys.filter(key => 
+        key.includes('backup') || 
+        key.includes('cloud_backup') ||
+        key.includes(username)
+    ).sort().reverse(); // Newest first
+    
+    for (const key of backupKeys) {
+        try {
+            const data = localStorage.getItem(key);
+            if (!data) continue;
+            
+            const parsed = JSON.parse(data);
+            console.log(`Checking backup ${key}:`, typeof parsed);
+            
+            // Try different backup formats
+            let monthData = null;
+            
+            if (parsed.data && parsed.data[monthYear]) {
+                // Format: {data: {[monthYear]: [...]}}
+                monthData = parsed.data[monthYear];
+            } else if (parsed[monthYear]) {
+                // Format: {[monthYear]: [...]}
+                monthData = parsed[monthYear];
+            } else if (Array.isArray(parsed) && parsed[0] && parsed[0].date) {
+                // Direct array (old format)
+                monthData = parsed;
+            }
+            
+            if (monthData && monthData.length > 0) {
+                console.log(`✅ Found ${monthData.length} entries in backup ${key}`);
+                return monthData;
+            }
+        } catch (e) {
+            console.log(`Error parsing backup ${key}:`, e.message);
+        }
+    }
+    
+    console.log('No data found in backups');
+    return [];
+}
+
 // Save data
-function saveData() {
-    const userData = localStorage.getItem('currentUser');
-    if (!userData) return;
+// ==================== ENHANCED SAVE FORM ====================
+function saveForm() {
+    console.log('=== SAVE FORM ===');
     
     try {
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) {
+            alert('Please log in first');
+            return;
+        }
+        
         const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
+        const username = user.uid || user.email.split('@')[0];
         const dataKey = `userData_${username}`;
         
-        // Get current month
-        const month = document.getElementById('month-select').value;
-        const year = document.getElementById('year-input').value;
+        // Get current month/year
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        const month = monthSelect.value;
+        const year = yearInput.value;
         const monthYear = `${month}-${year}`;
         
+        console.log(`Saving data for ${monthNames[month]} ${year} (${monthYear})`);
+        console.log('Current form data:', window.currentFormData);
+        
         // Get existing data
-        const existing = localStorage.getItem(dataKey);
-        let allData = existing ? JSON.parse(existing) : {};
+        const existingData = localStorage.getItem(dataKey);
+        let allData = existingData ? JSON.parse(existingData) : {};
         
-        // Update current month
-        allData[monthYear] = currentFormData;
+        // Update current month's data
+        allData[monthYear] = window.currentFormData || [];
         
-        // Save
+        // Save back to localStorage
         localStorage.setItem(dataKey, JSON.stringify(allData));
-        console.log('Data saved');
         
-        // Show notification
-        alert('Data saved successfully!');
+        console.log('Saved to main storage:', allData);
+        
+        // Create timestamped backup
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupKey = `backup_${username}_${timestamp}`;
+        localStorage.setItem(backupKey, JSON.stringify(allData));
+        
+        // Also create cloud backup
+        const cloudBackup = {
+            username: username,
+            data: allData,
+            timestamp: new Date().toISOString(),
+            source: 'manual_save'
+        };
+        localStorage.setItem(`cloud_backup_${username}`, JSON.stringify(cloudBackup));
+        
+        console.log(`✅ Form saved: ${window.currentFormData.length} entries for ${monthNames[month]} ${year}`);
+        console.log(`✅ Backup created: ${backupKey}`);
+        
+        // Update last saved timestamp
+        localStorage.setItem('lastSaved', new Date().toISOString());
+        
+        showNotification(`Saved ${window.currentFormData.length} entries`, 'success');
+        
+        // Auto-sync if enabled
+        if (localStorage.getItem('autoSyncEnabled') === 'true') {
+            console.log('Auto-sync enabled, syncing to cloud...');
+            syncToCloud();
+        }
+        
     } catch (error) {
-        console.log('Error saving:', error);
-        alert('Error saving data');
+        console.error('Save error:', error);
+        showNotification('Error saving form', 'error');
     }
 }
 
@@ -2819,6 +2968,133 @@ function checkCurrentUser() {
         return { user, username };
     } catch (error) {
         console.error('❌ Error parsing user data:', error);
+        return null;
+    }
+}
+
+// ==================== COMPREHENSIVE DATA CHECK ====================
+function checkAllData() {
+    console.log('🔍 ===== COMPREHENSIVE DATA CHECK =====');
+    
+    // 1. Check current user
+    const userData = localStorage.getItem('currentUser');
+    if (!userData) {
+        console.error('❌ No user logged in');
+        alert('Please log in first');
+        return;
+    }
+    
+    const user = JSON.parse(userData);
+    const username = user.uid || user.email.split('@')[0];
+    console.log('✅ User:', user.email);
+    console.log('✅ Username for data:', username);
+    
+    // 2. Check current month/year
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    const month = monthSelect?.value || new Date().getMonth();
+    const year = yearInput?.value || new Date().getFullYear();
+    const monthYear = `${month}-${year}`;
+    console.log('✅ Current period:', monthNames[month], year, `(${monthYear})`);
+    
+    // 3. Check main data storage
+    const mainKey = `userData_${username}`;
+    const mainData = localStorage.getItem(mainKey);
+    console.log(`✅ Main data key: ${mainKey}`);
+    console.log(`✅ Main data exists: ${!!mainData}`);
+    
+    if (mainData) {
+        try {
+            const parsed = JSON.parse(mainData);
+            console.log('✅ Main data structure:', typeof parsed);
+            
+            if (typeof parsed === 'object') {
+                console.log('✅ Months in main data:', Object.keys(parsed));
+                
+                if (parsed[monthYear]) {
+                    console.log(`✅ Data for ${monthYear}:`, parsed[monthYear]);
+                    console.log(`✅ Entries for current month: ${parsed[monthYear].length}`);
+                } else {
+                    console.log(`❌ No data for current month (${monthYear})`);
+                }
+            }
+        } catch (e) {
+            console.error('❌ Error parsing main data:', e);
+        }
+    }
+    
+    // 4. Check backups
+    console.log('\n📂 Checking backups...');
+    const allKeys = Object.keys(localStorage);
+    const backupKeys = allKeys.filter(key => 
+        key.includes('backup') || 
+        key.includes('cloud_backup') ||
+        key.includes('recovery') ||
+        key.includes(username)
+    );
+    
+    console.log(`✅ Found ${backupKeys.length} backup keys`);
+    backupKeys.forEach(key => {
+        console.log(`   📁 ${key}`);
+    });
+    
+    // 5. Check current form data
+    console.log('\n📋 Current form data in memory:');
+    console.log('✅ window.currentFormData:', window.currentFormData);
+    console.log('✅ Type:', typeof window.currentFormData);
+    console.log('✅ Length:', window.currentFormData ? window.currentFormData.length : 0);
+    
+    // 6. Check Firebase connection
+    console.log('\n☁️ Firebase status:');
+    console.log('✅ Firebase available:', !!window.firebase);
+    console.log('✅ Firestore available:', !!window.firebase?.firestore);
+    console.log('✅ Firebase initialized:', firebase?.apps?.length > 0);
+    
+    // 7. Try to get data from Firebase
+    if (window.firebase && firebase.firestore) {
+        console.log('\n🔄 Checking Firebase data...');
+        checkFirebaseData(username).then(firebaseData => {
+            if (firebaseData) {
+                console.log('✅ Firebase data found:', firebaseData);
+            } else {
+                console.log('❌ No data in Firebase');
+            }
+        });
+    }
+    
+    // 8. Show summary
+    console.log('\n📊 SUMMARY:');
+    console.log('1. User authenticated:', !!userData);
+    console.log('2. Main data exists:', !!mainData);
+    console.log('3. Current form data:', window.currentFormData?.length || 0, 'entries');
+    console.log('4. Backups found:', backupKeys.length);
+    console.log('5. Firebase available:', !!(window.firebase && firebase.firestore));
+    
+    // Alert summary
+    alert(`Data Check Complete!\n\n` +
+          `User: ${username}\n` +
+          `Main Data: ${mainData ? 'Found' : 'Missing'}\n` +
+          `Current Entries: ${window.currentFormData?.length || 0}\n` +
+          `Backups: ${backupKeys.length}\n` +
+          `Firebase: ${window.firebase ? 'Available' : 'Not Available'}\n\n` +
+          `Check console (F12) for details.`);
+}
+
+// Helper to check Firebase data
+async function checkFirebaseData(username) {
+    try {
+        if (!window.firebase || !firebase.firestore) return null;
+        
+        const db = firebase.firestore();
+        const docRef = db.collection('user_data').doc(username);
+        const doc = await docRef.get();
+        
+        if (doc.exists) {
+            return doc.data();
+        }
+        return null;
+    } catch (error) {
+        console.error('Error checking Firebase:', error);
         return null;
     }
 }
