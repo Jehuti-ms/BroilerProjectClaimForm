@@ -1006,3 +1006,27 @@ select {
         height: 30px;
     }
 }
+
+/* ===== SIMPLE FIX: Add top spacing to table header =====*/
+#time-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: #4CAF50;
+    z-index: 101;
+}
+
+/* Add margin to the container to push table down */
+.form-section {
+    margin-top: 20px;
+    position: relative;
+}
+
+/* Ensure the table header starts below other content */
+.container > *:not(.form-section) {
+    position: relative;
+    z-index: 1;
+}
+
+.form-section {
+    z-index: 2;
+}
