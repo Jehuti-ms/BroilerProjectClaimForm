@@ -1715,53 +1715,67 @@ function saveForm() {
     }
 }
 
-// ==================== SYNC TO CLOUD ====================
-function syncToCloud() {
-    console.log('Syncing to cloud...');
+// ==================== ENHANCED SYNC TO CLOUD ====================
+async function syncToCloud() {
+    console.log('=== SYNC TO CLOUD ===');
     
     // Show syncing status
     const statusElement = document.getElementById('sync-status') || createSyncStatusElement();
     statusElement.innerHTML = '<span style="color: #2196F3;">🔄 Syncing...</span>';
     
     try {
-        const userData = localStorage.getItem('currentUser');
-        if (!userData) {
-            throw new Error('Not logged in');
+        // Check current user
+        const userInfo = checkCurrentUser();
+        if (!userInfo) {
+            throw new Error('Please log in first');
         }
         
-        const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
+        const { username } = userInfo;
         const dataKey = `userData_${username}`;
         
         // Get all user data
         const allData = localStorage.getItem(dataKey);
         if (!allData) {
-            throw new Error('No data to sync');
+            console.warn('No local data found for sync');
+            statusElement.innerHTML = '<span style="color: #FF9800;">ℹ️ No data to sync</span>';
+            showNotification('No data to sync. Save some entries first.', 'warning');
+            return;
         }
         
-        // Try Firebase sync first
-        if (window.firebase && window.firebase.firestore) {
-            syncToFirebase(username, JSON.parse(allData))
-                .then(success => {
-                    if (success) {
-                        // Firebase sync successful
-                        statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Synced to Firebase</span>';
-                        showNotification('Data synced to cloud!', 'success');
-                        
-                        // Update last sync time
-                        localStorage.setItem('lastCloudSync', new Date().toISOString());
-                        updateLastSyncDisplay();
-                    } else {
-                        // Fallback to localStorage backup
-                        fallbackCloudSync(username, allData, statusElement);
-                    }
-                })
-                .catch(error => {
-                    console.error('Firebase sync error:', error);
-                    fallbackCloudSync(username, allData, statusElement);
-                });
+        console.log('Data to sync:', JSON.parse(allData));
+        
+        // Check Firebase availability
+        if (!window.firebase || !window.firebase.firestore) {
+            console.warn('Firebase not available, using local backup');
+            return fallbackCloudSync(username, allData, statusElement);
+        }
+        
+        if (!firebase.apps.length) {
+            console.error('Firebase not initialized');
+            return fallbackCloudSync(username, allData, statusElement);
+        }
+        
+        // Test Firebase connection first
+        try {
+            await testFirebaseConnection();
+        } catch (error) {
+            console.error('Firebase connection test failed:', error);
+            return fallbackCloudSync(username, allData, statusElement);
+        }
+        
+        // Try Firebase sync
+        const success = await syncToFirebase(username, JSON.parse(allData));
+        
+        if (success) {
+            // Firebase sync successful
+            statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Synced to Firebase</span>';
+            showNotification('Data synced to cloud!', 'success');
+            
+            // Update last sync time
+            localStorage.setItem('lastCloudSync', new Date().toISOString());
+            updateLastSyncDisplay();
         } else {
-            // Firebase not available, use fallback
+            // Fallback to localStorage backup
             fallbackCloudSync(username, allData, statusElement);
         }
         
@@ -1772,11 +1786,51 @@ function syncToCloud() {
     }
 }
 
-// Firebase sync function
-async function syncToFirebase(username, data) {
+// Test Firebase connection
+async function testFirebaseConnection() {
     return new Promise((resolve, reject) => {
         try {
             if (!window.firebase || !window.firebase.firestore) {
+                reject(new Error('Firebase not available'));
+                return;
+            }
+            
+            const db = firebase.firestore();
+            const testRef = db.collection('_test_connection').doc('test');
+            
+            // Try to write and read a test document
+            testRef.set({
+                test: true,
+                timestamp: new Date().toISOString()
+            }, { merge: true })
+            .then(() => testRef.get())
+            .then(doc => {
+                if (doc.exists) {
+                    console.log('✅ Firebase connection test passed');
+                    resolve(true);
+                } else {
+                    reject(new Error('Test document not found'));
+                }
+            })
+            .catch(error => {
+                console.error('Firebase test error:', error);
+                reject(error);
+            });
+            
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+// Enhanced Firebase sync
+async function syncToFirebase(username, data) {
+    console.log('Attempting Firebase sync for user:', username);
+    
+    return new Promise((resolve) => {
+        try {
+            if (!window.firebase || !window.firebase.firestore) {
+                console.log('Firebase not available');
                 resolve(false);
                 return;
             }
@@ -1784,19 +1838,27 @@ async function syncToFirebase(username, data) {
             const db = firebase.firestore();
             const userRef = db.collection('user_data').doc(username);
             
-            userRef.set({
+            const syncData = {
                 user_id: username,
+                user_email: localStorage.getItem('currentUser') ? JSON.parse(localStorage.getItem('currentUser')).email : '',
                 data: data,
                 updated_at: firebase.firestore.FieldValue.serverTimestamp(),
                 last_sync: new Date().toISOString(),
-                device: navigator.userAgent
-            }, { merge: true })
+                device: navigator.userAgent,
+                sync_type: 'manual',
+                app_version: '1.0'
+            };
+            
+            userRef.set(syncData, { merge: true })
             .then(() => {
-                console.log('✅ Firebase sync successful');
+                console.log('✅ Firebase sync successful for', username);
+                console.log('Data saved:', syncData);
                 resolve(true);
             })
             .catch(error => {
-                console.error('Firebase set error:', error);
+                console.error('❌ Firebase set error:', error);
+                console.error('Error code:', error.code);
+                console.error('Error message:', error.message);
                 resolve(false);
             });
             
@@ -1805,6 +1867,186 @@ async function syncToFirebase(username, data) {
             resolve(false);
         }
     });
+}
+
+// ==================== ENHANCED SYNC FROM CLOUD ====================
+async function syncFromCloud() {
+    console.log('=== SYNC FROM CLOUD ===');
+    
+    const statusElement = document.getElementById('sync-status') || createSyncStatusElement();
+    statusElement.innerHTML = '<span style="color: #2196F3;">🔄 Loading from cloud...</span>';
+    
+    try {
+        // Check current user
+        const userInfo = checkCurrentUser();
+        if (!userInfo) {
+            throw new Error('Please log in first');
+        }
+        
+        const { username } = userInfo;
+        
+        console.log('Loading cloud data for:', username);
+        
+        // Check Firebase availability
+        if (!window.firebase || !window.firebase.firestore || !firebase.apps.length) {
+            console.log('Firebase not available, using backup');
+            return loadFromBackup(username, statusElement);
+        }
+        
+        // Try to load from Firebase
+        const cloudData = await loadFromFirebase(username);
+        
+        if (cloudData && cloudData.data) {
+            // Save to localStorage
+            const dataKey = `userData_${username}`;
+            localStorage.setItem(dataKey, JSON.stringify(cloudData.data));
+            
+            console.log('✅ Loaded from Firebase:', cloudData.data);
+            
+            // Reload the data
+            if (typeof loadUserData === 'function') {
+                loadUserData();
+            }
+            
+            statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Loaded from Firebase</span>';
+            showNotification('Data loaded from cloud!', 'success');
+            
+            // Update last sync time
+            localStorage.setItem('lastCloudSync', new Date().toISOString());
+            updateLastSyncDisplay();
+            
+            return true;
+        } else {
+            // No Firebase data, try backup
+            console.log('No Firebase data found, trying backup');
+            return loadFromBackup(username, statusElement);
+        }
+        
+    } catch (error) {
+        console.error('Load from cloud error:', error);
+        statusElement.innerHTML = `<span style="color: #f44336;">❌ ${error.message}</span>`;
+        showNotification('Load failed: ' + error.message, 'error');
+        return false;
+    }
+}
+
+// Enhanced load from Firebase
+async function loadFromFirebase(username) {
+    console.log('Loading from Firebase for user:', username);
+    
+    return new Promise((resolve) => {
+        try {
+            if (!window.firebase || !window.firebase.firestore) {
+                console.log('Firebase not available');
+                resolve(null);
+                return;
+            }
+            
+            const db = firebase.firestore();
+            const userRef = db.collection('user_data').doc(username);
+            
+            userRef.get()
+            .then(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    console.log('✅ Firebase data found:', data);
+                    resolve(data);
+                } else {
+                    console.log('No Firebase data found for', username);
+                    resolve(null);
+                }
+            })
+            .catch(error => {
+                console.error('Firebase get error:', error);
+                console.error('Error code:', error.code);
+                console.error('Error message:', error.message);
+                resolve(null);
+            });
+            
+        } catch (error) {
+            console.error('Firebase load error:', error);
+            resolve(null);
+        }
+    });
+}
+
+// Enhanced load from backup
+function loadFromBackup(username, statusElement) {
+    console.log('Loading from backup for user:', username);
+    
+    try {
+        // Check multiple backup keys
+        const backupKeys = [
+            `cloud_backup_${username}`,
+            `backup_${username}`,
+            `userData_${username}`,
+            `userData_backup_${username}`,
+            `backup_${username}_${new Date().toISOString().split('T')[0]}`
+        ];
+        
+        let backupData = null;
+        let backupKey = null;
+        
+        for (const key of backupKeys) {
+            const data = localStorage.getItem(key);
+            if (data) {
+                console.log(`Found backup at: ${key}`);
+                backupData = data;
+                backupKey = key;
+                break;
+            }
+        }
+        
+        if (backupData) {
+            try {
+                const parsed = JSON.parse(backupData);
+                console.log('Backup data:', parsed);
+                
+                // Handle different backup formats
+                let userData = null;
+                
+                if (parsed.data) {
+                    // Firebase format: { data: {...} }
+                    userData = parsed.data;
+                } else if (parsed.username === username && parsed.data) {
+                    // Local backup format: { username: ..., data: ... }
+                    userData = parsed.data;
+                } else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    // Direct data object
+                    userData = parsed;
+                }
+                
+                if (userData) {
+                    const dataKey = `userData_${username}`;
+                    localStorage.setItem(dataKey, JSON.stringify(userData));
+                    
+                    console.log('✅ Restored from backup:', userData);
+                    
+                    // Reload the data
+                    if (typeof loadUserData === 'function') {
+                        loadUserData();
+                    }
+                    
+                    statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Loaded from backup</span>';
+                    showNotification('Data loaded from local backup', 'success');
+                    return true;
+                }
+            } catch (parseError) {
+                console.error('Error parsing backup:', parseError);
+            }
+        }
+        
+        console.log('❌ No backup data found');
+        statusElement.innerHTML = '<span style="color: #FF9800;">ℹ️ No cloud data found</span>';
+        showNotification('No cloud data available', 'info');
+        return false;
+        
+    } catch (error) {
+        console.error('Backup load error:', error);
+        statusElement.innerHTML = '<span style="color: #f44336;">❌ Backup load failed</span>';
+        showNotification('Backup load failed', 'error');
+        return false;
+    }
 }
 
 // Fallback cloud sync (localStorage backup)
@@ -2541,4 +2783,42 @@ function createSampleData(month, year) {
     allData[monthYear] = sampleData;
     
     return allData;
+}
+
+// ==================== DEBUG FUNCTIONS ====================
+function debugFirebase() {
+    console.log('=== FIREBASE DEBUG ===');
+    console.log('Firebase available:', typeof firebase !== 'undefined');
+    console.log('Firestore available:', typeof firebase.firestore !== 'undefined');
+    console.log('Firebase apps:', firebase.apps?.length || 0);
+    
+    // Check current user
+    const userData = localStorage.getItem('currentUser');
+    if (userData) {
+        const user = JSON.parse(userData);
+        console.log('Current user:', user);
+        console.log('Username for sync:', user.uid || user.email?.split('@')[0]);
+    }
+}
+
+function checkCurrentUser() {
+    const userData = localStorage.getItem('currentUser');
+    if (!userData) {
+        console.error('❌ No user data in localStorage');
+        return null;
+    }
+    
+    try {
+        const user = JSON.parse(userData);
+        console.log('✅ User found:', user);
+        
+        // Try different username formats
+        const username = user.uid || user.email?.split('@')[0] || 'unknown';
+        console.log('Username:', username);
+        
+        return { user, username };
+    } catch (error) {
+        console.error('❌ Error parsing user data:', error);
+        return null;
+    }
 }
