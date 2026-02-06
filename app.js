@@ -3590,23 +3590,3 @@ async function checkFirebaseData(username) {
     }
 }
 
-/* Use JavaScript to calculate exact top position */
-function setTableHeaderPosition() {
-    const header = document.querySelector('.header');
-    if (!header) return;
-    
-    const headerHeight = header.offsetHeight;
-    const dateControls = document.querySelector('.date-controls');
-    const dateControlsHeight = dateControls ? dateControls.offsetHeight : 0;
-    
-    const totalHeight = headerHeight + dateControlsHeight;
-    
-    const tableHeader = document.querySelector('#time-table thead');
-    if (tableHeader) {
-        tableHeader.style.top = totalHeight + 'px';
-    }
-}
-
-// Call this on load and resize
-window.addEventListener('load', setTableHeaderPosition);
-window.addEventListener('resize', setTableHeaderPosition);
