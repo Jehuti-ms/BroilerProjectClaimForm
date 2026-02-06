@@ -1032,19 +1032,63 @@ select {
 }*/
 
 /* ==================== STICKY TABLE HEADER BELOW MAIN HEADER ==================== */
-/* Main header sticks at top */
+/* ==================== SIMPLE STICKY TABLE HEADER ==================== */
+
+/* Make the main header sticky */
 .header {
     position: sticky;
     top: 0;
     z-index: 1000;
-    background: white; /* Important: needs background */
+    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* Table header sticks below main header */
-#time-table thead {
+/* Table container for scrolling */
+.table-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+/* Simple table header sticky - inside the container */
+.table-container thead {
     position: sticky;
-    top: 150px; /* Approximate height of your header + date controls */
-    z-index: 900;
+    top: 0; /* This is 0 relative to .table-container, not the whole page */
     background-color: #4CAF50;
+    color: white;
+    z-index: 100;
+}
+
+/* Table styling */
+#time-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+#time-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: #4CAF50;
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 2px solid #45a049;
+}
+
+#time-table tbody tr {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+#time-table td {
+    padding: 12px 15px;
+    font-size: 14px;
 }
 
