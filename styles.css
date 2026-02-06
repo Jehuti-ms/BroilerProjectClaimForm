@@ -1032,123 +1032,150 @@ select {
 }*/
 
 /* ==================== STICKY TABLE HEADER BELOW MAIN HEADER ==================== */
-/* ==================== TABLE CONTAINER WITH STICKY HEADER ==================== */
-.form-section {
-    margin-top: 20px;
-    position: relative;
-}
-
-/* THIS is the key - container with fixed height and overflow */
-.table-container {
-    max-height: 500px; /* REQUIRED: Fixed height for scrolling */
-    overflow-y: auto;  /* REQUIRED: Creates scrollable area */
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    position: relative;
-}
-
-/* Table styling */
-#time-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 0;
-}
-
-/* Sticky table header - sticks to top of .table-container */
-.table-container thead {
-    position: sticky;
-    top: 0; /* Sticks to top of the container */
-    background-color: #4CAF50;
-    color: white;
-    z-index: 100;
-}
-
-#time-table thead th {
-    position: sticky;
-    top: 0;
-    background-color: #4CAF50;
-    padding: 12px 15px;
-    text-align: left;
-    font-weight: 600;
-    font-size: 14px;
-    border-bottom: 2px solid #45a049;
-}
-
-/* Table body */
-#time-table tbody tr {
-    border-bottom: 1px solid #e0e0e0;
-    transition: background-color 0.2s;
-}
-
-#time-table tbody tr:hover {
-    background-color: #f9f9f9;
-}
-
-#time-table td {
-    padding: 12px 15px;
-    font-size: 14px;
-}
-
-/* Scrollbar styling */
-.table-container::-webkit-scrollbar {
-    width: 8px;
-}
-
-.table-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-.table-container::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-}
-
-.table-container::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-/* For Firefox */
-.table-container {
-    scrollbar-width: thin;
-    scrollbar-color: #888 #f1f1f1;
-}
-
-/* Total hours */
-.total-hours {
-    text-align: right;
-    margin-top: 15px;
-    padding: 12px 15px;
-    background-color: #f8f9fa;
-    border-radius: 6px;
-    font-weight: bold;
-    font-size: 16px;
+/* ==================== FORM CONTROLS ROW - SAME LINE ==================== */
+.form-controls-row {
+    display: flex;
+    align-items: stretch; /* Makes both sides same height */
+    gap: 30px;
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
     border: 1px solid #e9ecef;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-/* Actions header */
-.actions-header {
-    text-align: right;
+/* Employee Control - Left side */
+.employee-control {
+    flex: 3; /* Takes more width */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* Even spacing */
 }
 
-.add-entry-inline {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    background-color: #4CAF50;
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 4px;
-    font-size: 13px;
-    font-weight: 500;
+.employee-control label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 14px;
+    flex-shrink: 0; /* Prevent label from shrinking */
+}
+
+#employee-name-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 15px;
+    background: white;
+    transition: all 0.2s;
+    flex-grow: 1; /* Takes available space */
+    margin-bottom: 5px; /* Space before hint */
+}
+
+#employee-name-input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+/* Period Control - Right side */
+.period-control {
+    flex: 2; /* Takes less width */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* Even spacing */
+}
+
+.period-inputs {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 5px; /* Space before hint */
+}
+
+.period-input {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.period-input label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+#month-select {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 15px;
+    background: white;
     cursor: pointer;
     transition: all 0.2s;
-    vertical-align: middle;
+    flex-grow: 1; /* Match height with employee input */
 }
 
-.add-entry-inline:hover {
-    background-color: #45a049;
-    transform: translateY(-1px);
+#year-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 15px;
+    background: white;
+    text-align: center;
+    transition: all 0.2s;
+    flex-grow: 1; /* Match height with employee input */
 }
 
+#month-select:focus,
+#year-input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+/* Hint text - aligned at bottom of each section */
+.hint {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 6px;
+    font-style: italic;
+    flex-shrink: 0; /* Keep hint at bottom */
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .form-controls-row {
+        flex-direction: column;
+        gap: 20px;
+        align-items: stretch;
+    }
+    
+    .employee-control,
+    .period-control {
+        width: 100%;
+    }
+    
+    .period-inputs {
+        gap: 20px;
+    }
+}
+
+@media (max-width: 576px) {
+    .period-inputs {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    #employee-name-input,
+    #month-select,
+    #year-input {
+        padding: 12px 14px;
+    }
+}
