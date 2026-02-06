@@ -1008,7 +1008,7 @@ select {
 }
 
 /* ===== SIMPLE FIX: Add top spacing to table header =====*/
-#time-table thead th {
+/*#time-table thead th {
     position: sticky;
     top: 0;
     background-color: #4CAF50;
@@ -1016,17 +1016,130 @@ select {
 }
 
 /* Add margin to the container to push table down */
-.form-section {
+/*.form-section {
     margin-top: 20px;
     position: relative;
 }
 
 /* Ensure the table header starts below other content */
-.container > *:not(.form-section) {
+/*.container > *:not(.form-section) {
     position: relative;
     z-index: 1;
-}
+} */
+
+/*.form-section {
+    z-index: 2;
+}*/
+
+/* ==================== WORKING STICKY TABLE HEADER ==================== */
 
 .form-section {
-    z-index: 2;
+    margin-top: 20px;
+    position: relative;
 }
+
+/* Table container with fixed height - REQUIRED for sticky header */
+.table-container {
+    max-height: 500px; /* Adjust this value as needed */
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Table styling */
+#time-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+/* Table header - This will be sticky */
+#time-table thead {
+    background-color: #4CAF50;
+    color: white;
+    position: sticky;
+    top: 0; /* Stick to top of .table-container */
+    z-index: 100;
+}
+
+#time-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: #4CAF50;
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 2px solid #45a049;
+}
+
+/* Table body */
+#time-table tbody tr {
+    border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.2s;
+}
+
+#time-table tbody tr:hover {
+    background-color: #f9f9f9;
+}
+
+#time-table td {
+    padding: 12px 15px;
+    font-size: 14px;
+}
+
+/* Scrollbar styling */
+.table-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* For Firefox */
+.table-container {
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+}
+
+/* Total hours display */
+.total-hours {
+    text-align: right;
+    margin-top: 15px;
+    padding: 10px 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 16px;
+    border: 1px solid #e9ecef;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .table-container {
+        max-height: 400px;
+    }
+    
+    .add-entry-inline span:last-child {
+        display: none; /* Show only icon on mobile */
+    }
+    
+    #time-table th,
+    #time-table td {
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+}
+
