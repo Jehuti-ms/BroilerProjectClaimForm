@@ -1179,3 +1179,63 @@ select {
         padding: 12px 14px;
     }
 }
+
+/* ==================== STICKY TABLE HEADER BELOW MAIN HEADER ==================== */
+
+/* Main header stays at top */
+.header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Table container for scrolling */
+.table-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+/* Table header - sticks below main header */
+#time-table thead {
+    position: sticky;
+    top: 0; /* Will be overridden by JavaScript calculation */
+    background-color: #4CAF50;
+    color: white;
+    z-index: 900; /* Lower than main header */
+}
+
+#time-table thead th {
+    position: sticky;
+    top: 0; /* Will be overridden by JavaScript calculation */
+    background-color: #4CAF50;
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 2px solid #45a049;
+}
+
+/* Table styling */
+#time-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+#time-table tbody tr {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+#time-table td {
+    padding: 12px 15px;
+    font-size: 14px;
+}
