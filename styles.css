@@ -1032,135 +1032,123 @@ select {
 }*/
 
 /* ==================== STICKY TABLE HEADER BELOW MAIN HEADER ==================== */
-/* ==================== FORM CONTROLS ROW ==================== */
-.form-controls-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 30px;
-    margin-bottom: 25px;
-    padding: 20px;
-    background: #f8f9fa;
-    border-radius: 10px;
-    border: 1px solid #e9ecef;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-/* Employee Input Section */
-.employee-input-section {
-    flex: 2; /* Takes more space */
-    min-width: 300px;
-}
-
-.employee-input-section label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: #2c3e50;
-    font-size: 14px;
-}
-
-#employee-name-input {
-    width: 100%;
-    padding: 12px 15px;
-    border: 1px solid #ced4da;
-    border-radius: 6px;
-    font-size: 15px;
-    background: white;
-    transition: all 0.2s;
-}
-
-#employee-name-input:focus {
-    outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
-}
-
-.input-with-hint {
+/* ==================== TABLE CONTAINER WITH STICKY HEADER ==================== */
+.form-section {
+    margin-top: 20px;
     position: relative;
 }
 
-/* Date Controls Section */
-.date-controls-section {
-    flex: 1; /* Takes less space */
-    min-width: 250px;
+/* THIS is the key - container with fixed height and overflow */
+.table-container {
+    max-height: 500px; /* REQUIRED: Fixed height for scrolling */
+    overflow-y: auto;  /* REQUIRED: Creates scrollable area */
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    position: relative;
 }
 
-.date-inputs {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 5px;
+/* Table styling */
+#time-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
 }
 
-.date-input {
-    flex: 1;
+/* Sticky table header - sticks to top of .table-container */
+.table-container thead {
+    position: sticky;
+    top: 0; /* Sticks to top of the container */
+    background-color: #4CAF50;
+    color: white;
+    z-index: 100;
 }
 
-.date-input label {
-    display: block;
-    margin-bottom: 5px;
+#time-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: #4CAF50;
+    padding: 12px 15px;
+    text-align: left;
     font-weight: 600;
-    color: #2c3e50;
+    font-size: 14px;
+    border-bottom: 2px solid #45a049;
+}
+
+/* Table body */
+#time-table tbody tr {
+    border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.2s;
+}
+
+#time-table tbody tr:hover {
+    background-color: #f9f9f9;
+}
+
+#time-table td {
+    padding: 12px 15px;
     font-size: 14px;
 }
 
-#month-select {
-    width: 100%;
+/* Scrollbar styling */
+.table-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* For Firefox */
+.table-container {
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+}
+
+/* Total hours */
+.total-hours {
+    text-align: right;
+    margin-top: 15px;
     padding: 12px 15px;
-    border: 1px solid #ced4da;
+    background-color: #f8f9fa;
     border-radius: 6px;
-    font-size: 15px;
-    background: white;
+    font-weight: bold;
+    font-size: 16px;
+    border: 1px solid #e9ecef;
+}
+
+/* Actions header */
+.actions-header {
+    text-align: right;
+}
+
+.add-entry-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background-color: #4CAF50;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
+    vertical-align: middle;
 }
 
-#year-input {
-    width: 100%;
-    padding: 12px 15px;
-    border: 1px solid #ced4da;
-    border-radius: 6px;
-    font-size: 15px;
-    background: white;
-    text-align: center;
-    transition: all 0.2s;
+.add-entry-inline:hover {
+    background-color: #45a049;
+    transform: translateY(-1px);
 }
 
-#month-select:focus,
-#year-input:focus {
-    outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
-}
-
-/* Hint text styling */
-.hint {
-    font-size: 12px;
-    color: #6c757d;
-    margin-top: 6px;
-    font-style: italic;
-}
-
-/* Responsive */
-@media (max-width: 992px) {
-    .form-controls-row {
-        flex-direction: column;
-        gap: 20px;
-    }
-    
-    .employee-input-section,
-    .date-controls-section {
-        min-width: 100%;
-    }
-    
-    .date-inputs {
-        gap: 20px;
-    }
-}
-
-@media (max-width: 576px) {
-    .date-inputs {
-        flex-direction: column;
-        gap: 15px;
-    }
-}
