@@ -1033,18 +1033,7 @@ select {
 
 /* ==================== STICKY TABLE HEADER BELOW MAIN HEADER ==================== */
 
-/* Main header - will be sticky at the very top */
-.header {
-    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
-    color: white;
-    padding: 20px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
+
 
 /* Date controls - will also stick below header */
 .date-controls {
