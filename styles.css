@@ -1031,41 +1031,65 @@ select {
     z-index: 2;
 }*/
 
-/* ==================== WORKING STICKY TABLE HEADER ==================== */
+/* ==================== STICKY TABLE HEADER BELOW MAIN HEADER ==================== */
 
-.form-section {
-    margin-top: 20px;
-    position: relative;
+/* Main header - will be sticky at the very top */
+.header {
+    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* Table container with fixed height - REQUIRED for sticky header */
-.table-container {
-    max-height: 500px; /* Adjust this value as needed */
-    overflow-y: auto;
-    border: 1px solid #e0e0e0;
+/* Date controls - will also stick below header */
+.date-controls {
+    background: #f8f9fa;
+    padding: 15px;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+    margin-bottom: 15px;
+    position: sticky;
+    top: calc(var(--header-height, 100px)); /* Will stick below header */
+    z-index: 900;
+}
+
+/* Employee info - optional, can also stick */
+.employee-info {
+    background: #fff;
+    padding: 12px 15px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    margin-bottom: 15px;
+    position: sticky;
+    top: calc(var(--header-height, 100px) + var(--date-controls-height, 70px));
+    z-index: 800;
+}
+
+/* Table header - will stick below all the above */
+#time-table thead {
+    background-color: #4CAF50;
+    color: white;
+    position: sticky;
+    top: calc(var(--header-height, 100px) + var(--date-controls-height, 70px) + var(--employee-info-height, 50px));
+    z-index: 700;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 /* Table styling */
 #time-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 0;
-}
-
-/* Table header - This will be sticky */
-#time-table thead {
-    background-color: #4CAF50;
-    color: white;
-    position: sticky;
-    top: 0; /* Stick to top of .table-container */
-    z-index: 100;
+    margin-top: 0;
 }
 
 #time-table thead th {
     position: sticky;
-    top: 0;
+    top: calc(var(--header-height, 100px) + var(--date-controls-height, 70px) + var(--employee-info-height, 50px));
     background-color: #4CAF50;
     padding: 12px 15px;
     text-align: left;
@@ -1077,11 +1101,6 @@ select {
 /* Table body */
 #time-table tbody tr {
     border-bottom: 1px solid #e0e0e0;
-    transition: background-color 0.2s;
-}
-
-#time-table tbody tr:hover {
-    background-color: #f9f9f9;
 }
 
 #time-table td {
@@ -1089,57 +1108,11 @@ select {
     font-size: 14px;
 }
 
-/* Scrollbar styling */
-.table-container::-webkit-scrollbar {
-    width: 8px;
-}
-
-.table-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-.table-container::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-}
-
-.table-container::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-/* For Firefox */
+/* Container for scrolling */
 .table-container {
-    scrollbar-width: thin;
-    scrollbar-color: #888 #f1f1f1;
-}
-
-/* Total hours display */
-.total-hours {
-    text-align: right;
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
     margin-top: 15px;
-    padding: 10px 15px;
-    background-color: #f8f9fa;
-    border-radius: 6px;
-    font-weight: bold;
-    font-size: 16px;
-    border: 1px solid #e9ecef;
 }
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .table-container {
-        max-height: 400px;
-    }
-    
-    .add-entry-inline span:last-child {
-        display: none; /* Show only icon on mobile */
-    }
-    
-    #time-table th,
-    #time-table td {
-        padding: 8px 10px;
-        font-size: 12px;
-    }
-}
-
