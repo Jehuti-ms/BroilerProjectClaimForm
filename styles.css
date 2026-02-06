@@ -1032,63 +1032,135 @@ select {
 }*/
 
 /* ==================== STICKY TABLE HEADER BELOW MAIN HEADER ==================== */
-/* ==================== SIMPLE STICKY TABLE HEADER ==================== */
-
-/* Make the main header sticky */
-.header {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
-    color: white;
+/* ==================== FORM CONTROLS ROW ==================== */
+.form-controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 30px;
+    margin-bottom: 25px;
     padding: 20px;
+    background: #f8f9fa;
     border-radius: 10px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-/* Table container for scrolling */
-.table-container {
-    max-height: 500px;
-    overflow-y: auto;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    margin-top: 10px;
+/* Employee Input Section */
+.employee-input-section {
+    flex: 2; /* Takes more space */
+    min-width: 300px;
 }
 
-/* Simple table header sticky - inside the container */
-.table-container thead {
-    position: sticky;
-    top: 0; /* This is 0 relative to .table-container, not the whole page */
-    background-color: #4CAF50;
-    color: white;
-    z-index: 100;
-}
-
-/* Table styling */
-#time-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 0;
-}
-
-#time-table thead th {
-    position: sticky;
-    top: 0;
-    background-color: #4CAF50;
-    padding: 12px 15px;
-    text-align: left;
+.employee-input-section label {
+    display: block;
+    margin-bottom: 8px;
     font-weight: 600;
+    color: #2c3e50;
     font-size: 14px;
-    border-bottom: 2px solid #45a049;
 }
 
-#time-table tbody tr {
-    border-bottom: 1px solid #e0e0e0;
-}
-
-#time-table td {
+#employee-name-input {
+    width: 100%;
     padding: 12px 15px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 15px;
+    background: white;
+    transition: all 0.2s;
+}
+
+#employee-name-input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+.input-with-hint {
+    position: relative;
+}
+
+/* Date Controls Section */
+.date-controls-section {
+    flex: 1; /* Takes less space */
+    min-width: 250px;
+}
+
+.date-inputs {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 5px;
+}
+
+.date-input {
+    flex: 1;
+}
+
+.date-input label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #2c3e50;
     font-size: 14px;
 }
 
+#month-select {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 15px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#year-input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 15px;
+    background: white;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+#month-select:focus,
+#year-input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+/* Hint text styling */
+.hint {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 6px;
+    font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .form-controls-row {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .employee-input-section,
+    .date-controls-section {
+        min-width: 100%;
+    }
+    
+    .date-inputs {
+        gap: 20px;
+    }
+}
+
+@media (max-width: 576px) {
+    .date-inputs {
+        flex-direction: column;
+        gap: 15px;
+    }
+}
