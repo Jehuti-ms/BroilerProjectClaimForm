@@ -26,10 +26,11 @@ body {
     color: var(--text-color);
     background-color: #f5f5f5;
     min-height: 100vh;
+    padding-top: 80px;
 }
 
 /* ============== HEADER ============== */
-.header {
+/*.header {
     background: white;
     padding: 15px 0;
     box-shadow: var(--shadow);
@@ -37,6 +38,16 @@ body {
     top: 0;
     z-index: 100;
     border-bottom: 2px solid var(--border-color);
+} */
+
+.header {
+    position: fixed; /* CHANGE from sticky to FIXED */
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+    height: 80px; /* Your header height */
+    background: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 .header-content {
@@ -1204,23 +1215,38 @@ select {
 }
 
 /* Table header - sticky at TOP of container */
+/*.table-scroll-container thead {
+    position: sticky;
+    top: 0; 
+    background-color: white; 
+    z-index: 100;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+} */
+
 .table-scroll-container thead {
     position: sticky;
-    top: 0; /* This sticks it to top of .table-scroll-container */
-    background-color: white; /* White background as requested */
-    z-index: 100;
+    top: 80px; /* Same as header height - sticks right below it */
+    z-index: 900;
+    background-color: white;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 #time-table thead th {
     /* REMOVE position: sticky and top from here */
-    background-color: #4CAF50; /* White background */
+  /*  background-color: #4CAF50; 
     padding: 12px 15px;
     text-align: left;
     font-weight: 600;
     font-size: 14px;
-    color: white; /* Dark text for contrast */
-    border-bottom: 2px solid #4CAF50; /* Green border at bottom */
+    color: white; 
+    border-bottom: 2px solid #4CAF50; 
+} */
+
+    #time-table thead th {
+    background-color: #4CAF50;
+    padding: 12px 15px;
+    color: white;
+    border-bottom: 2px solid #4CAF50;
 }
 
 /* Table rows */
