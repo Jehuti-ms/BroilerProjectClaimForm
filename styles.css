@@ -1180,48 +1180,21 @@ select {
     }
 }
 
-/* ==================== STICKY TABLE HEADER BELOW MAIN HEADER ==================== */
 
-/* Main header stays at top */
-.header {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
-    color: white;
-    padding: 20px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+#time-table td {
+    padding: 12px 15px;
+    font-size: 14px;
 }
 
-/* Table container for scrolling */
-.table-container {
-    max-height: 500px;
-    overflow-y: auto;
+/* ==================== STICKY TABLE HEADER - TOP OF DATA ==================== */
+
+/* Table container - MUST have fixed height */
+.table-scroll-container {
+    max-height: 500px; /* This creates the scroll area */
+    overflow-y: auto;  /* This enables scrolling */
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    margin-top: 10px;
-}
-
-/* Table header - sticks below main header */
-#time-table thead {
-    position: sticky;
-    top: 0; /* Will be overridden by JavaScript calculation */
-    background-color: #4CAF50;
-    color: white;
-    z-index: 900; /* Lower than main header */
-}
-
-#time-table thead th {
-    position: sticky;
-    top: 0; /* Will be overridden by JavaScript calculation */
-    background-color: #4CAF50;
-    padding: 12px 15px;
-    text-align: left;
-    font-weight: 600;
-    font-size: 14px;
-    border-bottom: 2px solid #45a049;
+    margin-top: 15px;
 }
 
 /* Table styling */
@@ -1231,11 +1204,63 @@ select {
     margin: 0;
 }
 
+/* Table header - sticky at TOP of container */
+.table-scroll-container thead {
+    position: sticky;
+    top: 0; /* This sticks it to top of .table-scroll-container */
+    background-color: white; /* White background as requested */
+    z-index: 100;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+#time-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: white; /* White background */
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    color: #333; /* Dark text for contrast */
+    border-bottom: 2px solid #4CAF50; /* Green border at bottom */
+}
+
+/* Table rows */
 #time-table tbody tr {
     border-bottom: 1px solid #e0e0e0;
+}
+
+#time-table tbody tr:hover {
+    background-color: #f9f9f9;
 }
 
 #time-table td {
     padding: 12px 15px;
     font-size: 14px;
+    background-color: white;
+}
+
+/* Scrollbar styling */
+.table-scroll-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
+}
+
+/* For Firefox */
+.table-scroll-container {
+    scrollbar-width: thin;
+    scrollbar-color: #ccc #f1f1f1;
 }
