@@ -1031,7 +1031,6 @@ select {
     z-index: 2;
 }*/
 
-/* ==================== STICKY TABLE HEADER BELOW MAIN HEADER ==================== */
 /* ==================== FORM CONTROLS ROW - SAME LINE ==================== */
 .form-controls-row {
     display: flex;
@@ -1216,7 +1215,7 @@ select {
 #time-table thead th {
     position: sticky;
     top: 0;
-    background-color: white; /* White background */
+    background-color: #4CAF50; /* White background */
     padding: 12px 15px;
     text-align: left;
     font-weight: 600;
