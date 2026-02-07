@@ -296,8 +296,6 @@ body {
     width: 100px;
 }
 
-/* Form Section with sticky table */
-/* ==================== TABLE WITH STICKY HEADER ==================== */
 /* ==================== TABLE WITH STICKY HEADER ==================== */
 .form-section {
     position: relative;
@@ -314,7 +312,7 @@ body {
 }
 
 /* Sticky table header */
-#time-table thead {
+/*#time-table thead {
     background-color: #4CAF50;
     color: white;
     position: sticky;
@@ -328,7 +326,7 @@ body {
     top: 0;
     background-color: #4CAF50;
     z-index: 101;
-}
+} */
 
 /* Actions header */
 .actions-header {
@@ -1194,6 +1192,7 @@ select {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     margin-top: 15px;
+    position: relative;
 }
 
 /* Table styling */
@@ -1214,12 +1213,12 @@ select {
 
 #time-table thead th {
     /* REMOVE position: sticky and top from here */
-    background-color: #4CAF50; /* White background */
+    background-color: #4CAF50; 
     padding: 12px 15px;
     text-align: left;
     font-weight: 600;
     font-size: 14px;
-    color: white; /* Dark text for contrast */
+    color: white; 
     border-bottom: 2px solid #4CAF50; /* Green border at bottom */
 }
 
