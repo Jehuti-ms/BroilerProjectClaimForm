@@ -1031,7 +1031,6 @@ select {
     z-index: 2;
 }*/
 
-/* ==================== STICKY TABLE HEADER BELOW MAIN HEADER ==================== */
 /* ==================== FORM CONTROLS ROW - SAME LINE ==================== */
 .form-controls-row {
     display: flex;
@@ -1179,3 +1178,89 @@ select {
         padding: 12px 14px;
     }
 }
+
+
+#time-table td {
+    padding: 12px 15px;
+    font-size: 14px;
+}
+
+/* ==================== STICKY TABLE HEADER - TOP OF DATA ==================== */
+
+/* Table container - MUST have fixed height */
+.table-scroll-container {
+    max-height: 500px; /* This creates the scroll area */
+    overflow-y: auto;  /* This enables scrolling */
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+/* Table styling */
+#time-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+/* Table header - sticky at TOP of container */
+.table-scroll-container thead {
+    position: sticky;
+    top: 0; /* This sticks it to top of .table-scroll-container */
+    background-color: white; /* White background as requested */
+    z-index: 100;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+#time-table thead th {
+    /* REMOVE position: sticky and top from here */
+    background-color: #4CAF50; /* White background */
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    color: white; /* Dark text for contrast */
+    border-bottom: 2px solid #4CAF50; /* Green border at bottom */
+}
+
+/* Table rows */
+#time-table tbody tr {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+#time-table tbody tr:hover {
+    background-color: #f9f9f9;
+}
+
+#time-table td {
+    padding: 12px 15px;
+    font-size: 14px;
+    background-color: white;
+}
+
+/* Scrollbar styling */
+.table-scroll-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
+}
+
+/* For Firefox */
+.table-scroll-container {
+    scrollbar-width: thin;
+    scrollbar-color: #ccc #f1f1f1;
+}
+
+/* ---- Debug ---- */
