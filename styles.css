@@ -1225,7 +1225,7 @@ select {
 
 .table-scroll-container thead {
     position: sticky;
-    top: 80px; /* Same as header height - sticks right below it */
+    top: 175px; /* Same as header height - sticks right below it */
     z-index: 900;
     background-color: white;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
