@@ -1263,3 +1263,23 @@ select {
     scrollbar-width: thin;
     scrollbar-color: #ccc #f1f1f1;
 }
+
+/* ---- Debug ---- */
+/* Debug CSS to visualize sticky header */
+#time-table thead {
+    background: white !important;
+    border: 3px solid red !important;
+    box-shadow: 0 5px 15px rgba(255, 0, 0, 0.3) !important;
+}
+
+#time-table thead th {
+    background: white !important;
+    border: 2px solid blue !important;
+    color: #333 !important;
+}
+
+/* Make sure table container is visible */
+.table-scroll-container {
+    border: 3px solid green !important;
+    background: rgba(0, 255, 0, 0.1) !important;
+}
