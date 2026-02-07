@@ -35,7 +35,7 @@ body {
     box-shadow: var(--shadow);
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 1000;
     border-bottom: 2px solid var(--border-color);
 }
 
@@ -1005,30 +1005,6 @@ select {
     }
 }
 
-/* ===== SIMPLE FIX: Add top spacing to table header =====*/
-/*#time-table thead th {
-    position: sticky;
-    top: 0;
-    background-color: #4CAF50;
-    z-index: 101;
-}
-
-/* Add margin to the container to push table down */
-/*.form-section {
-    margin-top: 20px;
-    position: relative;
-}
-
-/* Ensure the table header starts below other content */
-/*.container > *:not(.form-section) {
-    position: relative;
-    z-index: 1;
-} */
-
-/*.form-section {
-    z-index: 2;
-}*/
-
 /* ==================== FORM CONTROLS ROW - SAME LINE ==================== */
 .form-controls-row {
     display: flex;
@@ -1187,8 +1163,8 @@ select {
 
 /* Table container - MUST have fixed height */
 .table-scroll-container {
-    max-height: 500px; /* This creates the scroll area */
-    overflow-y: auto;  /* This enables scrolling */
+    max-height: 500px; 
+    overflow-y: auto;  
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     margin-top: 15px;
@@ -1200,13 +1176,14 @@ select {
     width: 100%;
     border-collapse: collapse;
     margin: 0;
+    min-height: 400px;
 }
 
 /* Table header - sticky at TOP of container */
 .table-scroll-container thead {
     position: sticky;
-    top: 0; /* This sticks it to top of .table-scroll-container */
-    background-color: white; /* White background as requested */
+    top: 0; 
+    background-color: white; 
     z-index: 100;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
@@ -1224,6 +1201,9 @@ select {
 
 /* Table rows */
 #time-table tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
     border-bottom: 1px solid #e0e0e0;
 }
 
