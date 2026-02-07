@@ -1213,8 +1213,7 @@ select {
 }
 
 #time-table thead th {
-    position: sticky;
-    top: 0;
+    /* REMOVE position: sticky and top from here */
     background-color: #4CAF50; /* White background */
     padding: 12px 15px;
     text-align: left;
@@ -1265,21 +1264,3 @@ select {
 }
 
 /* ---- Debug ---- */
-/* Debug CSS to visualize sticky header */
-#time-table thead {
-    background: white !important;
-    border: 3px solid red !important;
-    box-shadow: 0 5px 15px rgba(255, 0, 0, 0.3) !important;
-}
-
-#time-table thead th {
-    background: white !important;
-    border: 2px solid blue !important;
-    color: #333 !important;
-}
-
-/* Make sure table container is visible */
-.table-scroll-container {
-    border: 3px solid green !important;
-    background: rgba(0, 255, 0, 0.1) !important;
-}
