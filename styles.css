@@ -1243,3 +1243,22 @@ select {
 }
 
 /* ---- Debug ---- */
+/* DEBUG: Make everything visible */
+.header {
+    background: red !important;
+    opacity: 0.8;
+}
+
+.table-scroll-container {
+    background: yellow !important;
+    border: 5px solid blue !important;
+}
+
+.table-scroll-container thead {
+    background: green !important;
+    border: 3px solid purple !important;
+}
+
+#time-table thead th {
+    background: orange !important;
+}
