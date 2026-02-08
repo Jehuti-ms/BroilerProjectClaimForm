@@ -1288,6 +1288,27 @@ function tryLoadFromBackups(username, monthYear) {
 // ==================== ENHANCED SAVE FORM ====================
 function saveForm() {
     console.log('=== SAVE FORM ===');
+
+    // 1. Check what currentFormData is HERE
+    console.log("currentFormData at start of saveForm:", window.currentFormData);
+    console.log("Length:", window.currentFormData?.length);
+    
+    const periodKey = `${window.currentMonth}-${window.currentYear}`;
+    
+    // 2. Check what's being saved
+    console.log("Creating dataToSave with periodKey:", periodKey);
+    const dataToSave = {
+        [periodKey]: window.currentFormData || []
+    };
+    console.log("dataToSave:", dataToSave);
+    console.log("Entries in dataToSave:", dataToSave[periodKey]?.length || 0);
+    
+    // 3. Check the saveUserData function call
+    saveUserData(dataToSave);
+    
+    // 4. This log says 0 entries - why?
+    console.log(`Form saved: ${dataToSave[periodKey]?.length || 0} entries for ${getMonthName(window.currentMonth)} ${window.currentYear}`);
+}
     
     try {
         const userData = localStorage.getItem('currentUser');
