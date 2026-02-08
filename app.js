@@ -1308,7 +1308,7 @@ function saveForm() {
     
     // 4. This log says 0 entries - why?
     console.log(`Form saved: ${dataToSave[periodKey]?.length || 0} entries for ${getMonthName(window.currentMonth)} ${window.currentYear}`);
-}
+
     
     try {
         const userData = localStorage.getItem('currentUser');
