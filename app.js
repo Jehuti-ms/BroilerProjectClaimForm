@@ -1046,13 +1046,12 @@ document.addEventListener('keydown', function(event) {
 });
 
 // Delete row
+// Delete row
 function deleteRow(index) {
     if (confirm('Delete this entry?')) {
         window.currentFormData.splice(index, 1);
         renderTable();
-        if (typeof saveData === 'function') {
-            saveData();
-        }
+        saveData(); // Save after deletion
     }
 }
 
@@ -1083,9 +1082,7 @@ function clearForm() {
     if (confirm('Clear all entries for this month?')) {
         window.currentFormData = [];
         renderTable();
-        if (typeof saveData === 'function') {
-            saveData();
-        }
+        saveData(); // Save empty array
     }
 }
 
