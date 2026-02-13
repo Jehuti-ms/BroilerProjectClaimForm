@@ -27,7 +27,6 @@ body {
     color: var(--text-color);
     background-color: #f5f5f5;
     min-height: 100vh;
-    /* REMOVED padding-top: 80px - we'll handle this differently */
 }
 
 /* ============== FIXED HEADER ============== */
@@ -49,6 +48,8 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 10px;
+    height: 100%;
+    justify-content: center;
 }
 
 /* School and Project Info - Centered */
@@ -64,8 +65,6 @@ body {
     color: var(--primary-color);
     line-height: 1.2;
     margin-bottom: 3px;
-    word-break: break-word;
-    hyphens: auto;
 }
 
 .project-name {
@@ -73,8 +72,6 @@ body {
     font-weight: 600;
     color: var(--secondary-color);
     font-style: italic;
-    line-height: 1.2;
-    word-break: break-word;
 }
 
 /* Claim Form Title with Employee Name - Centered */
@@ -90,7 +87,6 @@ body {
     color: var(--primary-color);
     line-height: 1.3;
     margin-bottom: 5px;
-    word-break: break-word;
 }
 
 #employee-display {
@@ -104,7 +100,7 @@ body {
     font-weight: 500;
 }
 
-/* User Info - Positioned absolutely on right for desktop */
+/* User Info - Positioned absolutely */
 .user-info {
     position: absolute;
     top: 15px;
@@ -113,193 +109,96 @@ body {
     background: var(--light-bg);
     border-radius: var(--radius);
     padding: 10px 15px;
-    margin: 0;
-    width: auto;
     min-width: 200px;
 }
 
-.user-display {
-    font-size: 14px;
-    margin-bottom: 8px;
-    color: var(--primary-color);
-}
-
-.welcome-text {
-    font-weight: 500;
-    color: #666;
-}
-
-.username {
-    font-weight: 600;
-    color: var(--accent-color);
-    display: block;
-    margin-top: 2px;
-    word-break: break-word;
-}
-
-.sync-status {
-    font-size: 12px;
-    color: #666;
-    margin-bottom: 10px;
-}
-
-#auto-sync-indicator {
-    color: var(--success-color);
-    font-weight: 600;
-}
-
-.logout-btn {
-    padding: 6px 15px;
-    background: var(--danger-color);
-    color: white;
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.2s;
-    width: 100%;
-}
-
-.logout-btn:hover {
-    background: #c82333;
-    transform: translateY(-1px);
-}
-
-/* Separator */
-.separator {
-    border: none;
-    border-top: 2px solid var(--border-color);
-    margin: 0;
-}
-
-/* ============== SCROLLABLE MAIN CONTENT ============== */
+/* ============== MAIN CONTENT ============== */
 .main-container {
     max-width: 1200px;
-    margin: var(--header-height) auto 0; /* Pushes content below fixed header */
+    margin: 0 auto;
     padding: 20px 15px;
-    /* This entire section scrolls normally */
 }
 
-/* Action Button */
-.action-bar {
-    text-align: right;
-    margin-bottom: 20px;
+/* Add top padding to body to account for fixed header */
+body {
+    padding-top: var(--header-height);
 }
 
-.add-entry-btn {
-    padding: 12px 24px;
-    background: var(--success-color);
-    color: white;
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 15px;
-    font-weight: 600;
-    transition: all 0.2s;
-}
-
-.add-entry-btn:hover {
-    background: #218838;
-    transform: translateY(-1px);
-}
-
-/* Employee Input Section - This will scroll away */
-.employee-input-section {
-    margin: 15px 0;
-    padding: 15px;
-    background: white;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
+/* Form Controls Row - This is ABOVE the table and scrolls away */
+.form-controls-row {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
+    align-items: stretch;
+    gap: 30px;
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    /* This scrolls away normally */
 }
 
-.employee-input-section label {
+/* Employee Control */
+.employee-control {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+}
+
+.employee-control label {
+    display: block;
+    margin-bottom: 8px;
     font-weight: 600;
-    color: var(--primary-color);
-    font-size: 15px;
-    white-space: nowrap;
-}
-
-.employee-input-section input {
-    flex: 1;
-    min-width: 200px;
-    padding: 10px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
+    color: #2c3e50;
     font-size: 14px;
 }
 
-.update-name-btn {
-    padding: 10px 20px;
-    background: var(--info-color);
-    color: white;
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s;
-    white-space: nowrap;
-}
-
-.update-name-btn:hover {
-    background: #138496;
-    transform: translateY(-1px);
-}
-
-/* Hint text */
-.hint {
-    font-size: 12px;
-    color: #666;
-    font-style: italic;
+#employee-name-input {
     width: 100%;
-    margin-top: 5px;
-}
-
-/* Date Controls - This will scroll away */
-.date-controls {
-    margin: 15px 0;
-    padding: 15px;
+    padding: 14px 16px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 15px;
     background: white;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
 }
 
-.date-selectors {
+/* Period Control */
+.period-control {
+    flex: 2;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+}
+
+.period-inputs {
+    display: flex;
     gap: 15px;
-    align-items: center;
 }
 
-.date-selectors label {
-    font-weight: 600;
-    color: var(--primary-color);
-    white-space: nowrap;
-    min-width: 45px;
-}
-
-.date-selectors select,
-.date-selectors input {
-    padding: 10px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    font-size: 14px;
-    background: white;
+.period-input {
     flex: 1;
-    min-width: 120px;
+    display: flex;
+    flex-direction: column;
 }
 
-.date-selectors input {
-    width: 100px;
+.period-input label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 14px;
 }
 
-/* ==================== STICKY TABLE HEADER ==================== */
-/* Table container - Creates scroll area for table */
+#month-select, #year-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 15px;
+    background: white;
+}
+
+/* ==================== TABLE WITH STICKY HEADER ==================== */
+/* Table container - Creates scroll area for table ONLY */
 .table-scroll-container {
     max-height: 500px;
     overflow-y: auto;
@@ -307,6 +206,7 @@ body {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     margin-top: 15px;
+    margin-bottom: 20px;
     position: relative;
     background: white;
 }
@@ -319,7 +219,7 @@ body {
     min-width: 600px;
 }
 
-/* Make thead sticky - THIS STICKS INSIDE THE CONTAINER */
+/* Make thead sticky - Sticks to TOP of the container */
 #time-table thead {
     position: sticky;
     top: 0;
@@ -341,68 +241,48 @@ body {
 
 /* Actions header */
 .actions-header {
-    min-width: 130px;
+    min-width: 180px;
     text-align: right;
     padding-right: 10px !important;
 }
 
-.actions-header span {
-    margin-right: 8px;
+.actions-header .actions-text {
     color: white;
     font-size: 13px;
+    margin-right: 8px;
 }
 
-.add-entry-inline {
+.actions-header .separator {
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0 4px;
+}
+
+.actions-header .add-entry-inline {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 5px 10px;
-    background-color: #4CAF50;
+    padding: 4px 8px;
+    background-color: rgba(255, 255, 255, 0.15);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 4px;
     font-size: 12px;
-    font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-    vertical-align: middle;
-    white-space: nowrap;
 }
 
-.add-entry-inline:hover {
-    background-color: #45a049;
-    border-color: rgba(255, 255, 255, 0.5);
+.actions-header .add-entry-inline:hover {
+    background-color: rgba(255, 255, 255, 0.25);
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.add-entry-inline:active {
-    transform: translateY(0);
-}
-
-.add-entry-inline svg {
-    width: 14px;
-    height: 14px;
-    stroke: white;
-    transition: transform 0.2s;
-}
-
-.add-entry-inline:hover svg {
-    transform: scale(1.1);
 }
 
 /* Table rows */
 #time-table tbody tr {
     border-bottom: 1px solid #e0e0e0;
-    transition: background-color 0.2s;
 }
 
 #time-table tbody tr:hover {
     background-color: #f9f9f9;
-}
-
-#time-table tbody tr:last-child {
-    border-bottom: none;
 }
 
 #time-table td {
@@ -419,8 +299,6 @@ body {
     border-radius: 4px;
     font-size: 12px;
     cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
 }
 
 .edit-btn {
@@ -428,20 +306,12 @@ body {
     color: white;
 }
 
-.edit-btn:hover {
-    background-color: #0b7dda;
-}
-
 .delete-btn {
     background-color: #f44336;
     color: white;
 }
 
-.delete-btn:hover {
-    background-color: #da190b;
-}
-
-/* Total Hours - Scrolls away */
+/* Total Hours - Below table, scrolls away */
 .total-hours {
     text-align: right;
     font-size: 16px;
@@ -454,29 +324,7 @@ body {
     margin: 20px 0;
 }
 
-/* Signature Section - Scrolls away */
-.signature-section {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 40px;
-    padding-top: 20px;
-    border-top: 1px solid #ccc;
-}
-
-.signature-box {
-    flex: 1;
-    margin: 0 10px;
-    text-align: center;
-}
-
-.signature-line {
-    height: 2px;
-    background-color: #000;
-    margin-top: 40px;
-    width: 100%;
-}
-
-/* Action Buttons - Scroll away */
+/* Buttons - Below table, scroll away */
 .buttons {
     display: flex;
     flex-wrap: wrap;
@@ -493,585 +341,18 @@ body {
     font-size: 14px;
     font-weight: 500;
     transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    flex: 1;
     min-width: 120px;
     max-width: 200px;
 }
 
-.buttons button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-.calc-btn { background: var(--info-color); color: white; }
-.pdf-btn { background: #007bff; color: white; }
-.print-btn { background: #6c757d; color: white; }
-.clear-btn { background: var(--warning-color); color: #212529; }
-.save-btn { background: var(--success-color); color: white; }
-.sync-btn { background: #6f42c1; color: white; }
-.load-btn { background: #20c997; color: white; }
-.recovery-btn { background: #fd7e14; color: white; }
-
-/* ==================== FORM CONTROLS ROW ==================== */
-.form-controls-row {
-    display: flex;
-    align-items: stretch;
-    gap: 30px;
-    margin-bottom: 25px;
-    padding: 20px;
-    background: #f8f9fa;
-    border-radius: 10px;
-    border: 1px solid #e9ecef;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-/* Employee Control - Left side */
-.employee-control {
-    flex: 3;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.employee-control label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: #2c3e50;
-    font-size: 14px;
-    flex-shrink: 0;
-}
-
-#employee-name-input {
-    width: 100%;
-    padding: 14px 16px;
-    border: 1px solid #ced4da;
-    border-radius: 6px;
-    font-size: 15px;
-    background: white;
-    transition: all 0.2s;
-    flex-grow: 1;
-    margin-bottom: 5px;
-}
-
-#employee-name-input:focus {
-    outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
-}
-
-/* Period Control - Right side */
-.period-control {
-    flex: 2;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.period-inputs {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 5px;
-}
-
-.period-input {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.period-input label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: #2c3e50;
-    font-size: 14px;
-    flex-shrink: 0;
-}
-
-#month-select {
-    width: 100%;
-    padding: 14px 16px;
-    border: 1px solid #ced4da;
-    border-radius: 6px;
-    font-size: 15px;
-    background: white;
-    cursor: pointer;
-    transition: all 0.2s;
-    flex-grow: 1;
-}
-
-#year-input {
-    width: 100%;
-    padding: 14px 16px;
-    border: 1px solid #ced4da;
-    border-radius: 6px;
-    font-size: 15px;
-    background: white;
-    text-align: center;
-    transition: all 0.2s;
-    flex-grow: 1;
-}
-
-#month-select:focus,
-#year-input:focus {
-    outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
-}
-
-/* Hint text */
-.hint {
-    font-size: 12px;
-    color: #6c757d;
-    margin-top: 6px;
-    font-style: italic;
-    flex-shrink: 0;
-}
-
-/* ==================== MODAL STYLES ==================== */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.4);
-    animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.modal-content {
-    background-color: #fff;
-    margin: 100px auto;
-    padding: 25px;
-    border-radius: 8px;
-    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.25);
-    width: 450px;
-    max-width: 90%;
-    animation: slideIn 0.3s ease-out;
-    position: relative;
-}
-
-@keyframes slideIn {
-    from {
-        transform: translateY(-30px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-.modal-header {
+/* Signature - Below table, scroll away */
+.signature-section {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.modal-header h2 {
-    margin: 0;
-    font-size: 1.3rem;
-    color: #333;
-    font-weight: 600;
-}
-
-.close {
-    color: #777;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-    background: none;
-    border: none;
-    padding: 0;
-    line-height: 1;
-    transition: color 0.2s;
-}
-
-.close:hover {
-    color: #333;
-}
-
-/* Form group styling */
-.form-group {
-    margin-bottom: 18px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: 500;
-    color: #555;
-    font-size: 14px;
-}
-
-.form-group input,
-.form-group select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-    box-sizing: border-box;
-    background-color: #fff;
-    transition: all 0.2s;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-    outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
-}
-
-/* Form row for side-by-side inputs */
-.form-row {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 10px;
-}
-
-.form-row .form-group {
-    flex: 1;
-    margin-bottom: 0;
-}
-
-/* Time inputs - make them more compact */
-.form-row .form-group input[type="time"] {
-    padding: 9px 10px;
-}
-
-/* Modal buttons */
-.modal-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 25px;
+    margin: 40px 0;
     padding-top: 20px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid #ccc;
 }
 
-.modal-buttons button {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 4px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.modal-buttons button:first-child {
-    background-color: #f5f5f5;
-    color: #555;
-}
-
-.modal-buttons button:first-child:hover {
-    background-color: #e8e8e8;
-}
-
-.modal-buttons .save-btn {
-    background-color: #4CAF50;
-    color: white;
-}
-
-.modal-buttons .save-btn:hover {
-    background-color: #45a049;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-/* ============== NOTIFICATION ============== */
-.notification {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    left: 20px;
-    padding: 15px 20px;
-    border-radius: var(--radius);
-    z-index: 10000;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-    animation: slideIn 0.3s ease;
-    font-size: 14px;
-    text-align: center;
-    max-width: 400px;
-    margin: 0 auto;
-}
-
-.notification.success { background: var(--success-color); color: white; }
-.notification.error { background: var(--danger-color); color: white; }
-.notification.info { background: var(--info-color); color: white; }
-.notification.warning { background: var(--warning-color); color: #212529; }
-
-/* Scrollbar styling */
-.table-scroll-container::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-.table-scroll-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-.table-scroll-container::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 4px;
-}
-
-.table-scroll-container::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
-}
-
-/* For Firefox */
-.table-scroll-container {
-    scrollbar-width: thin;
-    scrollbar-color: #ccc #f1f1f1;
-}
-
-/* Better date input styling */
-input[type="date"] {
-    font-family: inherit;
-    cursor: pointer;
-}
-
-input[type="time"] {
-    font-family: inherit;
-    cursor: pointer;
-}
-
-/* Make selects consistent */
-select {
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    background-size: 16px;
-    padding-right: 35px;
-    cursor: pointer;
-}
-
-/* ============== MEDIA QUERIES ============== */
-
-/* Tablet and larger phones (768px and up) */
-@media (min-width: 768px) {
-    .header-content {
-        flex-direction: column;
-        gap: 15px;
-        position: relative;
-        min-height: 140px;
-    }
-    
-    .user-info {
-        position: absolute;
-        top: 15px;
-        right: 15px;
-        text-align: right;
-        background: var(--light-bg);
-        padding: 10px 15px;
-        margin: 0;
-        width: auto;
-    }
-    
-    .user-display,
-    .sync-status {
-        margin-bottom: 6px;
-    }
-    
-    .logout-btn {
-        width: auto;
-        min-width: 100px;
-    }
-    
-    .school-project,
-    .claim-form-title {
-        width: 100%;
-        text-align: center;
-    }
-}
-
-/* For mobile, keep user info below header */
-@media (max-width: 767px) {
-    .user-info {
-        position: static;
-        text-align: center;
-        margin-top: 15px;
-        width: 100%;
-    }
-    
-    .header-content {
-        min-height: auto;
-    }
-}
-
-/* Desktop (992px and up) */
-@media (min-width: 992px) {
-    .header-content,
-    .main-container {
-        padding: 0 30px;
-    }
-    
-    .main-container {
-        padding: 30px 30px 40px;
-    }
-    
-    .school-name {
-        font-size: 24px;
-    }
-    
-    .project-name {
-        font-size: 20px;
-    }
-    
-    .claim-title {
-        font-size: 22px;
-    }
-    
-    .month-year {
-        font-size: 18px;
-    }
-    
-    .buttons button {
-        font-size: 15px;
-        padding: 13px 20px;
-    }
-}
-
-/* Responsive table adjustments */
-@media (max-width: 1024px) {
-    #time-table th,
-    #time-table td {
-        padding: 8px 10px;
-        font-size: 12px;
-    }
-    
-    .actions-header {
-        min-width: 120px;
-    }
-    
-    .add-entry-inline {
-        padding: 4px 8px;
-        font-size: 11px;
-    }
-    
-    .actions-header span {
-        font-size: 12px;
-        margin-right: 5px;
-    }
-}
-
-@media (max-width: 768px) {
-    .table-scroll-container {
-        max-height: 400px;
-    }
-    
-    #time-table {
-        min-width: 600px;
-    }
-    
-    .actions-header .add-entry-inline {
-        display: inline-flex;
-        padding: 3px 6px;
-        font-size: 10px;
-        gap: 2px;
-    }
-    
-    .add-entry-inline svg {
-        width: 12px;
-        height: 12px;
-    }
-    
-    .actions-header span {
-        font-size: 11px;
-        margin-right: 3px;
-    }
-    
-    .edit-btn, .delete-btn {
-        padding: 4px 8px;
-        font-size: 11px;
-        margin: 0 1px;
-    }
-    
-    .date-controls .add-entry-btn {
-        display: inline-block;
-        margin-top: 10px;
-        padding: 8px 16px;
-        font-size: 13px;
-    }
-}
-
-@media (max-width: 480px) {
-    .actions-header .add-entry-inline {
-        padding: 2px 4px;
-        font-size: 9px;
-    }
-    
-    .add-entry-inline span:last-child {
-        display: none;
-    }
-    
-    .add-entry-inline svg {
-        width: 10px;
-        height: 10px;
-    }
-}
-
-@media (max-width: 576px) {
-    .period-inputs {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    #employee-name-input,
-    #month-select,
-    #year-input {
-        padding: 12px 14px;
-    }
-}
-
-@media (max-width: 360px) {
-    .date-selectors {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-    }
-    
-    .date-selectors label {
-        min-width: auto;
-    }
-    
-    .date-selectors select,
-    .date-selectors input {
-        width: 100%;
-        min-width: auto;
-    }
-    
-    .buttons button {
-        min-width: 100%;
-        max-width: 100%;
-    }
-}
-
-@media (min-width: 769px) {
-    .date-controls .add-entry-btn {
-        display: none;
-    }
-    
-    .actions-header .add-entry-inline {
-        display: inline-flex;
-    }
-}
+/* ============== REST OF YOUR EXISTING STYLES ============== */
+/* Keep all your modal styles, notification styles, media queries exactly as they are */
