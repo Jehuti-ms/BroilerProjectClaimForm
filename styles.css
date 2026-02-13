@@ -307,40 +307,6 @@ body {
     width: 100px;
 }
 
-/* Form Section with sticky table */
-/* ==================== TABLE WITH STICKY HEADER ==================== */
-/* ==================== TABLE WITH STICKY HEADER ==================== */
-.form-section {
-    position: relative;
-    overflow: hidden;
-    margin-top: 20px;
-}
-
-#time-table {
-    width: 100%;
-    border-collapse: collapse;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    border-radius: 8px 8px 0 0;
-    overflow: hidden;
-}
-
-/* Sticky table header */
-#time-table thead {
-    background-color: #4CAF50;
-    color: white;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-#time-table thead th {
-    position: sticky;
-    top: 0;
-    background-color: #4CAF50;
-    z-index: 101;
-}
-
 /* Actions header */
 .actions-header {
     position: relative;
@@ -554,48 +520,6 @@ body {
     color: var(--primary-color);
     border-top: 2px solid var(--border-color);
 }
-
-/* Signature Section - Optimized for PDF */
-/*.signature-section {
-    display: flex;
-    flex-direction: column;
-    gap: 25px;
-    margin-top: 30px;
-    padding: 25px;
-    background: white;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    border-top: 2px solid var(--border-color);
-}
-
-.signature-box {
-    flex: 1;
-    text-align: center;
-}
-
-.signature-label {
-    font-weight: 600;
-    color: var(--primary-color);
-    margin-bottom: 10px;
-    font-size: 15px;
-}
-
-.signature-line {
-    height: 1px;
-    background: linear-gradient(to right, transparent 10%, #333 50%, transparent 90%);
-    margin-top: 40px;
-    position: relative;
-}
-
-.signature-line::after {
-    content: '';
-    position: absolute;
-    top: -20px;
-    left: 0;
-    right: 0;
-    height: 40px;
-    border-bottom: 1px solid var(--border-color);
-} */
 
 /* Signature Section */
 .signature-section {
@@ -900,7 +824,6 @@ select {
 }
 
 /* ============== MEDIA QUERIES ============== */
-
 /* Tablet and larger phones (768px and up) */
 @media (min-width: 768px) {
     .header-content {
@@ -1017,30 +940,6 @@ select {
         height: 30px;
     }
 }
-
-/* ===== SIMPLE FIX: Add top spacing to table header =====*/
-/*#time-table thead th {
-    position: sticky;
-    top: 0;
-    background-color: #4CAF50;
-    z-index: 101;
-}
-
-/* Add margin to the container to push table down */
-/*.form-section {
-    margin-top: 20px;
-    position: relative;
-}
-
-/* Ensure the table header starts below other content */
-/*.container > *:not(.form-section) {
-    position: relative;
-    z-index: 1;
-} */
-
-/*.form-section {
-    z-index: 2;
-}*/
 
 /* ==================== FORM CONTROLS ROW - SAME LINE ==================== */
 .form-controls-row {
@@ -1196,15 +1095,16 @@ select {
     font-size: 14px;
 }
 
-/* ==================== STICKY TABLE HEADER - TOP OF DATA ==================== */
-
+/* ==================== STICKY TABLE HEADER ==================== */
 /* Table container - MUST have fixed height */
 .table-scroll-container {
-    max-height: 500px; /* This creates the scroll area */
-    overflow-y: auto;  /* This enables scrolling */
+    max-height: 500px; /* Creates the scroll area */
+    overflow-y: auto;  /* Enables scrolling */
+    overflow-x: auto;  /* Enables horizontal scroll on small screens */
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     margin-top: 15px;
+    position: relative; /* For proper sticky positioning */
 }
 
 /* Table styling */
@@ -1212,50 +1112,78 @@ select {
     width: 100%;
     border-collapse: collapse;
     margin: 0;
+    min-width: 600px; /* Prevents table from getting too squished */
 }
 
-/* Table header - sticky at TOP of container */
-/*.table-scroll-container thead {
+/* Make thead sticky */
+#time-table thead {
     position: sticky;
-    top: 0; 
-    background-color: white; 
-    z-index: 100;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-} */
-
-.table-scroll-container thead {
-    position: sticky;
-    top: 175px; /* Same as header height - sticks right below it */
-    z-index: 900;
-    background-color: white;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    top: 0; /* Sticks to top of container, not viewport */
+    z-index: 10;
+    background-color: #4CAF50;
 }
 
+/* Table header cells */
 #time-table thead th {
-    /* REMOVE position: sticky and top from here */
-  /*  background-color: #4CAF50; 
+    background-color: #4CAF50;
     padding: 12px 15px;
     text-align: left;
     font-weight: 600;
     font-size: 14px;
-    color: white; 
-    border-bottom: 2px solid #4CAF50; 
-} */
-
-    #time-table thead th {
-    background-color: #4CAF50;
-    padding: 12px 15px;
     color: white;
-    border-bottom: 2px solid #4CAF50;
+    border-bottom: 2px solid #45a049;
+    white-space: nowrap; /* Prevents header text from wrapping */
+}
+
+/* Actions header - special styling */
+.actions-header {
+    min-width: 130px;
+    text-align: right;
+    padding-right: 10px !important;
+}
+
+.actions-header span {
+    margin-right: 8px;
+    color: white;
+    font-size: 13px;
+}
+
+.add-entry-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.add-entry-inline:hover {
+    background-color: #45a049;
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* Table rows */
 #time-table tbody tr {
     border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.2s;
 }
 
 #time-table tbody tr:hover {
     background-color: #f9f9f9;
+}
+
+#time-table tbody tr:last-child {
+    border-bottom: none;
 }
 
 #time-table td {
@@ -1264,9 +1192,40 @@ select {
     background-color: white;
 }
 
+/* Action buttons in rows */
+.edit-btn, .delete-btn {
+    padding: 5px 10px;
+    margin: 0 2px;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.edit-btn {
+    background-color: #2196F3;
+    color: white;
+}
+
+.edit-btn:hover {
+    background-color: #0b7dda;
+}
+
+.delete-btn {
+    background-color: #f44336;
+    color: white;
+}
+
+.delete-btn:hover {
+    background-color: #da190b;
+}
+
 /* Scrollbar styling */
 .table-scroll-container::-webkit-scrollbar {
     width: 8px;
+    height: 8px;
 }
 
 .table-scroll-container::-webkit-scrollbar-track {
@@ -1288,5 +1247,4 @@ select {
     scrollbar-width: thin;
     scrollbar-color: #ccc #f1f1f1;
 }
-
 /* ---- Debug ---- */
