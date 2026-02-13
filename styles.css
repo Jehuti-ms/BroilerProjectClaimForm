@@ -29,17 +29,6 @@ body {
     padding-top: 80px;
 }
 
-/* ============== HEADER ============== */
-/*.header {
-    background: white;
-    padding: 15px 0;
-    box-shadow: var(--shadow);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    border-bottom: 2px solid var(--border-color);
-} */
-
 .header {
     position: fixed; /* CHANGE from sticky to FIXED */
     top: 0;
@@ -113,7 +102,6 @@ body {
     font-weight: 500;
 }
 
-/* User Info - Positioned absolutely on right for desktop */
 /* User Info - Positioned absolutely on right for desktop */
 .user-info {
     position: absolute; /* Changed from static to absolute */
