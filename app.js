@@ -418,11 +418,11 @@ function setupButtonListeners() {
         addBtn.addEventListener('click', openModal);
     }
     
-    // Save Entry button (in modal)
+    /*// Save Entry button (in modal)
     const saveBtn = document.getElementById('save-entry-btn');
     if (saveBtn) {
         saveBtn.addEventListener('click', saveEntry);
-    }
+    }*/
     
     // Close Modal button
     const closeBtn = document.querySelector('.close-modal');
@@ -448,7 +448,7 @@ function setupButtonListeners() {
         clearBtn.addEventListener('click', clearForm);
     }
     
-    // Save button
+   // Save button - FIXED
     const saveFormBtn = document.getElementById('save-btn');
     if (saveFormBtn) {
         saveFormBtn.addEventListener('click', saveData);
@@ -1286,95 +1286,201 @@ function tryLoadFromBackups(username, monthYear) {
 
 // Save data
 // ==================== ENHANCED SAVE FORM ====================
-function saveForm() {
-    console.log('=== SAVE FORM ===');
-
-    // 1. Check what currentFormData is HERE
-    console.log("currentFormData at start of saveForm:", window.currentFormData);
-    console.log("Length:", window.currentFormData?.length);
-    
-    const periodKey = `${window.currentMonth}-${window.currentYear}`;
-    
-    // 2. Check what's being saved
-    console.log("Creating dataToSave with periodKey:", periodKey);
-    const dataToSave = {
-        [periodKey]: window.currentFormData || []
-    };
-    console.log("dataToSave:", dataToSave);
-    console.log("Entries in dataToSave:", dataToSave[periodKey]?.length || 0);
-    
-    // 3. Check the saveUserData function call
-    saveUserData(dataToSave);
-    
-    // 4. This log says 0 entries - why?
-    console.log(`Form saved: ${dataToSave[periodKey]?.length || 0} entries for ${getMonthName(window.currentMonth)} ${window.currentYear}`);
-
+// ==================== UNIFIED SAVE FUNCTION ====================
+function saveData() {
+    console.log('=== SAVE DATA ===');
     
     try {
+        // 1. Get current user
         const userData = localStorage.getItem('currentUser');
         if (!userData) {
-            alert('Please log in first');
+            console.error('No user found');
+            showNotification('Please log in first', 'error');
             return;
         }
         
         const user = JSON.parse(userData);
-        const username = user.uid || user.email.split('@')[0];
-        const dataKey = `userData_${username}`;
+        const userId = user.uid; // Use UID consistently
         
-        // Get current month/year
+        // 2. Get current month/year
         const monthSelect = document.getElementById('month-select');
         const yearInput = document.getElementById('year-input');
+        
+        if (!monthSelect || !yearInput) {
+            console.error('Month/Year elements not found');
+            return;
+        }
+        
         const month = monthSelect.value;
         const year = yearInput.value;
         const monthYear = `${month}-${year}`;
         
-        console.log(`Saving data for ${monthNames[month]} ${year} (${monthYear})`);
-        console.log('Current form data:', window.currentFormData);
+        // 3. Get current form data
+        const currentData = window.currentFormData || [];
+        console.log('Saving data for period:', monthYear);
+        console.log('Current entries:', currentData.length);
         
-        // Get existing data
+        // 4. Prepare data structure
+        const dataKey = `userData_${userId}`;
         const existingData = localStorage.getItem(dataKey);
         let allData = existingData ? JSON.parse(existingData) : {};
         
         // Update current month's data
-        allData[monthYear] = window.currentFormData || [];
+        allData[monthYear] = currentData;
         
-        // Save back to localStorage
+        // 5. Save to localStorage
         localStorage.setItem(dataKey, JSON.stringify(allData));
+        console.log('Saved to localStorage:', allData);
         
-        console.log('Saved to main storage:', allData);
-        
-        // Create timestamped backup
+        // 6. Create backup
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupKey = `backup_${username}_${timestamp}`;
-        localStorage.setItem(backupKey, JSON.stringify(allData));
-        
-        // Also create cloud backup
-        const cloudBackup = {
-            username: username,
+        const backupKey = `backup_${userId}_${timestamp}`;
+        localStorage.setItem(backupKey, JSON.stringify({
+            userId: userId,
             data: allData,
             timestamp: new Date().toISOString(),
             source: 'manual_save'
-        };
-        localStorage.setItem(`cloud_backup_${username}`, JSON.stringify(cloudBackup));
+        }));
         
-        console.log(`✅ Form saved: ${window.currentFormData.length} entries for ${monthNames[month]} ${year}`);
-        console.log(`✅ Backup created: ${backupKey}`);
-        
-        // Update last saved timestamp
+        // 7. Update last saved time
         localStorage.setItem('lastSaved', new Date().toISOString());
         
-        showNotification(`Saved ${window.currentFormData.length} entries`, 'success');
+        // 8. Show success message
+        const monthName = monthNames[month] || 'Month';
+        showNotification(`Saved ${currentData.length} entries for ${monthName} ${year}`, 'success');
         
-        // Auto-sync if enabled
+        // 9. Auto-sync if enabled
         if (localStorage.getItem('autoSyncEnabled') === 'true') {
             console.log('Auto-sync enabled, syncing to cloud...');
             syncToCloud();
         }
         
+        return { success: true, entries: currentData.length };
+        
     } catch (error) {
         console.error('Save error:', error);
-        showNotification('Error saving form', 'error');
+        showNotification('Error saving data', 'error');
+        return { success: false, error: error.message };
     }
+}
+
+// ==================== SIMPLIFIED LOAD FUNCTION ====================
+function loadUserData() {
+    console.log('=== LOAD USER DATA ===');
+    
+    try {
+        // 1. Get current user
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) {
+            console.log('No user found');
+            return;
+        }
+        
+        const user = JSON.parse(userData);
+        const userId = user.uid; // Always use UID
+        
+        // 2. Get current month/year
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        
+        if (!monthSelect || !yearInput) {
+            console.error('Month/Year elements not found');
+            return;
+        }
+        
+        const month = monthSelect.value;
+        const year = yearInput.value;
+        const monthYear = `${month}-${year}`;
+        
+        // 3. Try to load data
+        const dataKey = `userData_${userId}`;
+        const savedData = localStorage.getItem(dataKey);
+        
+        let loadedData = [];
+        
+        if (savedData) {
+            try {
+                const allData = JSON.parse(savedData);
+                loadedData = allData[monthYear] || [];
+                console.log(`Loaded ${loadedData.length} entries for ${monthYear}`);
+            } catch (e) {
+                console.error('Error parsing saved data:', e);
+                loadedData = [];
+            }
+        }
+        
+        // 4. If no data, check for backups
+        if (loadedData.length === 0) {
+            console.log('No main data, checking backups...');
+            loadedData = tryLoadFromBackups(userId, monthYear);
+        }
+        
+        // 5. Update global variable
+        window.currentFormData = loadedData;
+        
+        // 6. Render table
+        renderTable();
+        
+        // 7. Calculate total
+        calculateTotal();
+        
+        // 8. Show notification
+        if (loadedData.length > 0) {
+            const monthName = monthNames[month] || 'Month';
+            showNotification(`Loaded ${loadedData.length} entries for ${monthName} ${year}`, 'success');
+        }
+        
+        return loadedData;
+        
+    } catch (error) {
+        console.error('Load error:', error);
+        showNotification('Error loading data', 'error');
+        return [];
+    }
+}
+
+// ==================== SIMPLIFIED BACKUP LOADER ====================
+function tryLoadFromBackups(userId, monthYear) {
+    console.log('Checking backups for:', userId, monthYear);
+    
+    const allKeys = Object.keys(localStorage);
+    
+    // Look for backup keys
+    const backupKeys = allKeys.filter(key => 
+        key.includes(userId) ||
+        key.includes('backup') ||
+        key.includes('cloud_backup')
+    ).sort().reverse();
+    
+    for (const key of backupKeys) {
+        try {
+            const data = localStorage.getItem(key);
+            if (!data) continue;
+            
+            const parsed = JSON.parse(data);
+            
+            // Check different data formats
+            let monthData = null;
+            
+            if (parsed.data && parsed.data[monthYear]) {
+                monthData = parsed.data[monthYear];
+            } else if (parsed[monthYear]) {
+                monthData = parsed[monthYear];
+            } else if (Array.isArray(parsed) && parsed[0] && parsed[0].date) {
+                monthData = parsed;
+            }
+            
+            if (monthData && monthData.length > 0) {
+                console.log(`✅ Found ${monthData.length} entries in backup: ${key}`);
+                return monthData;
+            }
+        } catch (e) {
+            console.log(`Error parsing backup ${key}:`, e.message);
+        }
+    }
+    
+    console.log('No backup data found');
+    return [];
 }
 
 // ==================== UTILITIES =====================
@@ -1831,57 +1937,6 @@ function clearForm() {
         }
         
         showNotification('Form cleared successfully');
-    }
-}
-
-// ==================== SAVE FORM ====================
-function saveForm() {
-    console.log('Saving form...');
-    
-    try {
-        const userData = localStorage.getItem('currentUser');
-        if (!userData) {
-            alert('Please log in first');
-            return;
-        }
-        
-        const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
-        const dataKey = `userData_${username}`;
-        
-        // Get current month/year
-        const month = document.getElementById('month-select').value;
-        const year = document.getElementById('year-input').value;
-        const monthYear = `${month}-${year}`;
-        
-        // Get existing data
-        const existingData = localStorage.getItem(dataKey);
-        let allData = existingData ? JSON.parse(existingData) : {};
-        
-        // Update current month's data
-        allData[monthYear] = currentFormData;
-        
-        // Save back to localStorage
-        localStorage.setItem(dataKey, JSON.stringify(allData));
-        
-        // Also save to a backup key
-        localStorage.setItem(`${dataKey}_backup_${Date.now()}`, JSON.stringify(allData));
-        
-        console.log(`Form saved: ${currentFormData.length} entries for ${monthNames[month]} ${year}`);
-        
-        // Update last saved timestamp
-        localStorage.setItem('lastSaved', new Date().toISOString());
-        
-        showNotification('Form saved successfully!');
-        
-        // Auto-sync if enabled
-        if (localStorage.getItem('autoSyncEnabled') === 'true') {
-            syncToCloud();
-        }
-        
-    } catch (error) {
-        console.error('Save error:', error);
-        showNotification('Error saving form', 'error');
     }
 }
 
