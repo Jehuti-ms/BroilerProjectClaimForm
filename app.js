@@ -524,16 +524,15 @@ function generatePDF() {
         
         // Page dimensions
         const pageWidth = 210; // A4 width in mm
-        const pageHeight = 297; // A4 height in mm
         const margin = 15; // Margin in mm
         
         // Get data
         const monthSelect = document.getElementById('month-select');
         const yearInput = document.getElementById('year-input');
         
-        // Get employee name from localStorage or input field
-        const employeeName = localStorage.getItem('claimEmployeeName') || 
-                            document.getElementById('employee-name-input')?.value || 
+        // Get employee name - FIXED: Use the correct input ID
+        const employeeName = document.getElementById('employee-name')?.value || 
+                            localStorage.getItem('claimEmployeeName') || 
                             'Employee Name';
         
         const totalHours = document.getElementById('total-hours')?.textContent || '0:00';
@@ -542,7 +541,7 @@ function generatePDF() {
         const year = parseInt(yearInput?.value || 2026);
         const monthName = monthNames[month] || 'Month';
         
-        // Header section - Compact
+        // Header section - NOW INCLUDES EMPLOYEE NAME
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(16);
         doc.text('Grantley Adams Memorial School', pageWidth / 2, margin, { align: 'center' });
@@ -551,12 +550,11 @@ function generatePDF() {
         doc.text('Broiler Production Project', pageWidth / 2, margin + 8, { align: 'center' });
         
         doc.setFontSize(12);
-        doc.text('Claim Form', pageWidth / 2, margin + 16, { align: 'center' });
+        doc.text(`Claim Form for: ${employeeName}`, pageWidth / 2, margin + 16, { align: 'center' });
         
         // Employee and date info
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
-        doc.text(`Employee: ${employeeName}`, margin, margin + 25);
         doc.text(`${monthName} ${year}`, pageWidth - margin, margin + 25, { align: 'right' });
         
         // Line separator
@@ -624,12 +622,7 @@ function generatePDF() {
         doc.text(`Total Hours: ${totalHours}`, pageWidth - margin, yPos, { align: 'right' });
         
         // Add signature section - Optimized for A4
-        const signatureY = Math.min(yPos + 40, pageHeight - 50); // Ensure it fits on page
-        
-        // Add "Approved by:" text
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.text('Approved by:', margin, signatureY);
+        const signatureY = Math.min(yPos + 40, 250); // Ensure it fits on page
         
         // Signature boxes
         const boxWidth = 50;
@@ -643,6 +636,8 @@ function generatePDF() {
         doc.setLineWidth(0.5);
         
         // Box 1: Claimant
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
         doc.text('Signature Claimant:', startX, signatureY + 10);
         doc.line(startX, lineY, startX + boxWidth, lineY);
         
@@ -661,7 +656,7 @@ function generatePDF() {
             year: 'numeric'
         });
         
-        doc.text(`Generated on: ${currentDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        doc.text(`Generated on: ${currentDate}`, pageWidth / 2, 280, { align: 'center' });
         
         // Set document properties
         doc.setProperties({
@@ -687,14 +682,7 @@ function generatePDF() {
 function printForm() {
     console.log('Printing form...');
     
-    // Create a print-friendly window
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) {
-        alert('Please allow popups to print the form.');
-        return;
-    }
-    
-    // Get data
+    // Get data FIRST before creating window
     const monthSelect = document.getElementById('month-select');
     const yearInput = document.getElementById('year-input');
     
@@ -705,7 +693,14 @@ function printForm() {
     
     const month = parseInt(monthSelect.value);
     const year = parseInt(yearInput.value);
-       
+    
+    // Get employee name and total hours
+    const employeeName = document.getElementById('employee-name')?.value || 
+                        localStorage.getItem('claimEmployeeName') || 
+                        'Employee';
+    
+    const totalHours = document.getElementById('total-hours')?.textContent || '0:00';
+    
     // Get table data
     let tableRows = '';
     const rows = document.querySelectorAll('#time-table tbody tr');
@@ -730,12 +725,19 @@ function printForm() {
         }
     });
     
-    // Create print document
+    // Create a print-friendly window
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+        alert('Please allow popups to print the form.');
+        return;
+    }
+    
+    // Create print document - NOW INCLUDES EMPLOYEE NAME
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Broiler Claim Form - ${monthNames[month]} ${year}</title>
+            <title>Broiler Claim Form - ${employeeName} - ${monthNames[month]} ${year}</title>
             <style>
                 @media print {
                     @page { margin: 20mm; }
@@ -744,7 +746,8 @@ function printForm() {
                 body { font-family: Arial, sans-serif; margin: 20px; }
                 .header { text-align: center; margin-bottom: 30px; }
                 .header h1 { margin: 0; font-size: 24px; }
-                .header h2 { margin: 5px 0; font-size: 18px; font-style: italic; }
+                .header h2 { margin: 5px 0; font-size: 18px; }
+                .header h3 { margin: 5px 0; font-size: 16px; color: #333; }
                 .info { margin: 20px 0; }
                 table { width: 100%; border-collapse: collapse; margin: 20px 0; }
                 th, td { border: 1px solid #000; padding: 8px; text-align: center; }
@@ -753,7 +756,6 @@ function printForm() {
                 .signature-section { display: flex; justify-content: space-between; margin-top: 60px; }
                 .signature-box { width: 30%; }
                 .signature-line { border-top: 2px solid #000; margin-top: 40px; padding-top: 5px; }
-                .no-print { display: none; }
                 .footer { margin-top: 50px; font-size: 12px; color: #666; text-align: center; }
             </style>
         </head>
@@ -761,7 +763,8 @@ function printForm() {
             <div class="header">
                 <h1>Grantley Adams Memorial School</h1>
                 <h2>Broiler Production Project</h2>
-                <h2>Claim Form - ${monthNames[month]} ${year}</h2>
+                <h3>Claim Form for: ${employeeName}</h3>
+                <h3>${monthNames[month]} ${year}</h3>
             </div>
             
             <div class="info">
@@ -811,10 +814,12 @@ function printForm() {
             
             <script>
                 window.onload = function() {
-                    window.print();
                     setTimeout(function() {
-                        window.close();
-                    }, 500);
+                        window.print();
+                        setTimeout(function() {
+                            window.close();
+                        }, 500);
+                    }, 250);
                 };
             </script>
         </body>
