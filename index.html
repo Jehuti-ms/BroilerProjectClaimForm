@@ -91,12 +91,14 @@
         <div class="form-controls-row">
                 <!-- Left: Employee Name -->
                     <div class="employee-control">
-                        <label for="employee-name-input">Employee Name for this claim:</label>
-                        <input type="text" id="employee-name-input" 
+                        <label for="employee-name">Employee Name for this claim:</label>
+                        <input type="text" 
+                               id="employee-name" 
+                               class="employee-name-input" 
                                placeholder="Enter employee name (e.g. Jeoffery Knight)"
-                               oninput="updateEmployeeDisplayInHeaderWithName(this.value)"
-                               onblur="saveClaimRecipientName(this.value)">
-                        <div class="hint">Name auto-saves as you type</div>
+                               value="" 
+                               autocomplete="off">
+                        <div class="input-hint">Name auto-saves as you type</div>
                     </div>
                     
                     <!-- Right: Month & Year -->
