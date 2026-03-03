@@ -56,12 +56,15 @@ function updateDateDisplayInHeader() {
 function setupEmployeeNameField() {
     console.log('Setting up employee name field...');
     
-    // Get the input field
-    const nameInput = document.getElementById('employee-name-input');
+    // Get the input field - UPDATED TO USE 'employee-name'
+    const nameInput = document.getElementById('employee-name');
     if (!nameInput) {
-        console.error('Employee name input field not found!');
+        console.error('Employee name input field not found! Looking for ID: employee-name');
+        console.log('Available inputs:', document.querySelectorAll('input[type="text"]').length);
         return;
     }
+    
+    console.log('Found employee name input field');
     
     // Load previously saved claim recipient name
     const savedClaimName = localStorage.getItem('claimEmployeeName');
@@ -71,7 +74,7 @@ function setupEmployeeNameField() {
         console.log('Loaded saved claim recipient name:', savedClaimName);
         
         // Update the header display
-        updateEmployeeDisplayInHeader();
+        updateClaimForDisplay(savedClaimName);
     } else {
         console.log('No saved claim recipient name found');
     }
@@ -81,6 +84,8 @@ function setupEmployeeNameField() {
     
     // Auto-save on input (with debouncing)
     nameInput.addEventListener('input', function() {
+        const currentValue = this.value;
+        
         // Clear previous timeout
         if (saveTimeout) {
             clearTimeout(saveTimeout);
@@ -88,11 +93,11 @@ function setupEmployeeNameField() {
         
         // Set new timeout (save after 1 second of inactivity)
         saveTimeout = setTimeout(() => {
-            saveClaimRecipientName(this.value);
+            saveClaimRecipientName(currentValue);
         }, 1000);
         
         // Update header immediately for better UX
-        updateEmployeeDisplayInHeaderWithName(this.value);
+        updateClaimForDisplay(currentValue);
     });
     
     // Save on blur (when user leaves the field)
@@ -120,26 +125,24 @@ function updateEmployeeDisplayInHeaderWithName(name) {
 }
 
 // Save claim recipient name
+// Save claim recipient name
 function saveClaimRecipientName(name) {
-    console.log('Saving claim recipient name:', name);
-    
     const trimmedName = name ? name.trim() : '';
+    
+    if (trimmedName === '') {
+        console.log('Empty name, not saving');
+        return;
+    }
     
     // Save to localStorage
     localStorage.setItem('claimEmployeeName', trimmedName);
+    console.log('Claim recipient name saved to localStorage:', trimmedName);
     
-    // Update the header display
-    updateEmployeeDisplayInHeader();
+    // Update claim for display
+    updateClaimForDisplay(trimmedName);
     
-    // Update document title
-    document.title = `Broiler Claim - ${trimmedName || 'Employee'}`;
-    
-    // Show notification if name is not empty
-    if (trimmedName !== '') {
-        showNotification(`Claim form updated for: ${trimmedName}`, 'success');
-    }
-    
-    console.log('Claim recipient name saved');
+    // Show notification
+    showNotification(`Employee name saved: ${trimmedName}`, 'success');
 }
 
 // Update header display from saved name
@@ -831,11 +834,85 @@ function printForm() {
 }
 
 // ==================== UPDATE FUNCTION FOR THE "UPDATE" BUTTON ====================
+/*
 function updateClaimName() {
     const nameInput = document.getElementById('employee-name-input');
     if (!nameInput) return;
     
     saveClaimRecipientName(nameInput.value);
+}
+*/
+
+// Update claim for display in header
+function updateClaimForDisplay(employeeName) {
+    if (!employeeName || employeeName.trim() === '') return;
+    
+    console.log('Updating display with employee name:', employeeName);
+    
+    // Find the claim form title (h2 element that contains "Claim Form")
+    const allHeadings = document.querySelectorAll('h1, h2, h3');
+    let claimTitle = null;
+    
+    for (const heading of allHeadings) {
+        const text = heading.textContent || '';
+        if (text.includes('Claim Form') || text.includes('Claim for')) {
+            claimTitle = heading;
+            break;
+        }
+    }
+    
+    // Get current month/year
+    let monthYear = '';
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    
+    if (monthSelect && yearInput) {
+        const month = parseInt(monthSelect.value);
+        const year = parseInt(yearInput.value);
+        if (!isNaN(month) && !isNaN(year)) {
+            monthYear = `${monthNames[month]} ${year}`;
+        }
+    }
+    
+    if (claimTitle) {
+        // Update existing title
+        if (monthYear) {
+            claimTitle.textContent = `Claim Form for: ${employeeName} - ${monthYear}`;
+        } else {
+            claimTitle.textContent = `Claim Form for: ${employeeName}`;
+        }
+        console.log('Updated existing title:', claimTitle.textContent);
+    } else {
+        // Create new title if none exists
+        const header = document.querySelector('header') || document.querySelector('.header') || document.body;
+        const title = document.createElement('h2');
+        title.id = 'claim-form-title';
+        
+        if (monthYear) {
+            title.textContent = `Claim Form for: ${employeeName} - ${monthYear}`;
+        } else {
+            title.textContent = `Claim Form for: ${employeeName}`;
+        }
+        
+        title.style.cssText = `
+            text-align: center;
+            font-size: 1.5em;
+            margin: 10px 0 20px 0;
+            color: #2c3e50;
+        `;
+        
+        // Insert after the main h1 if it exists
+        const h1 = document.querySelector('h1');
+        if (h1 && h1.parentNode) {
+            h1.parentNode.insertBefore(title, h1.nextSibling);
+        } else {
+            header.insertBefore(title, header.firstChild);
+        }
+        console.log('Created new title:', title.textContent);
+    }
+    
+    // Update browser tab title
+    document.title = `Broiler Claim - ${employeeName}`;
 }
 
 // Open modal with better focus management
