@@ -1272,3 +1272,230 @@ select {
         font-size: 12px;
     }
 }
+
+/* ==================== CENTERED FIREBASE TOOLS ==================== */
+.firebase-tools {
+    margin: 20px auto;
+    padding: 15px;
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    border: 1px solid #bee5eb;
+    border-radius: 10px;
+    max-width: 800px;
+    width: 90%;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.firebase-tools h4 {
+    margin: 0 0 15px 0;
+    color: #0c5460;
+    font-size: clamp(16px, 4vw, 18px);
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 1px solid rgba(12, 84, 96, 0.2);
+    padding-bottom: 10px;
+}
+
+/* Button container for flexible layout */
+.firebase-tools .button-group {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin: 0 auto;
+}
+
+/* Base button styles */
+.firebase-tools button {
+    flex: 0 1 auto;
+    min-width: 140px;
+    max-width: 200px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: clamp(13px, 3vw, 14px);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Individual button colors */
+.firebase-tools button:nth-child(1) { /* Check Firebase */
+    background: #17a2b8;
+    color: white;
+}
+
+.firebase-tools button:nth-child(2) { /* Repair Firebase */
+    background: #dc3545;
+    color: white;
+}
+
+.firebase-tools button:nth-child(3) { /* Force Cloud Sync */
+    background: #28a745;
+    color: white;
+}
+
+/* Hover effects */
+.firebase-tools button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    filter: brightness(1.1);
+}
+
+.firebase-tools button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Disabled state */
+.firebase-tools button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Loading state with spinner */
+.firebase-tools button.loading {
+    position: relative;
+    color: transparent !important;
+}
+
+.firebase-tools button.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid white;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: button-spin 0.8s linear infinite;
+}
+
+@keyframes button-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+    .firebase-tools {
+        width: 95%;
+        padding: 12px;
+        margin: 15px auto;
+    }
+    
+    .firebase-tools .button-group {
+        gap: 8px;
+    }
+    
+    .firebase-tools button {
+        min-width: 120px;
+        padding: 10px 15px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .firebase-tools {
+        width: 98%;
+        padding: 10px;
+        margin: 10px auto;
+        border-radius: 8px;
+    }
+    
+    .firebase-tools h4 {
+        margin-bottom: 10px;
+        font-size: 15px;
+    }
+    
+    .firebase-tools .button-group {
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .firebase-tools button {
+        width: 100%;
+        max-width: 100%;
+        min-width: unset;
+        padding: 12px;
+        font-size: 14px;
+        white-space: normal;
+        word-break: break-word;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 320px) {
+    .firebase-tools {
+        width: 100%;
+        border-radius: 0;
+        margin: 5px 0;
+    }
+    
+    .firebase-tools button {
+        padding: 10px;
+        font-size: 13px;
+    }
+}
+
+/* Landscape mode for phones */
+@media (max-width: 768px) and (orientation: landscape) {
+    .firebase-tools .button-group {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .firebase-tools button {
+        flex: 1 1 auto;
+        min-width: 150px;
+    }
+}
+
+/* Tablet landscape */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .firebase-tools {
+        max-width: 90%;
+    }
+    
+    .firebase-tools button {
+        min-width: 160px;
+    }
+}
+
+/* Add to your existing styles */
+.firebase-tools button i,
+.firebase-tools button svg {
+    font-size: 16px;
+}
+
+/* Success/error states */
+.firebase-tools button.success {
+    background: #28a745 !important;
+}
+
+.firebase-tools button.error {
+    background: #dc3545 !important;
+}
+
+/* Pulse animation for attention */
+@keyframes soft-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(23, 162, 184, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(23, 162, 184, 0); }
+}
+
+.firebase-tools button:focus {
+    outline: none;
+    animation: soft-pulse 1.5s infinite;
+}
