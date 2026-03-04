@@ -382,11 +382,17 @@ function initializeApp() {
     });
 
     // Load data
-    if (typeof loadUserData === 'function') {
+  /*  if (typeof loadUserData === 'function') {
         setTimeout(() => {
             loadUserData();
         }, 1000); // Small delay to ensure DOM is ready
-    }
+    }*/
+
+    // Load data - try Firebase first
+        setTimeout(async () => {
+            console.log('Loading data after initialization...');
+            await loadUserData(); // This will try Firebase then localStorage
+        }, 1000);
     
     // Setup header
     setupHeader();
@@ -1011,9 +1017,9 @@ function saveEntry() {
     closeModal();
 }
 
-// ==================== SAVE ENTIRE FORM ====================
-function saveData() {
-    console.log('=== SAVING ENTIRE FORM ===');
+// ==================== SAVE ENTIRE FORM TO FIREBASE ====================
+async function saveData() {
+    console.log('=== SAVING ENTIRE FORM TO FIREBASE ===');
     
     try {
         // 1. Get current user
@@ -1026,6 +1032,7 @@ function saveData() {
         
         const user = JSON.parse(userData);
         const userId = user.uid; // Use UID
+        const userEmail = user.email;
         
         // 2. Get current month/year
         const monthSelect = document.getElementById('month-select');
@@ -1042,64 +1049,157 @@ function saveData() {
         const monthYear = `${month}-${year}`;
         const monthName = monthNames[parseInt(month)] || 'Month';
         
-        // 3. Get current form data from window
+        // 3. Get current form data
         const currentData = window.currentFormData || [];
         console.log(`Saving ${currentData.length} entries for ${monthName} ${year}`);
         
-        // 4. Prepare data structure
+        // 4. Get employee name
+        const employeeName = document.getElementById('employee-name')?.value || 
+                            localStorage.getItem('claimEmployeeName') || 
+                            'Unknown';
+        
+        // 5. Prepare data for Firebase
+        const firebaseData = {
+            userId: userId,
+            userEmail: userEmail,
+            month: parseInt(month),
+            year: parseInt(year),
+            monthYear: monthYear,
+            monthName: monthName,
+            employeeName: employeeName,
+            entries: currentData,
+            totalHours: document.getElementById('total-hours')?.textContent || '0:00',
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+            lastUpdatedISO: new Date().toISOString(),
+            device: navigator.userAgent
+        };
+        
+        // 6. SAVE TO FIREBASE FIRESTORE
+        if (db) {
+            try {
+                // Save to user's document in Firestore
+                await db.collection('broilerClaims').doc(userId).collection('months').doc(monthYear).set(firebaseData);
+                console.log('✅ Saved to Firebase Firestore');
+                
+                // Also save to a global collection for backup
+                await db.collection('allClaims').add({
+                    ...firebaseData,
+                    userId: userId,
+                    savedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log('✅ Backup saved to global collection');
+                
+                showNotification(`Saved to cloud!`, 'success');
+            } catch (firebaseError) {
+                console.error('Firebase save error:', firebaseError);
+                showNotification('Cloud save failed, but saved locally', 'warning');
+            }
+        } else {
+            console.warn('Firebase not available, saving only locally');
+            showNotification('Firebase unavailable - saved locally only', 'warning');
+        }
+        
+        // 7. Save to localStorage (as backup)
         const dataKey = `userData_${userId}`;
         let allData = {};
         
-        // Load existing data if any
         const existingData = localStorage.getItem(dataKey);
         if (existingData) {
             try {
                 allData = JSON.parse(existingData);
-                console.log('Loaded existing data with months:', Object.keys(allData));
             } catch (e) {
-                console.log('Error parsing existing data, starting fresh');
                 allData = {};
             }
         }
         
-        // 5. Update current month's data
         allData[monthYear] = currentData;
-        
-        // 6. Save to localStorage
         localStorage.setItem(dataKey, JSON.stringify(allData));
-        console.log('✅ Saved to main storage:', dataKey);
+        console.log('✅ Saved to localStorage backup');
         
-        // 7. Create a timestamped backup
+        // 8. Create timestamped backup
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const backupKey = `backup_${userId}_${monthYear}_${timestamp}`;
         localStorage.setItem(backupKey, JSON.stringify({
             userId: userId,
             month: monthYear,
             data: currentData,
-            allData: allData,
-            timestamp: new Date().toISOString(),
-            source: 'manual_save'
+            timestamp: new Date().toISOString()
         }));
-        console.log('✅ Backup created:', backupKey);
         
-        // 8. Update last saved timestamp
+        // 9. Update last saved timestamp
         localStorage.setItem('lastSaved', new Date().toISOString());
         
-        // 9. Show success message
+        // 10. Show success
         const entryCount = currentData.length;
-        showNotification(`Saved ${entryCount} ${entryCount === 1 ? 'entry' : 'entries'} for ${monthName} ${year}`, 'success');
-        
-        // 10. Auto-sync if enabled
-        if (localStorage.getItem('autoSyncEnabled') === 'true') {
-            console.log('Auto-sync enabled, syncing to cloud...');
-            setTimeout(() => syncToCloud(), 500);
-        }
+        showNotification(`Saved ${entryCount} ${entryCount === 1 ? 'entry' : 'entries'} to cloud`, 'success');
         
         return true;
         
     } catch (error) {
         console.error('❌ Save error:', error);
         showNotification('Error saving form: ' + error.message, 'error');
+        return false;
+    }
+}
+
+// ==================== LOAD FROM FIREBASE ====================
+async function loadFromFirebase() {
+    console.log('=== LOADING FROM FIREBASE ===');
+    
+    try {
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) return false;
+        
+        const user = JSON.parse(userData);
+        const userId = user.uid;
+        
+        // Get current month/year
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        
+        if (!monthSelect || !yearInput) return false;
+        
+        const month = monthSelect.value;
+        const year = yearInput.value;
+        const monthYear = `${month}-${year}`;
+        
+        // Try to load from Firebase
+        if (db) {
+            const docRef = db.collection('broilerClaims').doc(userId).collection('months').doc(monthYear);
+            const docSnap = await docRef.get();
+            
+            if (docSnap.exists) {
+                const firebaseData = docSnap.data();
+                
+                if (firebaseData.entries && Array.isArray(firebaseData.entries)) {
+                    window.currentFormData = firebaseData.entries;
+                    
+                    // Update employee name if available
+                    if (firebaseData.employeeName) {
+                        const nameInput = document.getElementById('employee-name');
+                        if (nameInput) {
+                            nameInput.value = firebaseData.employeeName;
+                            localStorage.setItem('claimEmployeeName', firebaseData.employeeName);
+                            updateClaimForDisplay(firebaseData.employeeName);
+                        }
+                    }
+                    
+                    // Render the table
+                    renderTable();
+                    
+                    console.log(`✅ Loaded ${firebaseData.entries.length} entries from Firebase`);
+                    showNotification('Loaded from cloud', 'success');
+                    return true;
+                }
+            } else {
+                console.log('No Firebase data for this month');
+            }
+        }
+        
+        return false;
+        
+    } catch (error) {
+        console.error('Error loading from Firebase:', error);
         return false;
     }
 }
@@ -1360,90 +1460,54 @@ function showNotification(message, type = 'success') {
 }
 
 // ==================== SYNC FUNCTIONS (KEEP YOUR EXISTING ONES) ====================
-// ==================== ENHANCED LOAD USER DATA ====================
-function loadUserData() {
-    console.log('=== loadUserData() called ===');
+// ==================== LOAD USER DATA (with Firebase) ====================
+async function loadUserData() {
+    console.log('=== LOADING USER DATA ===');
+    
+    // Try Firebase first
+    const firebaseLoaded = await loadFromFirebase();
+    
+    if (firebaseLoaded) {
+        console.log('✅ Data loaded from Firebase');
+        return;
+    }
+    
+    // Fallback to localStorage
+    console.log('No Firebase data, checking localStorage...');
+    
+    const userData = localStorage.getItem('currentUser');
+    if (!userData) return;
     
     try {
-        // Get current user
-        const userData = localStorage.getItem('currentUser');
-        if (!userData) {
-            console.log('No user found');
-            return;
-        }
-        
         const user = JSON.parse(userData);
-        const username = user.uid || user.email.split('@')[0];
-        console.log('Loading data for user:', username);
-        
-        // Get current month/year
-        const monthSelect = document.getElementById('month-select');
-        const yearInput = document.getElementById('year-input');
-        
-        if (!monthSelect || !yearInput) {
-            console.error('Month/Year elements not found');
-            return;
-        }
-        
-        const month = monthSelect.value;
-        const year = yearInput.value;
-        const monthYear = `${month}-${year}`;
-        console.log('Loading data for period:', monthYear);
-        
-        // Try multiple data sources in order
-        let loadedData = null;
-        
-        // 1. Try main storage
+        const username = user.email.split('@')[0];
         const dataKey = `userData_${username}`;
-        const savedData = localStorage.getItem(dataKey);
         
+        // Get current month
+        const month = document.getElementById('month-select')?.value;
+        const year = document.getElementById('year-input')?.value;
+        const monthYear = `${month}-${year}`;
+        
+        const savedData = localStorage.getItem(dataKey);
         if (savedData) {
-            console.log('Found data in main storage');
-            try {
-                const allData = JSON.parse(savedData);
-                loadedData = allData[monthYear] || [];
-                console.log(`Loaded ${loadedData.length} entries from main storage`);
-            } catch (e) {
-                console.error('Error parsing main data:', e);
-                loadedData = [];
+            const allData = JSON.parse(savedData);
+            
+            if (allData[monthYear]) {
+                window.currentFormData = allData[monthYear];
+                console.log(`✅ Loaded ${window.currentFormData.length} entries from localStorage`);
+                renderTable();
+            } else {
+                console.log('No localStorage data for this month');
+                window.currentFormData = [];
+                renderTable();
             }
         } else {
-            console.log('No data in main storage');
+            console.log('No localStorage data found');
+            window.currentFormData = [];
+            renderTable();
         }
-        
-        // 2. If no data, try recent backup
-        if (!loadedData || loadedData.length === 0) {
-            console.log('Trying backups...');
-            loadedData = tryLoadFromBackups(username, monthYear);
-        }
-        
-        // 3. If still no data, check Firebase
-        if ((!loadedData || loadedData.length === 0) && window.firebase) {
-            console.log('Trying Firebase...');
-            // We'll try async Firebase load, but for now set empty
-            loadedData = loadedData || [];
-        }
-        
-        // Update global variable
-        window.currentFormData = loadedData || [];
-        console.log('Final currentFormData:', window.currentFormData);
-        
-        // Render table
-        renderTable();
-        
-        // Calculate total
-        calculateTotal();
-        
-        // Show notification if data loaded
-        if (window.currentFormData.length > 0) {
-            showNotification(`Loaded ${window.currentFormData.length} entries for ${monthNames[month]} ${year}`, 'success');
-        } else {
-            console.log('No data loaded for this period');
-        }
-        
     } catch (error) {
-        console.error('Error in loadUserData:', error);
-        showNotification('Error loading data', 'error');
+        console.log('Error loading data:', error);
     }
 }
 
