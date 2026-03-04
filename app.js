@@ -1870,53 +1870,85 @@ function showNotification(message, type = 'success') {
 
 // ==================== SYNC FUNCTIONS (KEEP YOUR EXISTING ONES) ====================
 // ==================== LOAD USER DATA (with Firebase) ====================
+// ==================== FIXED LOAD USER DATA ====================
 async function loadUserData() {
-    console.log('=== LOADING USER DATA ===');
-    
-    // Try Firebase first
-    const firebaseLoaded = await loadFromFirebase();
-    
-    if (firebaseLoaded) {
-        console.log('✅ Data loaded from Firebase');
-        return;
-    }
-    
-    // Fallback to localStorage
-    console.log('No Firebase data, checking localStorage...');
-    
-    const userData = localStorage.getItem('currentUser');
-    if (!userData) return;
+    console.log('=== loadUserData() called ===');
     
     try {
-        const user = JSON.parse(userData);
-        const username = user.email.split('@')[0];
-        const dataKey = `userData_${username}`;
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) return;
         
-        // Get current month
-        const month = document.getElementById('month-select')?.value;
-        const year = document.getElementById('year-input')?.value;
+        const user = JSON.parse(userData);
+        const userId = user.uid;
+        
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        
+        const month = monthSelect.value;
+        const year = yearInput.value;
         const monthYear = `${month}-${year}`;
         
-        const savedData = localStorage.getItem(dataKey);
-        if (savedData) {
-            const allData = JSON.parse(savedData);
+        console.log(`Loading data for ${monthYear}`);
+        
+        // STEP 1: ALWAYS TRY FIREBASE FIRST
+        let loadedData = null;
+        let loadedFrom = 'none';
+        
+        if (db) {
+            const docRef = db.collection('broilerClaims').doc(userId).collection('months').doc(monthYear);
+            const docSnap = await docRef.get();
             
-            if (allData[monthYear]) {
-                window.currentFormData = allData[monthYear];
-                console.log(`✅ Loaded ${window.currentFormData.length} entries from localStorage`);
-                renderTable();
-            } else {
-                console.log('No localStorage data for this month');
-                window.currentFormData = [];
-                renderTable();
+            if (docSnap.exists) {
+                const firebaseData = docSnap.data();
+                if (firebaseData.entries && firebaseData.entries.length > 0) {
+                    loadedData = firebaseData.entries;
+                    loadedFrom = 'Firebase';
+                    console.log(`✅ Loaded ${loadedData.length} entries from Firebase`);
+                }
             }
-        } else {
-            console.log('No localStorage data found');
-            window.currentFormData = [];
-            renderTable();
         }
+        
+        // STEP 2: FALLBACK TO LOCALSTORAGE
+        if (!loadedData) {
+            const dataKey = `userData_${userId}`;
+            const savedData = localStorage.getItem(dataKey);
+            
+            if (savedData) {
+                try {
+                    const allData = JSON.parse(savedData);
+                    loadedData = allData[monthYear] || [];
+                    loadedFrom = 'localStorage';
+                    console.log(`📁 Loaded ${loadedData.length} entries from localStorage`);
+                } catch (e) {
+                    console.error('Error parsing localStorage:', e);
+                }
+            }
+        }
+        
+        // STEP 3: UPDATE THE UI
+        window.currentFormData = loadedData || [];
+        renderTable();
+        calculateTotal();
+        
+        // Calculate total for logging
+        let total = 0;
+        window.currentFormData.forEach(entry => {
+            if (entry.hours) {
+                const [h, m] = entry.hours.split(':').map(Number);
+                total += (h * 60) + m;
+            }
+        });
+        const hours = Math.floor(total / 60);
+        const mins = total % 60;
+        
+        console.log(`📊 Final: ${window.currentFormData.length} entries, ${hours}:${mins.toString().padStart(2,'0')} (from ${loadedFrom})`);
+        
+        if (window.currentFormData.length > 0) {
+            showNotification(`Loaded ${window.currentFormData.length} entries (${hours}:${mins.toString().padStart(2,'0')})`, 'success');
+        }
+        
     } catch (error) {
-        console.log('Error loading data:', error);
+        console.error('Error in loadUserData:', error);
     }
 }
 
