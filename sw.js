@@ -1,6 +1,6 @@
-// Service Worker for Broiler App Sync
-const CACHE_NAME = 'broiler-sync-v1';
-const SYNC_TAG = 'broiler-background-sync';
+// sw.js - Enhanced Service Worker for Firebase Sync
+const CACHE_NAME = 'broiler-sync-v2';
+const FIRESTORE_SYNC_TAG = 'firestore-sync';
 
 self.addEventListener('install', (event) => {
     console.log('Service Worker installed');
@@ -14,27 +14,29 @@ self.addEventListener('activate', (event) => {
 
 // Handle background sync
 self.addEventListener('sync', (event) => {
-    if (event.tag === SYNC_TAG) {
-        console.log('Background sync triggered');
-        event.waitUntil(doBackgroundSync());
-    }
-});
-
-// Handle periodic background sync (if supported)
-self.addEventListener('periodicsync', (event) => {
-    if (event.tag === 'broiler-periodic-sync') {
-        console.log('Periodic sync triggered');
-        event.waitUntil(doBackgroundSync());
+    if (event.tag === FIRESTORE_SYNC_TAG) {
+        console.log('Background sync triggered for Firestore');
+        event.waitUntil(syncWithFirestore());
     }
 });
 
 // Main sync function
-async function doBackgroundSync() {
+async function syncWithFirestore() {
+    console.log('🔄 Service Worker syncing with Firestore...');
+    
     try {
         // Get all clients (browser tabs)
         const clients = await self.clients.matchAll();
         
-        // Notify all clients that sync is starting
+        // Get the current user from IndexedDB/localStorage
+        const syncData = await getSyncData();
+        
+        if (!syncData || !syncData.userId) {
+            console.log('No user data to sync');
+            return;
+        }
+        
+        // Notify clients that sync is starting
         clients.forEach(client => {
             client.postMessage({
                 type: 'SYNC_STARTED',
@@ -42,8 +44,8 @@ async function doBackgroundSync() {
             });
         });
 
-        // Perform the actual sync
-        const result = await performSync();
+        // Perform Firebase sync
+        const result = await performFirestoreSync(syncData);
         
         // Notify clients of sync completion
         clients.forEach(client => {
@@ -55,10 +57,10 @@ async function doBackgroundSync() {
         });
 
         return result;
+        
     } catch (error) {
         console.error('Background sync failed:', error);
         
-        // Notify clients of sync failure
         const clients = await self.clients.matchAll();
         clients.forEach(client => {
             client.postMessage({
@@ -72,39 +74,10 @@ async function doBackgroundSync() {
     }
 }
 
-// Perform the actual data synchronization
-async function performSync() {
-    try {
-        // Get sync data from IndexedDB
-        const syncData = await getSyncDataFromIDB();
-        
-        if (!syncData || Object.keys(syncData).length === 0) {
-            console.log('No data to sync');
-            return true;
-        }
-
-        // Try to sync to cloud
-        const cloudSuccess = await syncToCloud(syncData);
-        
-        if (cloudSuccess) {
-            console.log('Cloud sync successful');
-            // Clear sync queue after successful sync
-            await clearSyncQueue();
-        } else {
-            console.log('Cloud sync failed, will retry later');
-        }
-
-        return cloudSuccess;
-    } catch (error) {
-        console.error('Sync operation failed:', error);
-        return false;
-    }
-}
-
-// Get data from IndexedDB
-async function getSyncDataFromIDB() {
+// Get sync data from IndexedDB
+async function getSyncData() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('BroilerSyncDB', 1);
+        const request = indexedDB.open('BroilerSyncDB', 2);
         
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
@@ -113,94 +86,58 @@ async function getSyncDataFromIDB() {
             const store = transaction.objectStore('syncQueue');
             const getAllRequest = store.getAll();
             
-            getAllRequest.onsuccess = () => resolve(getAllRequest.result);
+            getAllRequest.onsuccess = () => {
+                const items = getAllRequest.result;
+                // Get the most recent sync data
+                const latest = items.sort((a, b) => 
+                    new Date(b.timestamp) - new Date(a.timestamp)
+                )[0];
+                resolve(latest);
+            };
             getAllRequest.onerror = () => reject(getAllRequest.error);
         };
         
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
             if (!db.objectStoreNames.contains('syncQueue')) {
-                db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
+                const store = db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
+                store.createIndex('timestamp', 'timestamp', { unique: false });
+                store.createIndex('userId', 'userId', { unique: false });
+                store.createIndex('monthYear', 'monthYear', { unique: false });
             }
         };
     });
 }
 
-// Sync to cloud storage
-async function syncToCloud(syncData) {
+// Perform Firestore sync
+async function performFirestoreSync(syncData) {
     try {
-        // Use jsonblob.com as cloud storage (free, no auth required)
-        const blobId = await getBlobId();
-        const syncPayload = {
-            data: syncData,
-            lastSync: new Date().toISOString(),
-            device: 'service-worker'
-        };
-
-        const url = blobId ? 
-            `https://jsonblob.com/api/jsonBlob/${blobId}` :
-            'https://jsonblob.com/api/jsonBlob';
-
-        const method = blobId ? 'PUT' : 'POST';
-
-        const response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(syncPayload)
-        });
-
-        if (response.ok) {
-            if (!blobId) {
-                // Store the new blob ID
-                const location = response.headers.get('Location');
-                if (location) {
-                    const newBlobId = location.split('/').pop();
-                    await setBlobId(newBlobId);
-                }
-            }
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.error('Cloud sync error:', error);
-        return false;
-    }
-}
-
-// Get stored blob ID
-async function getBlobId() {
-    const cache = await caches.open(CACHE_NAME);
-    const response = await cache.match('/blob-id');
-    if (response) {
-        return await response.text();
-    }
-    return null;
-}
-
-// Store blob ID
-async function setBlobId(blobId) {
-    const cache = await caches.open(CACHE_NAME);
-    await cache.put('/blob-id', new Response(blobId));
-}
-
-// Clear sync queue after successful sync
-async function clearSyncQueue() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('BroilerSyncDB', 1);
+        // This is where you'd sync with Firebase
+        // Since we can't use Firebase SDK in Service Worker directly,
+        // we'll use fetch to hit a Cloud Function or just trigger the main app
         
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            const db = request.result;
-            const transaction = db.transaction(['syncQueue'], 'readwrite');
-            const store = transaction.objectStore('syncQueue');
-            const clearRequest = store.clear();
-            
-            clearRequest.onsuccess = () => resolve();
-            clearRequest.onerror = () => reject(clearRequest.error);
-        };
-    });
+        const { userId, monthYear, entries } = syncData.data;
+        
+        // Store sync status
+        await saveSyncStatus({
+            lastSync: new Date().toISOString(),
+            userId: userId,
+            monthYear: monthYear,
+            entriesCount: entries?.length || 0
+        });
+        
+        return true;
+        
+    } catch (error) {
+        console.error('Firestore sync error:', error);
+        return false;
+    }
+}
+
+// Save sync status to cache
+async function saveSyncStatus(status) {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put('/sync-status', new Response(JSON.stringify(status)));
 }
 
 // Handle messages from main thread
@@ -208,24 +145,38 @@ self.addEventListener('message', (event) => {
     const { type, payload } = event.data;
     
     switch (type) {
-        case 'TRIGGER_SYNC':
-            event.waitUntil(doBackgroundSync());
+        case 'REGISTER_SYNC':
+            // Register for background sync
+            event.waitUntil(
+                self.registration.sync.register(FIRESTORE_SYNC_TAG)
+                    .then(() => {
+                        console.log('Background sync registered');
+                        // Also queue the data
+                        return queueForSync(payload);
+                    })
+                    .catch(err => console.log('Background sync not supported:', err))
+            );
             break;
             
         case 'QUEUE_DATA':
-            event.waitUntil(queueDataForSync(payload));
+            event.waitUntil(queueForSync(payload));
             break;
             
         case 'GET_SYNC_STATUS':
-            event.ports[0].postMessage({ status: 'active' });
+            event.waitUntil(
+                (async () => {
+                    const status = await getSyncStatus();
+                    event.ports[0].postMessage(status);
+                })()
+            );
             break;
     }
 });
 
 // Queue data for background sync
-async function queueDataForSync(data) {
+async function queueForSync(data) {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('BroilerSyncDB', 1);
+        const request = indexedDB.open('BroilerSyncDB', 2);
         
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
@@ -236,18 +187,30 @@ async function queueDataForSync(data) {
             const addRequest = store.add({
                 data: data,
                 timestamp: new Date().toISOString(),
-                type: 'user_data'
+                type: 'firestore_sync',
+                userId: data.userId,
+                monthYear: data.monthYear
             });
             
-            addRequest.onsuccess = () => resolve();
+            addRequest.onsuccess = () => {
+                // Try to trigger background sync
+                if (self.registration.sync) {
+                    self.registration.sync.register(FIRESTORE_SYNC_TAG)
+                        .catch(err => console.log('Sync registration failed:', err));
+                }
+                resolve();
+            };
             addRequest.onerror = () => reject(addRequest.error);
         };
-        
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains('syncQueue')) {
-                db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
-            }
-        };
     });
+}
+
+// Get latest sync status
+async function getSyncStatus() {
+    const cache = await caches.open(CACHE_NAME);
+    const response = await cache.match('/sync-status');
+    if (response) {
+        return await response.json();
+    }
+    return { lastSync: null };
 }
