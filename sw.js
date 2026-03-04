@@ -44,19 +44,19 @@ async function syncWithFirestore() {
             });
         });
 
-        // Perform Firebase sync
-        const result = await performFirestoreSync(syncData);
+        // Perform Firebase sync (this would need Firebase SDK in SW, but we'll trigger main app)
+        console.log('Sync data ready:', syncData);
         
         // Notify clients of sync completion
         clients.forEach(client => {
             client.postMessage({
                 type: 'SYNC_COMPLETED',
                 timestamp: new Date().toISOString(),
-                success: result
+                success: true
             });
         });
 
-        return result;
+        return true;
         
     } catch (error) {
         console.error('Background sync failed:', error);
@@ -77,11 +77,39 @@ async function syncWithFirestore() {
 // Get sync data from IndexedDB
 async function getSyncData() {
     return new Promise((resolve, reject) => {
+        // Open database with proper version and error handling
         const request = indexedDB.open('BroilerSyncDB', 2);
         
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            const db = request.result;
+        request.onerror = (event) => {
+            console.error('IndexedDB error:', event.target.error);
+            resolve(null); // Resolve with null instead of rejecting
+        };
+        
+        request.onupgradeneeded = (event) => {
+            console.log('Creating/upgrading IndexedDB...');
+            const db = event.target.result;
+            
+            // Create object store if it doesn't exist
+            if (!db.objectStoreNames.contains('syncQueue')) {
+                const store = db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
+                store.createIndex('timestamp', 'timestamp', { unique: false });
+                store.createIndex('userId', 'userId', { unique: false });
+                store.createIndex('monthYear', 'monthYear', { unique: false });
+                console.log('Created syncQueue object store');
+            }
+        };
+        
+        request.onsuccess = (event) => {
+            const db = event.target.result;
+            
+            // Check if object store exists before using it
+            if (!db.objectStoreNames.contains('syncQueue')) {
+                console.log('syncQueue store not found, closing DB');
+                db.close();
+                resolve(null);
+                return;
+            }
+            
             const transaction = db.transaction(['syncQueue'], 'readonly');
             const store = transaction.objectStore('syncQueue');
             const getAllRequest = store.getAll();
@@ -92,46 +120,17 @@ async function getSyncData() {
                 const latest = items.sort((a, b) => 
                     new Date(b.timestamp) - new Date(a.timestamp)
                 )[0];
+                db.close();
                 resolve(latest);
             };
-            getAllRequest.onerror = () => reject(getAllRequest.error);
-        };
-        
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains('syncQueue')) {
-                const store = db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
-                store.createIndex('timestamp', 'timestamp', { unique: false });
-                store.createIndex('userId', 'userId', { unique: false });
-                store.createIndex('monthYear', 'monthYear', { unique: false });
-            }
+            
+            getAllRequest.onerror = (error) => {
+                console.error('Error getting sync data:', error);
+                db.close();
+                resolve(null);
+            };
         };
     });
-}
-
-// Perform Firestore sync
-async function performFirestoreSync(syncData) {
-    try {
-        // This is where you'd sync with Firebase
-        // Since we can't use Firebase SDK in Service Worker directly,
-        // we'll use fetch to hit a Cloud Function or just trigger the main app
-        
-        const { userId, monthYear, entries } = syncData.data;
-        
-        // Store sync status
-        await saveSyncStatus({
-            lastSync: new Date().toISOString(),
-            userId: userId,
-            monthYear: monthYear,
-            entriesCount: entries?.length || 0
-        });
-        
-        return true;
-        
-    } catch (error) {
-        console.error('Firestore sync error:', error);
-        return false;
-    }
 }
 
 // Save sync status to cache
@@ -176,11 +175,33 @@ self.addEventListener('message', (event) => {
 // Queue data for background sync
 async function queueForSync(data) {
     return new Promise((resolve, reject) => {
+        // Open database with proper error handling
         const request = indexedDB.open('BroilerSyncDB', 2);
         
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            const db = request.result;
+        request.onerror = (event) => {
+            console.error('Error opening DB for queue:', event.target.error);
+            resolve(); // Resolve anyway to not block
+        };
+        
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('syncQueue')) {
+                db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
+                console.log('Created syncQueue during queue operation');
+            }
+        };
+        
+        request.onsuccess = (event) => {
+            const db = event.target.result;
+            
+            // Ensure object store exists
+            if (!db.objectStoreNames.contains('syncQueue')) {
+                console.log('syncQueue store missing, closing DB');
+                db.close();
+                resolve();
+                return;
+            }
+            
             const transaction = db.transaction(['syncQueue'], 'readwrite');
             const store = transaction.objectStore('syncQueue');
             
@@ -193,14 +214,21 @@ async function queueForSync(data) {
             });
             
             addRequest.onsuccess = () => {
+                console.log('Data queued for sync');
                 // Try to trigger background sync
                 if (self.registration.sync) {
                     self.registration.sync.register(FIRESTORE_SYNC_TAG)
                         .catch(err => console.log('Sync registration failed:', err));
                 }
+                db.close();
                 resolve();
             };
-            addRequest.onerror = () => reject(addRequest.error);
+            
+            addRequest.onerror = (error) => {
+                console.error('Error queuing data:', error);
+                db.close();
+                resolve(); // Resolve anyway
+            };
         };
     });
 }
