@@ -1471,64 +1471,144 @@ async function saveData() {
     }
 }
 
-// ==================== LOAD FROM FIREBASE ====================
+// ==================== LOAD FROM FIREBASE - FIXED VERSION ====================
 async function loadFromFirebase() {
     console.log('=== LOADING FROM FIREBASE ===');
     
     try {
         const userData = localStorage.getItem('currentUser');
-        if (!userData) return false;
+        if (!userData) {
+            console.log('No user logged in');
+            return false;
+        }
         
         const user = JSON.parse(userData);
-        const userId = user.uid;
+        const userId = user.uid; // Use UID
         
         // Get current month/year
         const monthSelect = document.getElementById('month-select');
         const yearInput = document.getElementById('year-input');
         
-        if (!monthSelect || !yearInput) return false;
+        if (!monthSelect || !yearInput) {
+            console.error('Month/Year elements not found');
+            return false;
+        }
         
         const month = monthSelect.value;
         const year = yearInput.value;
         const monthYear = `${month}-${year}`;
         
+        console.log(`Looking for data at: broilerClaims/${userId}/months/${monthYear}`);
+        
         // Try to load from Firebase
-        if (db) {
-            const docRef = db.collection('broilerClaims').doc(userId).collection('months').doc(monthYear);
-            const docSnap = await docRef.get();
+        if (!db) {
+            console.error('Firebase db not available');
+            return false;
+        }
+        
+        // THIS PATH MUST EXACTLY MATCH YOUR SAVE PATH
+        const docRef = db.collection('broilerClaims').doc(userId).collection('months').doc(monthYear);
+        const docSnap = await docRef.get();
+        
+        if (docSnap.exists) {
+            const firebaseData = docSnap.data();
+            console.log('✅ Firebase data found:', firebaseData);
             
-            if (docSnap.exists) {
-                const firebaseData = docSnap.data();
+            // Check the data structure - your save function stores entries directly
+            if (firebaseData.entries && Array.isArray(firebaseData.entries)) {
+                window.currentFormData = firebaseData.entries;
+                console.log(`✅ Loaded ${firebaseData.entries.length} entries from Firebase`);
                 
-                if (firebaseData.entries && Array.isArray(firebaseData.entries)) {
-                    window.currentFormData = firebaseData.entries;
-                    
-                    // Update employee name if available
-                    if (firebaseData.employeeName) {
-                        const nameInput = document.getElementById('employee-name');
-                        if (nameInput) {
-                            nameInput.value = firebaseData.employeeName;
-                            localStorage.setItem('claimEmployeeName', firebaseData.employeeName);
-                            updateClaimForDisplay(firebaseData.employeeName);
-                        }
+                // Update employee name if available
+                if (firebaseData.employeeName) {
+                    const nameInput = document.getElementById('employee-name');
+                    if (nameInput) {
+                        nameInput.value = firebaseData.employeeName;
+                        localStorage.setItem('claimEmployeeName', firebaseData.employeeName);
+                        updateClaimForDisplay(firebaseData.employeeName);
                     }
-                    
-                    // Render the table
+                }
+                
+                // Update total hours if available
+                if (firebaseData.totalHours) {
+                    const totalElement = document.getElementById('total-hours');
+                    if (totalElement) {
+                        totalElement.textContent = firebaseData.totalHours;
+                    }
+                }
+                
+                // Render the table
+                renderTable();
+                
+                // Also save to localStorage as backup
+                const dataKey = `userData_${userId}`;
+                let allData = {};
+                const existingData = localStorage.getItem(dataKey);
+                if (existingData) {
+                    try {
+                        allData = JSON.parse(existingData);
+                    } catch (e) {
+                        allData = {};
+                    }
+                }
+                allData[monthYear] = firebaseData.entries;
+                localStorage.setItem(dataKey, JSON.stringify(allData));
+                
+                showNotification(`Loaded ${firebaseData.entries.length} entries from cloud`, 'success');
+                return true;
+            } else {
+                console.log('Firebase data has wrong format:', firebaseData);
+                // Try to recover if data is in different format
+                if (Array.isArray(firebaseData)) {
+                    window.currentFormData = firebaseData;
                     renderTable();
-                    
-                    console.log(`✅ Loaded ${firebaseData.entries.length} entries from Firebase`);
-                    showNotification('Loaded from cloud', 'success');
+                    showNotification('Loaded data from cloud (array format)', 'success');
                     return true;
                 }
-            } else {
-                console.log('No Firebase data for this month');
+            }
+        } else {
+            console.log('No Firebase data found for this month');
+            
+            // Try the global collection as fallback
+            try {
+                const globalQuery = await db.collection('allClaims')
+                    .where('userId', '==', userId)
+                    .where('monthYear', '==', monthYear)
+                    .orderBy('savedAt', 'desc')
+                    .limit(1)
+                    .get();
+                
+                if (!globalQuery.empty) {
+                    const globalData = globalQuery.docs[0].data();
+                    console.log('✅ Found data in global collection:', globalData);
+                    
+                    if (globalData.entries && Array.isArray(globalData.entries)) {
+                        window.currentFormData = globalData.entries;
+                        
+                        if (globalData.employeeName) {
+                            const nameInput = document.getElementById('employee-name');
+                            if (nameInput) {
+                                nameInput.value = globalData.employeeName;
+                                localStorage.setItem('claimEmployeeName', globalData.employeeName);
+                                updateClaimForDisplay(globalData.employeeName);
+                            }
+                        }
+                        
+                        renderTable();
+                        showNotification('Loaded from backup', 'success');
+                        return true;
+                    }
+                }
+            } catch (globalError) {
+                console.log('Error checking global collection:', globalError);
             }
         }
         
         return false;
         
     } catch (error) {
-        console.error('Error loading from Firebase:', error);
+        console.error('❌ Load error:', error);
+        showNotification('Error loading from cloud: ' + error.message, 'error');
         return false;
     }
 }
@@ -3107,64 +3187,42 @@ async function syncToFirebase(username, data) {
     });
 }
 
-// ==================== ENHANCED SYNC FROM CLOUD ====================
+// ==================== FIXED SYNC FROM CLOUD ====================
 async function syncFromCloud() {
     console.log('=== SYNC FROM CLOUD ===');
     
     const statusElement = document.getElementById('sync-status') || createSyncStatusElement();
-    statusElement.innerHTML = '<span style="color: #2196F3;">🔄 Loading from cloud...</span>';
+    if (statusElement) {
+        statusElement.innerHTML = '<span style="color: #2196F3;">🔄 Loading from cloud...</span>';
+    }
+    
+    showNotification('Syncing from cloud...', 'info');
     
     try {
-        // Check current user
-        const userInfo = checkCurrentUser();
-        if (!userInfo) {
-            throw new Error('Please log in first');
-        }
+        const success = await loadFromFirebase();
         
-        const { username } = userInfo;
-        
-        console.log('Loading cloud data for:', username);
-        
-        // Check Firebase availability
-        if (!window.firebase || !window.firebase.firestore || !firebase.apps.length) {
-            console.log('Firebase not available, using backup');
-            return loadFromBackup(username, statusElement);
-        }
-        
-        // Try to load from Firebase
-        const cloudData = await loadFromFirebase(username);
-        
-        if (cloudData && cloudData.data) {
-            // Save to localStorage
-            const dataKey = `userData_${username}`;
-            localStorage.setItem(dataKey, JSON.stringify(cloudData.data));
-            
-            console.log('✅ Loaded from Firebase:', cloudData.data);
-            
-            // Reload the data
-            if (typeof loadUserData === 'function') {
-                loadUserData();
+        if (success) {
+            if (statusElement) {
+                statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Synced from cloud</span>';
             }
-            
-            statusElement.innerHTML = '<span style="color: #4CAF50;">✅ Loaded from Firebase</span>';
             showNotification('Data loaded from cloud!', 'success');
             
             // Update last sync time
             localStorage.setItem('lastCloudSync', new Date().toISOString());
             updateLastSyncDisplay();
-            
-            return true;
         } else {
-            // No Firebase data, try backup
-            console.log('No Firebase data found, trying backup');
-            return loadFromBackup(username, statusElement);
+            if (statusElement) {
+                statusElement.innerHTML = '<span style="color: #FF9800;">ℹ️ No cloud data</span>';
+            }
+            showNotification('No cloud data found for this month', 'info');
         }
         
     } catch (error) {
-        console.error('Load from cloud error:', error);
-        statusElement.innerHTML = `<span style="color: #f44336;">❌ ${error.message}</span>`;
-        showNotification('Load failed: ' + error.message, 'error');
-        return false;
+        console.error('Sync from cloud error:', error);
+        if (statusElement) {
+            statusElement.innerHTML = '<span style="color: #f44336;">❌ Sync failed</span>';
+        }
+        showNotification('Error syncing from cloud', 'error');
     }
 }
 
