@@ -515,9 +515,9 @@ function updateClaimName() {
 }
 
 // ==================== FIXED PDF FUNCTION ====================
-// ==================== FIXED PDF FUNCTION WITH CENTERED TABLE ====================
+// ==================== PDF FUNCTION WITH PERFECTLY CENTERED TABLE ====================
 function generatePDF() {
-    console.log('Generating A4 PDF with centered table...');
+    console.log('Generating A4 PDF with perfectly centered table...');
     
     // Check if jsPDF is loaded
     if (!window.jspdf) {
@@ -534,8 +534,8 @@ function generatePDF() {
         
         // Page dimensions
         const pageWidth = 210; // A4 width in mm
-        const margin = 20; // Left/right margin
-        const contentWidth = pageWidth - (margin * 2); // Width available for content
+        const pageHeight = 297; // A4 height in mm
+        const margin = 15; // Left/right margin
         
         // Get data
         const monthSelect = document.getElementById('month-select');
@@ -588,14 +588,14 @@ function generatePDF() {
             const timeOut = row.cells[3]?.textContent;
             const hours = row.cells[4]?.textContent;
             
-            if (date && date !== '') {
-                tableData.push([date, amPm, timeIn, timeOut, hours]);
+            if (date && date !== '' && date !== 'undefined') {
+                tableData.push([date, amPm || '', timeIn || '', timeOut || '', hours || '0:00']);
             }
         });
         
-        // ========== CENTERED TABLE ==========
-        if (tableData.length > 0 && doc.autoTable) {
-            // Calculate optimal column widths
+        // ========== PERFECTLY CENTERED TABLE ==========
+        if (tableData.length > 0) {
+            // Calculate optimal column widths based on content
             const columnWidths = {
                 0: 35, // Date
                 1: 25, // AM/PM
@@ -607,9 +607,10 @@ function generatePDF() {
             // Calculate total table width
             const tableWidth = Object.values(columnWidths).reduce((a, b) => a + b, 0);
             
-            // Calculate starting X position to center the table
+            // Calculate starting X position to PERFECTLY center the table
             const startX = (pageWidth - tableWidth) / 2;
             
+            // Use autoTable with centered positioning
             doc.autoTable({
                 startY: 65,
                 head: [['Date', 'AM/PM', 'Time IN', 'Time OUT', 'Hours']],
@@ -639,55 +640,77 @@ function generatePDF() {
                     3: { cellWidth: columnWidths[3], halign: 'center' },
                     4: { cellWidth: columnWidths[4], halign: 'center' }
                 },
-                margin: { left: startX, right: pageWidth - startX - tableWidth },
+                margin: { 
+                    left: startX, 
+                    right: pageWidth - startX - tableWidth 
+                },
                 tableWidth: tableWidth,
+                tableLineColor: [0, 0, 0],
+                tableLineWidth: 0.2,
                 didDrawPage: function(data) {
-                    // This ensures the table stays centered on each page
-                    console.log('Drawing centered table');
+                    // Optional: Add page numbers if needed
+                    doc.setFontSize(8);
+                    doc.setTextColor(150, 150, 150);
+                    doc.text(`Page ${data.pageNumber}`, pageWidth / 2, 290, { align: 'center' });
                 }
             });
             
             // Update position after table
-            let finalY = doc.lastAutoTable.finalY + 10;
+            let finalY = doc.lastAutoTable.finalY + 15;
             
             // ========== CENTERED TOTAL HOURS ==========
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(12);
+            doc.setFontSize(14);
+            doc.setTextColor(40, 167, 69); // Green color for total
             doc.text(`Total Hours: ${totalHours}`, pageWidth / 2, finalY, { align: 'center' });
             
-            finalY += 15;
+            finalY += 20;
             
             // ========== CENTERED SIGNATURE SECTION ==========
-            const signatureWidth = 150; // Total width of signature section
+            doc.setTextColor(0, 0, 0); // Reset to black
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            
+            const signatureWidth = 160; // Total width of signature section
             const signatureStartX = (pageWidth - signatureWidth) / 2;
             const boxWidth = 45;
-            const spacing = 7.5;
+            const spacing = 12.5;
             
-            // Signature labels
+            // Draw signature lines with labels
+            doc.setFont('helvetica', 'bold');
+            doc.text('Signature Claimant:', signatureStartX, finalY);
             doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            
-            // Claimant
-            doc.text('Claimant:', signatureStartX, finalY);
             doc.line(signatureStartX, finalY + 15, signatureStartX + boxWidth, finalY + 15);
             
-            // HOD
-            doc.text('HOD:', signatureStartX + boxWidth + spacing, finalY);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Signature HOD:', signatureStartX + boxWidth + spacing, finalY);
+            doc.setFont('helvetica', 'normal');
             doc.line(signatureStartX + boxWidth + spacing, finalY + 15, 
                     signatureStartX + (boxWidth * 2) + spacing, finalY + 15);
             
-            // Principal
-            doc.text('Principal:', signatureStartX + (boxWidth * 2) + (spacing * 2), finalY);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Signature Principal:', signatureStartX + (boxWidth * 2) + (spacing * 2), finalY);
+            doc.setFont('helvetica', 'normal');
             doc.line(signatureStartX + (boxWidth * 2) + (spacing * 2), finalY + 15, 
                     signatureStartX + (boxWidth * 3) + (spacing * 2), finalY + 15);
             
-            finalY += 30;
+            finalY += 35;
+            
+            // Add employee name under claimant signature
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            doc.text(employeeName, signatureStartX + (boxWidth / 2), finalY, { align: 'center' });
             
         } else {
-            // No entries message - centered
+            // ========== CENTERED NO ENTRIES MESSAGE ==========
             doc.setFont('helvetica', 'italic');
+            doc.setFontSize(14);
+            doc.setTextColor(150, 150, 150);
+            doc.text('No entries found for this period.', pageWidth / 2, 120, { align: 'center' });
+            
             doc.setFontSize(12);
-            doc.text('No entries found for this period.', pageWidth / 2, 100, { align: 'center' });
+            doc.text('Please add time entries using the form.', pageWidth / 2, 130, { align: 'center' });
         }
         
         // ========== CENTERED FOOTER ==========
@@ -701,6 +724,11 @@ function generatePDF() {
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(`Generated on: ${currentDate}`, pageWidth / 2, 285, { align: 'center' });
+        
+        // Add a thin line above footer
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.2);
+        doc.line(margin, 280, pageWidth - margin, 280);
         
         // Set document properties
         doc.setProperties({
