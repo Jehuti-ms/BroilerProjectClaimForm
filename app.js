@@ -4585,7 +4585,7 @@ function handleSWMessage(event) {
     }
 }
 
-// Trigger background sync
+// Trigger background sync with better error handling
 async function triggerBackgroundSync() {
     if (!syncWorker || !syncWorker.sync) {
         console.log('Background sync not available');
@@ -4611,19 +4611,29 @@ async function triggerBackgroundSync() {
             monthYear: monthYear,
             entries: window.currentFormData || [],
             employeeName: document.getElementById('employee-name')?.value,
-            totalHours: document.getElementById('total-hours')?.textContent
+            totalHours: document.getElementById('total-hours')?.textContent,
+            timestamp: new Date().toISOString()
         };
         
-        // Send to service worker
+        // Send to service worker with error handling
         const registration = await navigator.serviceWorker.ready;
-        registration.active.postMessage({
-            type: 'QUEUE_DATA',
-            payload: syncData
-        });
         
-        // Register sync
-        await registration.sync.register('firestore-sync');
-        console.log('Background sync triggered');
+        if (registration.active) {
+            // Use MessageChannel for response if needed
+            const channel = new MessageChannel();
+            
+            registration.active.postMessage({
+                type: 'QUEUE_DATA',
+                payload: syncData
+            }, [channel.port2]);
+            
+            // Register sync
+            if (registration.sync) {
+                await registration.sync.register('firestore-sync');
+                console.log('✅ Background sync registered');
+            }
+        }
+        
         return true;
         
     } catch (error) {
@@ -4631,6 +4641,31 @@ async function triggerBackgroundSync() {
         return false;
     }
 }
+
+// Add this to your app.js for debugging
+async function clearIndexedDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.deleteDatabase('BroilerSyncDB');
+        
+        request.onsuccess = () => {
+            console.log('✅ IndexedDB cleared');
+            resolve();
+        };
+        
+        request.onerror = () => {
+            console.log('Failed to clear IndexedDB');
+            reject();
+        };
+        
+        request.onblocked = () => {
+            console.log('IndexedDB delete blocked - close other tabs');
+            alert('Please close other tabs with this app open and try again');
+        };
+    });
+}
+
+// Run this in console if you keep having issues:
+// clearIndexedDB();
 
 // Update sync status in UI
 function updateSyncStatus(message, color) {
