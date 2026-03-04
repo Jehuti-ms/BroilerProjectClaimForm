@@ -4949,3 +4949,36 @@ async function checkFirebaseData(username) {
     }
 }
 
+// Add loading state to buttons
+async function quickFirebaseCheck() {
+    const btn = event.currentTarget;
+    const originalText = btn.innerHTML;
+    
+    btn.classList.add('loading');
+    btn.disabled = true;
+    
+    try {
+        // Your existing function code
+        await yourFirebaseCheckFunction();
+    } finally {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+    }
+}
+
+// Apply to all Firebase buttons
+document.querySelectorAll('.firebase-tools button').forEach(btn => {
+    const originalClick = btn.onclick;
+    btn.onclick = async function(e) {
+        const originalText = this.innerHTML;
+        this.classList.add('loading');
+        this.disabled = true;
+        
+        try {
+            await originalClick.call(this, e);
+        } finally {
+            this.classList.remove('loading');
+            this.disabled = false;
+        }
+    };
+});
