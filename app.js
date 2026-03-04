@@ -633,8 +633,19 @@ async function checkSyncStatus() {
 }
 
 // Add pulse animation for sync button
+// Add all CSS animations in one place
 const style = document.createElement('style');
 style.textContent = `
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+    
+    @keyframes slideOut {
+        from { transform: translateY(0); opacity: 1; }
+        to { transform: translateY(-20px); opacity: 0; }
+    }
+    
     @keyframes pulse {
         0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.7); }
         70% { box-shadow: 0 0 0 10px rgba(33, 150, 243, 0); }
@@ -1515,21 +1526,6 @@ function closeModal() {
     window.editingIndex = undefined;
 }
 
-// Add these CSS animations for closing
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes fadeOut {
-        from { opacity: 1; }
-        to { opacity: 0; }
-    }
-    
-    @keyframes slideOut {
-        from { transform: translateY(0); opacity: 1; }
-        to { transform: translateY(-20px); opacity: 0; }
-    }
-`;
-document.head.appendChild(style);
-
 // Save entry
 function saveEntry() {
     console.log('Saving entry...');
@@ -1571,7 +1567,6 @@ function saveEntry() {
     closeModal();
 }
 
-// ==================== SAVE ENTIRE FORM TO FIREBASE ====================
 // ==================== UPDATED SAVE FUNCTION WITH SERVICE WORKER SYNC ====================
 async function saveData() {
     console.log('=== SAVING ENTIRE FORM TO FIREBASE ===');
