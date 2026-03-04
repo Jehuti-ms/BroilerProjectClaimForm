@@ -751,9 +751,9 @@ function updateClaimName() {
 }
 
 // ==================== FIXED PDF FUNCTION ====================
-// ==================== PDF FUNCTION WITH PERFECTLY CENTERED TABLE ====================
+// ==================== PDF FUNCTION - FORCE CENTERED TABLE ====================
 function generatePDF() {
-    console.log('Generating A4 PDF with perfectly centered table...');
+    console.log('Generating A4 PDF with FORCE CENTERED table...');
     
     // Check if jsPDF is loaded
     if (!window.jspdf) {
@@ -771,7 +771,7 @@ function generatePDF() {
         // Page dimensions
         const pageWidth = 210; // A4 width in mm
         const pageHeight = 297; // A4 height in mm
-        const margin = 15; // Left/right margin
+        const margin = 20; // Left/right margin
         
         // Get data
         const monthSelect = document.getElementById('month-select');
@@ -809,7 +809,7 @@ function generatePDF() {
         doc.setFont('helvetica', 'normal');
         doc.text(`${monthName} ${year}`, pageWidth / 2, 50, { align: 'center' });
         
-        // Line separator - centered
+        // Line separator
         doc.setLineWidth(0.5);
         doc.line(margin, 55, pageWidth - margin, 55);
         
@@ -829,123 +829,162 @@ function generatePDF() {
             }
         });
         
-        // ========== PERFECTLY CENTERED TABLE ==========
+        // ========== FORCE CENTERED TABLE ==========
         if (tableData.length > 0) {
-            // Calculate optimal column widths based on content
-            const columnWidths = {
-                0: 35, // Date
-                1: 25, // AM/PM
-                2: 30, // Time IN
-                3: 30, // Time OUT
-                4: 25  // Hours
-            };
+            // APPROACH 1: Calculate exact center position
+            // Column widths (optimized for A4)
+            const colWidths = [35, 25, 30, 30, 25]; // Date, AM/PM, Time IN, Time OUT, Hours
+            const totalTableWidth = colWidths.reduce((a, b) => a + b, 0);
             
-            // Calculate total table width
-            const tableWidth = Object.values(columnWidths).reduce((a, b) => a + b, 0);
+            // Calculate starting X to PERFECTLY center the table
+            const startX = (pageWidth - totalTableWidth) / 2;
             
-            // Calculate starting X position to PERFECTLY center the table
-            const startX = (pageWidth - tableWidth) / 2;
+            console.log(`Table width: ${totalTableWidth}mm, Start X: ${startX}mm`);
             
-            // Use autoTable with centered positioning
-            doc.autoTable({
-                startY: 65,
-                head: [['Date', 'AM/PM', 'Time IN', 'Time OUT', 'Hours']],
-                body: tableData,
-                theme: 'grid',
-                styles: { 
-                    fontSize: 10, 
-                    cellPadding: 4,
-                    textColor: [0, 0, 0],
-                    lineColor: [100, 100, 100],
-                    lineWidth: 0.1,
-                    halign: 'center', // Center text horizontally
-                    valign: 'middle'   // Center text vertically
-                },
-                headStyles: { 
-                    fillColor: [70, 70, 70],
-                    textColor: [255, 255, 255],
-                    fontStyle: 'bold',
-                    fontSize: 11,
-                    halign: 'center',
-                    valign: 'middle'
-                },
-                columnStyles: {
-                    0: { cellWidth: columnWidths[0], halign: 'center' },
-                    1: { cellWidth: columnWidths[1], halign: 'center' },
-                    2: { cellWidth: columnWidths[2], halign: 'center' },
-                    3: { cellWidth: columnWidths[3], halign: 'center' },
-                    4: { cellWidth: columnWidths[4], halign: 'center' }
-                },
-                margin: { 
-                    left: startX, 
-                    right: pageWidth - startX - tableWidth 
-                },
-                tableWidth: tableWidth,
-                tableLineColor: [0, 0, 0],
-                tableLineWidth: 0.2,
-                didDrawPage: function(data) {
-                    // Optional: Add page numbers if needed
-                    doc.setFontSize(8);
-                    doc.setTextColor(150, 150, 150);
-                    doc.text(`Page ${data.pageNumber}`, pageWidth / 2, 290, { align: 'center' });
+            // Draw table manually if autoTable is causing issues
+            let yPos = 70;
+            
+            // Draw table header
+            doc.setFillColor(70, 70, 70);
+            doc.rect(startX, yPos - 5, totalTableWidth, 8, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            
+            let xPos = startX;
+            doc.text('Date', xPos + 5, yPos);
+            xPos += colWidths[0];
+            doc.text('AM/PM', xPos + 5, yPos);
+            xPos += colWidths[1];
+            doc.text('Time IN', xPos + 5, yPos);
+            xPos += colWidths[2];
+            doc.text('Time OUT', xPos + 5, yPos);
+            xPos += colWidths[3];
+            doc.text('Hours', xPos + 5, yPos);
+            
+            // Draw vertical lines for header
+            doc.setDrawColor(255, 255, 255);
+            doc.setLineWidth(0.1);
+            xPos = startX;
+            for (let i = 0; i <= colWidths.length; i++) {
+                doc.line(xPos, yPos - 5, xPos, yPos + 3);
+                if (i < colWidths.length) xPos += colWidths[i];
+            }
+            
+            yPos += 8;
+            
+            // Draw table rows
+            doc.setTextColor(0, 0, 0);
+            doc.setFont('helvetica', 'normal');
+            
+            tableData.forEach((row, index) => {
+                if (yPos > 250) {
+                    doc.addPage();
+                    yPos = 30;
+                    
+                    // Redraw header on new page
+                    doc.setFillColor(70, 70, 70);
+                    doc.rect(startX, yPos - 5, totalTableWidth, 8, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont('helvetica', 'bold');
+                    
+                    xPos = startX;
+                    doc.text('Date', xPos + 5, yPos);
+                    xPos += colWidths[0];
+                    doc.text('AM/PM', xPos + 5, yPos);
+                    xPos += colWidths[1];
+                    doc.text('Time IN', xPos + 5, yPos);
+                    xPos += colWidths[2];
+                    doc.text('Time OUT', xPos + 5, yPos);
+                    xPos += colWidths[3];
+                    doc.text('Hours', xPos + 5, yPos);
+                    
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont('helvetica', 'normal');
+                    yPos += 8;
                 }
+                
+                // Draw row background (alternating colors)
+                if (index % 2 === 0) {
+                    doc.setFillColor(245, 245, 245);
+                    doc.rect(startX, yPos - 4, totalTableWidth, 7, 'F');
+                }
+                
+                // Draw row data
+                doc.setTextColor(0, 0, 0);
+                xPos = startX;
+                
+                doc.text(row[0], xPos + 5, yPos);
+                xPos += colWidths[0];
+                doc.text(row[1], xPos + 5, yPos);
+                xPos += colWidths[1];
+                doc.text(row[2], xPos + 5, yPos);
+                xPos += colWidths[2];
+                doc.text(row[3], xPos + 5, yPos);
+                xPos += colWidths[3];
+                doc.text(row[4], xPos + 5, yPos);
+                
+                // Draw bottom border
+                doc.setDrawColor(200, 200, 200);
+                doc.line(startX, yPos + 3, startX + totalTableWidth, yPos + 3);
+                
+                yPos += 7;
             });
             
-            // Update position after table
-            let finalY = doc.lastAutoTable.finalY + 15;
+            yPos += 10;
             
             // ========== CENTERED TOTAL HOURS ==========
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);
-            doc.setTextColor(40, 167, 69); // Green color for total
-            doc.text(`Total Hours: ${totalHours}`, pageWidth / 2, finalY, { align: 'center' });
+            doc.setTextColor(40, 167, 69);
+            doc.text(`Total Hours: ${totalHours}`, pageWidth / 2, yPos, { align: 'center' });
             
-            finalY += 20;
+            yPos += 15;
             
             // ========== CENTERED SIGNATURE SECTION ==========
-            doc.setTextColor(0, 0, 0); // Reset to black
+            doc.setTextColor(0, 0, 0);
             doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
             
-            const signatureWidth = 160; // Total width of signature section
-            const signatureStartX = (pageWidth - signatureWidth) / 2;
+            // Calculate positions for centered signature boxes
             const boxWidth = 45;
-            const spacing = 12.5;
+            const spacing = 10;
+            const totalSigWidth = (boxWidth * 3) + (spacing * 2);
+            const sigStartX = (pageWidth - totalSigWidth) / 2;
             
-            // Draw signature lines with labels
+            // Draw signature lines
             doc.setFont('helvetica', 'bold');
-            doc.text('Signature Claimant:', signatureStartX, finalY);
-            doc.setFont('helvetica', 'normal');
-            doc.line(signatureStartX, finalY + 15, signatureStartX + boxWidth, finalY + 15);
             
+            // Claimant
+            doc.text('Claimant:', sigStartX, yPos);
+            doc.setFont('helvetica', 'normal');
+            doc.line(sigStartX, yPos + 15, sigStartX + boxWidth, yPos + 15);
+            
+            // HOD
             doc.setFont('helvetica', 'bold');
-            doc.text('Signature HOD:', signatureStartX + boxWidth + spacing, finalY);
+            doc.text('HOD:', sigStartX + boxWidth + spacing, yPos);
             doc.setFont('helvetica', 'normal');
-            doc.line(signatureStartX + boxWidth + spacing, finalY + 15, 
-                    signatureStartX + (boxWidth * 2) + spacing, finalY + 15);
+            doc.line(sigStartX + boxWidth + spacing, yPos + 15, 
+                    sigStartX + (boxWidth * 2) + spacing, yPos + 15);
             
+            // Principal
             doc.setFont('helvetica', 'bold');
-            doc.text('Signature Principal:', signatureStartX + (boxWidth * 2) + (spacing * 2), finalY);
+            doc.text('Principal:', sigStartX + (boxWidth * 2) + (spacing * 2), yPos);
             doc.setFont('helvetica', 'normal');
-            doc.line(signatureStartX + (boxWidth * 2) + (spacing * 2), finalY + 15, 
-                    signatureStartX + (boxWidth * 3) + (spacing * 2), finalY + 15);
+            doc.line(sigStartX + (boxWidth * 2) + (spacing * 2), yPos + 15, 
+                    sigStartX + (boxWidth * 3) + (spacing * 2), yPos + 15);
             
-            finalY += 35;
-            
-            // Add employee name under claimant signature
+            // Add employee name under claimant
             doc.setFont('helvetica', 'italic');
             doc.setFontSize(9);
             doc.setTextColor(100, 100, 100);
-            doc.text(employeeName, signatureStartX + (boxWidth / 2), finalY, { align: 'center' });
+            doc.text(employeeName, sigStartX + (boxWidth / 2), yPos + 25, { align: 'center' });
             
         } else {
-            // ========== CENTERED NO ENTRIES MESSAGE ==========
+            // No entries message - centered
             doc.setFont('helvetica', 'italic');
             doc.setFontSize(14);
             doc.setTextColor(150, 150, 150);
             doc.text('No entries found for this period.', pageWidth / 2, 120, { align: 'center' });
-            
-            doc.setFontSize(12);
             doc.text('Please add time entries using the form.', pageWidth / 2, 130, { align: 'center' });
         }
         
@@ -961,24 +1000,11 @@ function generatePDF() {
         doc.setTextColor(150, 150, 150);
         doc.text(`Generated on: ${currentDate}`, pageWidth / 2, 285, { align: 'center' });
         
-        // Add a thin line above footer
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.2);
-        doc.line(margin, 280, pageWidth - margin, 280);
-        
-        // Set document properties
-        doc.setProperties({
-            title: `Broiler Claim - ${employeeName} - ${monthName} ${year}`,
-            subject: 'Employee Time Claim Form',
-            author: 'Grantley Adams Memorial School',
-            keywords: 'broiler, chicken, claim, form, timesheet'
-        });
-        
         // Save the PDF
         const filename = `Broiler_Claim_${monthName}_${year}_${employeeName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
         doc.save(filename);
         
-        showNotification('Centered PDF generated successfully!');
+        showNotification('FORCE CENTERED PDF generated successfully!');
         
     } catch (error) {
         console.error('PDF generation error:', error);
