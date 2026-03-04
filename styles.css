@@ -2073,3 +2073,36 @@ select {
 .social-btn.facebook {
     color: #4267B2;
 }
+
+/* Chicken Icon Styles */
+.chicken-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+}
+
+.chicken-icon svg {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+    transition: transform 0.3s ease;
+}
+
+.chicken-icon svg:hover {
+    transform: scale(1.1) rotate(5deg);
+}
+
+/* For header use */
+.header-icon {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+@media (max-width: 768px) {
+    .header-icon {
+        position: static;
+        transform: none;
+        margin-bottom: 10px;
+    }
+}
