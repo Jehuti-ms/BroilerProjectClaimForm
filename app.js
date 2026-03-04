@@ -515,8 +515,9 @@ function updateClaimName() {
 }
 
 // ==================== FIXED PDF FUNCTION ====================
+// ==================== FIXED PDF FUNCTION WITH CENTERED TABLE ====================
 function generatePDF() {
-    console.log('Generating A4 PDF...');
+    console.log('Generating A4 PDF with centered table...');
     
     // Check if jsPDF is loaded
     if (!window.jspdf) {
@@ -533,13 +534,14 @@ function generatePDF() {
         
         // Page dimensions
         const pageWidth = 210; // A4 width in mm
-        const margin = 15; // Margin in mm
+        const margin = 20; // Left/right margin
+        const contentWidth = pageWidth - (margin * 2); // Width available for content
         
         // Get data
         const monthSelect = document.getElementById('month-select');
         const yearInput = document.getElementById('year-input');
         
-        // Get employee name - FIXED: Use the correct input ID
+        // Get employee name
         const employeeName = document.getElementById('employee-name')?.value || 
                             localStorage.getItem('claimEmployeeName') || 
                             'Employee Name';
@@ -550,31 +552,34 @@ function generatePDF() {
         const year = parseInt(yearInput?.value || 2026);
         const monthName = monthNames[month] || 'Month';
         
-        // Header section - NOW INCLUDES EMPLOYEE NAME
+        // ========== CENTERED HEADER ==========
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(16);
-        doc.text('Grantley Adams Memorial School', pageWidth / 2, margin, { align: 'center' });
         
+        // School name - centered
+        doc.setFontSize(18);
+        doc.text('Grantley Adams Memorial School', pageWidth / 2, 20, { align: 'center' });
+        
+        // Project name - centered
         doc.setFontSize(14);
-        doc.text('Broiler Production Project', pageWidth / 2, margin + 8, { align: 'center' });
+        doc.text('Broiler Production Project', pageWidth / 2, 30, { align: 'center' });
         
+        // Claim form with employee name - centered
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Claim Form for: ${employeeName}`, pageWidth / 2, 40, { align: 'center' });
+        
+        // Month/Year - centered
         doc.setFontSize(12);
-        doc.text(`Claim Form for: ${employeeName}`, pageWidth / 2, margin + 16, { align: 'center' });
-        
-        // Employee and date info
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.text(`${monthName} ${year}`, pageWidth - margin, margin + 25, { align: 'right' });
+        doc.text(`${monthName} ${year}`, pageWidth / 2, 50, { align: 'center' });
         
-        // Line separator
+        // Line separator - centered
         doc.setLineWidth(0.5);
-        doc.line(margin, margin + 30, pageWidth - margin, margin + 30);
+        doc.line(margin, 55, pageWidth - margin, 55);
         
         // Get table data
         const tableData = [];
         const rows = document.querySelectorAll('#time-table tbody tr');
-        
-        let yPos = margin + 40; // Starting position for table
         
         rows.forEach(row => {
             const date = row.cells[0]?.textContent;
@@ -588,84 +593,114 @@ function generatePDF() {
             }
         });
         
-        // Create table with autoTable
-        if (tableData.length > 0 && jsPDF.API.autoTable) {
+        // ========== CENTERED TABLE ==========
+        if (tableData.length > 0 && doc.autoTable) {
+            // Calculate optimal column widths
+            const columnWidths = {
+                0: 35, // Date
+                1: 25, // AM/PM
+                2: 30, // Time IN
+                3: 30, // Time OUT
+                4: 25  // Hours
+            };
+            
+            // Calculate total table width
+            const tableWidth = Object.values(columnWidths).reduce((a, b) => a + b, 0);
+            
+            // Calculate starting X position to center the table
+            const startX = (pageWidth - tableWidth) / 2;
+            
             doc.autoTable({
-                startY: yPos,
+                startY: 65,
                 head: [['Date', 'AM/PM', 'Time IN', 'Time OUT', 'Hours']],
                 body: tableData,
                 theme: 'grid',
                 styles: { 
-                    fontSize: 9, 
-                    cellPadding: 3,
+                    fontSize: 10, 
+                    cellPadding: 4,
                     textColor: [0, 0, 0],
-                    lineWidth: 0.1
+                    lineColor: [100, 100, 100],
+                    lineWidth: 0.1,
+                    halign: 'center', // Center text horizontally
+                    valign: 'middle'   // Center text vertically
                 },
                 headStyles: { 
-                    fillColor: [220, 220, 220],
-                    textColor: [0, 0, 0],
+                    fillColor: [70, 70, 70],
+                    textColor: [255, 255, 255],
                     fontStyle: 'bold',
-                    fontSize: 10
+                    fontSize: 11,
+                    halign: 'center',
+                    valign: 'middle'
                 },
-                margin: { left: margin, right: margin },
-                tableWidth: pageWidth - (margin * 2),
                 columnStyles: {
-                    0: { cellWidth: 30 }, // Date
-                    1: { cellWidth: 20 }, // AM/PM
-                    2: { cellWidth: 25 }, // Time IN
-                    3: { cellWidth: 25 }, // Time OUT
-                    4: { cellWidth: 20 }  // Hours
+                    0: { cellWidth: columnWidths[0], halign: 'center' },
+                    1: { cellWidth: columnWidths[1], halign: 'center' },
+                    2: { cellWidth: columnWidths[2], halign: 'center' },
+                    3: { cellWidth: columnWidths[3], halign: 'center' },
+                    4: { cellWidth: columnWidths[4], halign: 'center' }
+                },
+                margin: { left: startX, right: pageWidth - startX - tableWidth },
+                tableWidth: tableWidth,
+                didDrawPage: function(data) {
+                    // This ensures the table stays centered on each page
+                    console.log('Drawing centered table');
                 }
             });
             
             // Update position after table
-            yPos = doc.lastAutoTable.finalY + 10;
+            let finalY = doc.lastAutoTable.finalY + 10;
+            
+            // ========== CENTERED TOTAL HOURS ==========
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12);
+            doc.text(`Total Hours: ${totalHours}`, pageWidth / 2, finalY, { align: 'center' });
+            
+            finalY += 15;
+            
+            // ========== CENTERED SIGNATURE SECTION ==========
+            const signatureWidth = 150; // Total width of signature section
+            const signatureStartX = (pageWidth - signatureWidth) / 2;
+            const boxWidth = 45;
+            const spacing = 7.5;
+            
+            // Signature labels
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            
+            // Claimant
+            doc.text('Claimant:', signatureStartX, finalY);
+            doc.line(signatureStartX, finalY + 15, signatureStartX + boxWidth, finalY + 15);
+            
+            // HOD
+            doc.text('HOD:', signatureStartX + boxWidth + spacing, finalY);
+            doc.line(signatureStartX + boxWidth + spacing, finalY + 15, 
+                    signatureStartX + (boxWidth * 2) + spacing, finalY + 15);
+            
+            // Principal
+            doc.text('Principal:', signatureStartX + (boxWidth * 2) + (spacing * 2), finalY);
+            doc.line(signatureStartX + (boxWidth * 2) + (spacing * 2), finalY + 15, 
+                    signatureStartX + (boxWidth * 3) + (spacing * 2), finalY + 15);
+            
+            finalY += 30;
+            
         } else {
-            doc.text('No entries found', margin, yPos);
-            yPos += 10;
+            // No entries message - centered
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(12);
+            doc.text('No entries found for this period.', pageWidth / 2, 100, { align: 'center' });
         }
         
-        // Add total hours
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.text(`Total Hours: ${totalHours}`, pageWidth - margin, yPos, { align: 'right' });
-        
-        // Add signature section - Optimized for A4
-        const signatureY = Math.min(yPos + 40, 250); // Ensure it fits on page
-        
-        // Signature boxes
-        const boxWidth = 50;
-        const boxSpacing = 10;
-        const totalWidth = (boxWidth * 3) + (boxSpacing * 2);
-        const startX = (pageWidth - totalWidth) / 2;
-        
-        // Signature lines
-        const lineY = signatureY + 20;
-        
-        doc.setLineWidth(0.5);
-        
-        // Box 1: Claimant
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.text('Signature Claimant:', startX, signatureY + 10);
-        doc.line(startX, lineY, startX + boxWidth, lineY);
-        
-        // Box 2: HOD
-        doc.text('Signature HOD:', startX + boxWidth + boxSpacing, signatureY + 10);
-        doc.line(startX + boxWidth + boxSpacing, lineY, startX + (boxWidth * 2) + boxSpacing, lineY);
-        
-        // Box 3: Principal
-        doc.text('Signature Principal:', startX + (boxWidth * 2) + (boxSpacing * 2), signatureY + 10);
-        doc.line(startX + (boxWidth * 2) + (boxSpacing * 2), lineY, startX + (boxWidth * 3) + (boxSpacing * 2), lineY);
-        
-        // Add date line at bottom
+        // ========== CENTERED FOOTER ==========
         const currentDate = new Date().toLocaleDateString('en-GB', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
         });
         
-        doc.text(`Generated on: ${currentDate}`, pageWidth / 2, 280, { align: 'center' });
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Generated on: ${currentDate}`, pageWidth / 2, 285, { align: 'center' });
         
         // Set document properties
         doc.setProperties({
@@ -679,7 +714,7 @@ function generatePDF() {
         const filename = `Broiler_Claim_${monthName}_${year}_${employeeName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
         doc.save(filename);
         
-        showNotification('A4 PDF generated successfully!');
+        showNotification('Centered PDF generated successfully!');
         
     } catch (error) {
         console.error('PDF generation error:', error);
@@ -687,9 +722,9 @@ function generatePDF() {
     }
 }
 
-// ==================== FIXED PRINT FUNCTION ====================
+// ==================== FIXED PRINT FUNCTION WITH CENTERED LAYOUT ====================
 function printForm() {
-    console.log('Printing form...');
+    console.log('Printing form with centered layout...');
     
     // Get data FIRST before creating window
     const monthSelect = document.getElementById('month-select');
@@ -713,6 +748,7 @@ function printForm() {
     // Get table data
     let tableRows = '';
     const rows = document.querySelectorAll('#time-table tbody tr');
+    let hasEntries = false;
     
     rows.forEach(row => {
         const date = row.cells[0]?.textContent;
@@ -721,14 +757,15 @@ function printForm() {
         const timeOut = row.cells[3]?.textContent;
         const hours = row.cells[4]?.textContent;
         
-        if (date && date !== '') {
+        if (date && date !== '' && date !== 'undefined') {
+            hasEntries = true;
             tableRows += `
                 <tr>
                     <td>${date}</td>
-                    <td>${amPm}</td>
-                    <td>${timeIn}</td>
-                    <td>${timeOut}</td>
-                    <td>${hours}</td>
+                    <td>${amPm || ''}</td>
+                    <td>${timeIn || ''}</td>
+                    <td>${timeOut || ''}</td>
+                    <td class="hours">${hours || '0:00'}</td>
                 </tr>
             `;
         }
@@ -741,102 +778,366 @@ function printForm() {
         return;
     }
     
-    // Create print document - NOW INCLUDES EMPLOYEE NAME
-    printWindow.document.write(`
+    // Create print document with centered layout
+    const printDocument = `
         <!DOCTYPE html>
         <html>
         <head>
             <title>Broiler Claim Form - ${employeeName} - ${monthNames[month]} ${year}</title>
             <style>
+                /* Print styles */
                 @media print {
-                    @page { margin: 20mm; }
-                    body { font-family: Arial, sans-serif; margin: 0; }
+                    @page {
+                        size: A4;
+                        margin: 2cm;
+                    }
+                    body {
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .no-print {
+                        display: none;
+                    }
                 }
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                .header { text-align: center; margin-bottom: 30px; }
-                .header h1 { margin: 0; font-size: 24px; }
-                .header h2 { margin: 5px 0; font-size: 18px; }
-                .header h3 { margin: 5px 0; font-size: 16px; color: #333; }
-                .info { margin: 20px 0; }
-                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                th, td { border: 1px solid #000; padding: 8px; text-align: center; }
-                th { background-color: #f2f2f2; font-weight: bold; }
-                .total { text-align: right; font-weight: bold; font-size: 16px; margin: 20px 0; }
-                .signature-section { display: flex; justify-content: space-between; margin-top: 60px; }
-                .signature-box { width: 30%; }
-                .signature-line { border-top: 2px solid #000; margin-top: 40px; padding-top: 5px; }
-                .footer { margin-top: 50px; font-size: 12px; color: #666; text-align: center; }
+                
+                /* Screen styles */
+                body {
+                    font-family: 'Arial', sans-serif;
+                    line-height: 1.4;
+                    color: #333;
+                    max-width: 800px;
+                    margin: 20px auto;
+                    padding: 20px;
+                    background: white;
+                    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+                }
+                
+                /* Centered header */
+                .header {
+                    text-align: center;
+                    margin-bottom: 30px;
+                    padding-bottom: 15px;
+                    border-bottom: 2px solid #333;
+                }
+                
+                .header h1 {
+                    margin: 5px 0;
+                    font-size: 24px;
+                    color: #000;
+                    font-weight: bold;
+                }
+                
+                .header h2 {
+                    margin: 5px 0;
+                    font-size: 20px;
+                    color: #333;
+                }
+                
+                .header h3 {
+                    margin: 5px 0;
+                    font-size: 18px;
+                    color: #444;
+                }
+                
+                .header .claim-for {
+                    font-size: 18px;
+                    font-weight: bold;
+                    margin: 10px 0;
+                    color: #2c3e50;
+                }
+                
+                .header .month-year {
+                    font-size: 16px;
+                    color: #666;
+                    margin-top: 5px;
+                }
+                
+                /* Info section */
+                .info-section {
+                    margin: 20px 0;
+                    padding: 15px;
+                    background-color: #f8f9fa;
+                    border: 1px solid #dee2e6;
+                    border-radius: 5px;
+                    text-align: left;
+                }
+                
+                .info-item {
+                    margin: 5px 0;
+                    font-size: 14px;
+                }
+                
+                .info-item strong {
+                    display: inline-block;
+                    width: 80px;
+                    color: #495057;
+                }
+                
+                /* Centered table */
+                .table-container {
+                    margin: 30px 0;
+                    overflow-x: auto;
+                }
+                
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 0 auto;
+                    font-size: 14px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                }
+                
+                th {
+                    background-color: #343a40;
+                    color: white;
+                    font-weight: bold;
+                    padding: 12px;
+                    text-align: center;
+                    border: 1px solid #454d55;
+                }
+                
+                td {
+                    padding: 10px;
+                    text-align: center;
+                    border: 1px solid #dee2e6;
+                }
+                
+                td.hours {
+                    font-weight: bold;
+                    color: #28a745;
+                }
+                
+                /* Zebra striping for table rows */
+                tbody tr:nth-child(even) {
+                    background-color: #f8f9fa;
+                }
+                
+                tbody tr:hover {
+                    background-color: #e9ecef;
+                }
+                
+                /* Centered total section */
+                .total-section {
+                    text-align: center;
+                    margin: 25px 0;
+                    padding: 15px;
+                    font-size: 18px;
+                    font-weight: bold;
+                    border-top: 2px solid #333;
+                    border-bottom: 2px solid #333;
+                    background-color: #f8f9fa;
+                }
+                
+                .total-hours {
+                    color: #28a745;
+                    font-size: 22px;
+                    margin-left: 10px;
+                }
+                
+                /* Centered signature section */
+                .signature-section {
+                    display: flex;
+                    justify-content: center;
+                    gap: 30px;
+                    margin: 50px 0 30px 0;
+                    flex-wrap: wrap;
+                }
+                
+                .signature-box {
+                    width: 150px;
+                    text-align: center;
+                }
+                
+                .signature-label {
+                    font-size: 12px;
+                    color: #666;
+                    margin-bottom: 5px;
+                }
+                
+                .signature-line {
+                    border-top: 2px solid #333;
+                    margin-top: 40px;
+                    padding-top: 5px;
+                    font-size: 14px;
+                    font-weight: bold;
+                }
+                
+                /* No entries message */
+                .no-entries {
+                    text-align: center;
+                    color: #999;
+                    font-style: italic;
+                    padding: 40px;
+                    border: 2px dashed #ccc;
+                    border-radius: 5px;
+                    margin: 30px 0;
+                    font-size: 16px;
+                }
+                
+                /* Footer */
+                .footer {
+                    text-align: center;
+                    margin-top: 40px;
+                    padding-top: 15px;
+                    font-size: 11px;
+                    color: #999;
+                    border-top: 1px solid #dee2e6;
+                }
+                
+                /* Print button */
+                .print-button {
+                    text-align: center;
+                    margin: 20px 0;
+                }
+                
+                .print-btn {
+                    background-color: #007bff;
+                    color: white;
+                    border: none;
+                    padding: 10px 30px;
+                    font-size: 16px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                }
+                
+                .print-btn:hover {
+                    background-color: #0056b3;
+                }
+                
+                /* Responsive design */
+                @media (max-width: 600px) {
+                    body {
+                        padding: 10px;
+                    }
+                    
+                    .signature-section {
+                        gap: 15px;
+                    }
+                    
+                    .signature-box {
+                        width: 120px;
+                    }
+                    
+                    table {
+                        font-size: 12px;
+                    }
+                    
+                    th, td {
+                        padding: 6px;
+                    }
+                }
             </style>
         </head>
         <body>
+            <!-- Centered Header -->
             <div class="header">
                 <h1>Grantley Adams Memorial School</h1>
                 <h2>Broiler Production Project</h2>
-                <h3>Claim Form for: ${employeeName}</h3>
-                <h3>${monthNames[month]} ${year}</h3>
+                <div class="claim-for">Claim Form for: ${employeeName}</div>
+                <div class="month-year">${monthNames[month]} ${year}</div>
             </div>
             
-            <div class="info">
-                <div><strong>Employee:</strong> ${employeeName}</div>
-                <div><strong>Period:</strong> ${monthNames[month]} ${year}</div>
+            <!-- Info Section -->
+            <div class="info-section">
+                <div class="info-item"><strong>Employee:</strong> ${employeeName}</div>
+                <div class="info-item"><strong>Period:</strong> ${monthNames[month]} ${year}</div>
+                <div class="info-item"><strong>Date Printed:</strong> ${new Date().toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                })}</div>
+                <div class="info-item"><strong>Time Printed:</strong> ${new Date().toLocaleTimeString()}</div>
             </div>
             
-            ${tableRows ? `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>AM/PM</th>
-                        <th>Time IN</th>
-                        <th>Time OUT</th>
-                        <th>Hours</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${tableRows}
-                </tbody>
-            </table>
-            
-            <div class="total">
-                Total Hours: ${totalHours}
+            <!-- Centered Table -->
+            ${hasEntries ? `
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>AM/PM</th>
+                            <th>Time IN</th>
+                            <th>Time OUT</th>
+                            <th>Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
             </div>
-            ` : '<p>No entries to display</p>'}
             
+            <!-- Centered Total Hours -->
+            <div class="total-section">
+                Total Hours: <span class="total-hours">${totalHours}</span>
+            </div>
+            ` : `
+            <div class="no-entries">
+                No time entries found for this period.<br>
+                Please add entries using the form.
+            </div>
+            `}
+            
+            <!-- Centered Signature Section -->
             <div class="signature-section">
                 <div class="signature-box">
-                    <div>Signature Claimant:</div>
-                    <div class="signature-line"></div>
+                    <div class="signature-label">Claimant Signature</div>
+                    <div class="signature-line">${employeeName}</div>
                 </div>
                 <div class="signature-box">
-                    <div>Signature HOD:</div>
-                    <div class="signature-line"></div>
+                    <div class="signature-label">Head of Department</div>
+                    <div class="signature-line">_________________</div>
                 </div>
                 <div class="signature-box">
-                    <div>Signature Principal:</div>
-                    <div class="signature-line"></div>
+                    <div class="signature-label">Principal</div>
+                    <div class="signature-line">_________________</div>
                 </div>
             </div>
             
+            <!-- Footer -->
             <div class="footer">
-                Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+                This is a computer-generated document from the Broiler Production Project Management System.<br>
+                Generated on ${new Date().toLocaleDateString('en-GB', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                })} at ${new Date().toLocaleTimeString()}
+            </div>
+            
+            <!-- Print Button (only visible on screen) -->
+            <div class="print-button no-print">
+                <button class="print-btn" onclick="window.print();">🖨️ Print Form</button>
+                <p style="margin-top: 10px; color: #666; font-size: 12px;">
+                    Click print, then choose your printer or "Save as PDF"
+                </p>
             </div>
             
             <script>
+                // Auto-trigger print dialog when window loads
                 window.onload = function() {
+                    // Small delay to ensure everything is rendered
                     setTimeout(function() {
                         window.print();
+                    }, 500);
+                    
+                    // Close window after printing (optional)
+                    window.onafterprint = function() {
                         setTimeout(function() {
                             window.close();
-                        }, 500);
-                    }, 250);
+                        }, 1000);
+                    };
                 };
             </script>
         </body>
         </html>
-    `);
+    `;
     
+    printWindow.document.write(printDocument);
     printWindow.document.close();
-    showNotification('Opening print preview...');
+    
+    showNotification('Print preview opened with centered layout!', 'success');
 }
 
 // ==================== UPDATE FUNCTION FOR THE "UPDATE" BUTTON ====================
