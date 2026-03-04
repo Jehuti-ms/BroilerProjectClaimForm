@@ -844,22 +844,11 @@ function updateClaimName() {
 */
 
 // Update claim for display in header
+// EVEN SIMPLER VERSION - JUST UPDATE EXISTING TITLE
 function updateClaimForDisplay(employeeName) {
     if (!employeeName || employeeName.trim() === '') return;
     
     console.log('Updating display with employee name:', employeeName);
-    
-    // Find the claim form title (h2 element that contains "Claim Form")
-    const allHeadings = document.querySelectorAll('h1, h2, h3');
-    let claimTitle = null;
-    
-    for (const heading of allHeadings) {
-        const text = heading.textContent || '';
-        if (text.includes('Claim Form') || text.includes('Claim for')) {
-            claimTitle = heading;
-            break;
-        }
-    }
     
     // Get current month/year
     let monthYear = '';
@@ -874,45 +863,50 @@ function updateClaimForDisplay(employeeName) {
         }
     }
     
-    if (claimTitle) {
-        // Update existing title
-        if (monthYear) {
-            claimTitle.textContent = `Claim Form for: ${employeeName} - ${monthYear}`;
-        } else {
-            claimTitle.textContent = `Claim Form for: ${employeeName}`;
-        }
-        console.log('Updated existing title:', claimTitle.textContent);
-    } else {
-        // Create new title if none exists
-        const header = document.querySelector('header') || document.querySelector('.header') || document.body;
-        const title = document.createElement('h2');
-        title.id = 'claim-form-title';
+    // Find ALL h2 elements
+    const allH2 = document.querySelectorAll('h2');
+    let updated = false;
+    
+    // Look for the specific h2 that contains the month/year or "Claim Form"
+    for (const h2 of allH2) {
+        const text = h2.textContent || '';
         
-        if (monthYear) {
-            title.textContent = `Claim Form for: ${employeeName} - ${monthYear}`;
-        } else {
-            title.textContent = `Claim Form for: ${employeeName}`;
-        }
+        // Check if this h2 contains a month name or "Claim Form"
+        const hasMonth = monthNames.some(month => text.includes(month));
+        const hasClaim = text.includes('Claim');
+        const hasYear = /\d{4}/.test(text);
         
-        title.style.cssText = `
-            text-align: center;
-            font-size: 1.5em;
-            margin: 10px 0 20px 0;
-            color: #2c3e50;
-        `;
-        
-        // Insert after the main h1 if it exists
-        const h1 = document.querySelector('h1');
-        if (h1 && h1.parentNode) {
-            h1.parentNode.insertBefore(title, h1.nextSibling);
-        } else {
-            header.insertBefore(title, header.firstChild);
+        if ((hasClaim || hasMonth || hasYear) && 
+            !text.includes('Grantley') && 
+            !text.includes('Broiler')) {
+            
+            // This is the claim title - update it
+            h2.textContent = `Claim Form for: ${employeeName} - ${monthYear}`;
+            console.log('Updated claim title:', h2.textContent);
+            updated = true;
+            break;
         }
-        console.log('Created new title:', title.textContent);
+    }
+    
+    // If no matching h2 found, try the first h2 that isn't the school or project
+    if (!updated) {
+        for (const h2 of allH2) {
+            const text = h2.textContent || '';
+            if (!text.includes('Grantley') && !text.includes('Broiler')) {
+                h2.textContent = `Claim Form for: ${employeeName} - ${monthYear}`;
+                console.log('Updated generic h2:', h2.textContent);
+                updated = true;
+                break;
+            }
+        }
     }
     
     // Update browser tab title
     document.title = `Broiler Claim - ${employeeName}`;
+    
+    if (!updated) {
+        console.log('No suitable h2 found to update');
+    }
 }
 
 // Open modal with better focus management
