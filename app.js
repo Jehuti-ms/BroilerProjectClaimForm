@@ -125,7 +125,6 @@ function updateEmployeeDisplayInHeaderWithName(name) {
 }
 
 // Save claim recipient name
-// Save claim recipient name
 function saveClaimRecipientName(name) {
     const trimmedName = name ? name.trim() : '';
     
@@ -318,6 +317,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 // ================== Initialization ===================
 // Initialize app
+// ==================== UPDATED INITIALIZE APP WITH SYNC ====================
 function initializeApp() {
     console.log('initializeApp called');
     
@@ -370,6 +370,10 @@ function initializeApp() {
         if (typeof loadUserData === 'function') {
             loadUserData();
         }
+        // Check for updates when month changes
+        if (typeof checkForUpdates === 'function') {
+            setTimeout(checkForUpdates, 500);
+        }
     });
     
     yearInput.addEventListener('change', function() {
@@ -379,20 +383,22 @@ function initializeApp() {
         if (typeof loadUserData === 'function') {
             loadUserData();
         }
+        // Check for updates when year changes
+        if (typeof checkForUpdates === 'function') {
+            setTimeout(checkForUpdates, 500);
+        }
     });
 
-    // Load data
-  /*  if (typeof loadUserData === 'function') {
-        setTimeout(() => {
-            loadUserData();
-        }, 1000); // Small delay to ensure DOM is ready
-    }*/
-
     // Load data - try Firebase first
-        setTimeout(async () => {
-            console.log('Loading data after initialization...');
-            await loadUserData(); // This will try Firebase then localStorage
-        }, 1000);
+    setTimeout(async () => {
+        console.log('Loading data after initialization...');
+        await loadUserData(); // This will try Firebase then localStorage
+        
+        // After loading, check for updates
+        if (typeof checkForUpdates === 'function') {
+            setTimeout(checkForUpdates, 1000);
+        }
+    }, 1000);
     
     // Setup header
     setupHeader();
@@ -400,23 +406,242 @@ function initializeApp() {
     // Set up name auto-save
     setupEmployeeNameField();
     
-    // Load user data if function exists
-    if (typeof loadUserData === 'function') {
-        loadUserData();
-    }
+    // Load user data if function exists (remove duplicate)
+    // if (typeof loadUserData === 'function') {
+    //     loadUserData();
+    // }
     
     // Initialize auto-sync if needed
     if (typeof initAutoSync === 'function') {
         initAutoSync();
     }
 
-     // Add button event listeners
+    // Add button event listeners
     setupButtonListeners();
     
-    console.log('App initialized completely');
+    // ========== NEW SYNC FEATURES ==========
     
+    // 1. Initialize Service Worker sync
+    if (typeof initServiceWorkerSync === 'function') {
+        setTimeout(() => {
+            initServiceWorkerSync();
+        }, 2000);
+    }
+    
+    // 2. Setup broadcast channel for same-device sync
+    if (typeof setupBroadcastChannel === 'function') {
+        setupBroadcastChannel();
+    }
+    
+    // 3. Setup periodic update checks
+    setupPeriodicUpdates();
+    
+    // 4. Setup online/offline listeners
+    setupConnectivityListeners();
+    
+    // 5. Check for pending syncs
+    if (typeof checkPendingSyncs === 'function') {
+        setTimeout(checkPendingSyncs, 3000);
+    }
+    
+    // 6. Update last seen timestamp
+    updateLastSeen();
+    
+    console.log('App initialized completely with sync features');
     console.log('App initialized. Current month:', monthSelect.value, 'Year:', yearInput.value);
 }
+
+// ==================== NEW HELPER FUNCTIONS ====================
+
+// Setup periodic updates
+function setupPeriodicUpdates() {
+    console.log('Setting up periodic update checks...');
+    
+    // Check every 5 minutes
+    const UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    
+    setInterval(() => {
+        if (navigator.onLine && !document.hidden) {
+            console.log('Periodic update check...');
+            if (typeof checkForUpdates === 'function') {
+                checkForUpdates();
+            }
+            if (typeof syncFromCloud === 'function') {
+                // Lightweight sync check
+                checkSyncStatus();
+            }
+        }
+    }, UPDATE_INTERVAL);
+    
+    // Also check when page becomes visible again
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && navigator.onLine) {
+            console.log('Page became visible, checking for updates...');
+            if (typeof checkForUpdates === 'function') {
+                setTimeout(checkForUpdates, 1000);
+            }
+        }
+    });
+}
+
+// Setup connectivity listeners
+function setupConnectivityListeners() {
+    console.log('Setting up connectivity listeners...');
+    
+    window.addEventListener('online', () => {
+        console.log('📶 Device is online');
+        showNotification('Back online - syncing data...', 'info');
+        updateSyncStatus('Online', '#4CAF50');
+        
+        // Trigger sync when coming online
+        setTimeout(() => {
+            if (typeof syncFromCloud === 'function') {
+                syncFromCloud();
+            }
+            if (typeof checkForUpdates === 'function') {
+                checkForUpdates();
+            }
+        }, 2000);
+    });
+    
+    window.addEventListener('offline', () => {
+        console.log('📵 Device is offline');
+        showNotification('You are offline - working with local data', 'warning');
+        updateSyncStatus('Offline', '#f44336');
+    });
+    
+    // Initial status
+    updateSyncStatus(navigator.onLine ? 'Online' : 'Offline', 
+                     navigator.onLine ? '#4CAF50' : '#f44336');
+}
+
+// Update sync status in UI
+function updateSyncStatus(status, color) {
+    const statusElement = document.getElementById('sync-status');
+    if (statusElement) {
+        statusElement.innerHTML = `<span style="color: ${color}">${status}</span>`;
+    }
+}
+
+// Check for pending syncs
+async function checkPendingSyncs() {
+    console.log('Checking for pending syncs...');
+    
+    try {
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) return;
+        
+        const user = JSON.parse(userData);
+        const userId = user.uid;
+        
+        // Check IndexedDB for pending syncs
+        if ('indexedDB' in window) {
+            const request = indexedDB.open('BroilerSyncDB', 2);
+            
+            request.onsuccess = (event) => {
+                const db = event.target.result;
+                if (db.objectStoreNames.contains('syncQueue')) {
+                    const transaction = db.transaction(['syncQueue'], 'readonly');
+                    const store = transaction.objectStore('syncQueue');
+                    const countRequest = store.count();
+                    
+                    countRequest.onsuccess = () => {
+                        const count = countRequest.result;
+                        if (count > 0) {
+                            console.log(`📦 ${count} pending syncs in queue`);
+                            updateSyncStatus(`📦 ${count} pending`, '#FF9800');
+                            
+                            // Trigger sync if online
+                            if (navigator.onLine && typeof triggerBackgroundSync === 'function') {
+                                triggerBackgroundSync();
+                            }
+                        }
+                    };
+                }
+            };
+        }
+    } catch (error) {
+        console.error('Error checking pending syncs:', error);
+    }
+}
+
+// Update last seen timestamp
+function updateLastSeen() {
+    const now = new Date().toISOString();
+    localStorage.setItem('lastSeen', now);
+    
+    // Also update in Firebase if online
+    if (navigator.onLine && db) {
+        const userData = localStorage.getItem('currentUser');
+        if (userData) {
+            const user = JSON.parse(userData);
+            const userId = user.uid;
+            
+            db.collection('userPresence').doc(userId).set({
+                lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+                lastSeenISO: now,
+                status: 'online'
+            }, { merge: true }).catch(err => console.log('Presence update failed:', err));
+        }
+    }
+}
+
+// Check sync status without full load
+async function checkSyncStatus() {
+    try {
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) return;
+        
+        const user = JSON.parse(userData);
+        const userId = user.uid;
+        
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        const monthYear = `${monthSelect.value}-${yearInput.value}`;
+        
+        const lastSync = localStorage.getItem('lastCloudSync');
+        
+        if (db) {
+            const docRef = db.collection('broilerClaims').doc(userId).collection('months').doc(monthYear);
+            const docSnap = await docRef.get();
+            
+            if (docSnap.exists) {
+                const firebaseData = docSnap.data();
+                const firebaseTime = firebaseData.lastUpdatedISO || '';
+                
+                if (firebaseTime > lastSync) {
+                    console.log('✨ Updates available from cloud');
+                    updateSyncStatus('✨ Updates available', '#2196F3');
+                    
+                    // Show subtle indicator
+                    const syncBtn = document.querySelector('.sync-btn');
+                    if (syncBtn) {
+                        syncBtn.style.animation = 'pulse 2s infinite';
+                    }
+                } else {
+                    updateSyncStatus('Synced', '#4CAF50');
+                    const syncBtn = document.querySelector('.sync-btn');
+                    if (syncBtn) {
+                        syncBtn.style.animation = '';
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error checking sync status:', error);
+    }
+}
+
+// Add pulse animation for sync button
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(33, 150, 243, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0); }
+    }
+`;
+document.head.appendChild(style);
 
 function setupButtonListeners() {
     console.log('Setting up button listeners...');
@@ -1347,6 +1572,7 @@ function saveEntry() {
 }
 
 // ==================== SAVE ENTIRE FORM TO FIREBASE ====================
+// ==================== UPDATED SAVE FUNCTION WITH SERVICE WORKER SYNC ====================
 async function saveData() {
     console.log('=== SAVING ENTIRE FORM TO FIREBASE ===');
     
@@ -1400,15 +1626,20 @@ async function saveData() {
             totalHours: document.getElementById('total-hours')?.textContent || '0:00',
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
             lastUpdatedISO: new Date().toISOString(),
-            device: navigator.userAgent
+            device: navigator.userAgent,
+            syncVersion: '2.0', // Add version for tracking
+            appVersion: '1.0'
         };
         
         // 6. SAVE TO FIREBASE FIRESTORE
+        let firebaseSuccess = false;
+        
         if (db) {
             try {
                 // Save to user's document in Firestore
                 await db.collection('broilerClaims').doc(userId).collection('months').doc(monthYear).set(firebaseData);
                 console.log('✅ Saved to Firebase Firestore');
+                firebaseSuccess = true;
                 
                 // Also save to a global collection for backup
                 await db.collection('allClaims').add({
@@ -1422,10 +1653,12 @@ async function saveData() {
             } catch (firebaseError) {
                 console.error('Firebase save error:', firebaseError);
                 showNotification('Cloud save failed, but saved locally', 'warning');
+                firebaseSuccess = false;
             }
         } else {
             console.warn('Firebase not available, saving only locally');
             showNotification('Firebase unavailable - saved locally only', 'warning');
+            firebaseSuccess = false;
         }
         
         // 7. Save to localStorage (as backup)
@@ -1458,9 +1691,79 @@ async function saveData() {
         // 9. Update last saved timestamp
         localStorage.setItem('lastSaved', new Date().toISOString());
         
-        // 10. Show success
+        // 10. TRIGGER SERVICE WORKER BACKGROUND SYNC
+        if (firebaseSuccess && 'serviceWorker' in navigator) {
+            try {
+                const registration = await navigator.serviceWorker.ready;
+                
+                // Prepare sync data for background sync
+                const syncData = {
+                    userId: userId,
+                    userEmail: userEmail,
+                    monthYear: monthYear,
+                    monthName: monthName,
+                    entries: currentData,
+                    employeeName: employeeName,
+                    totalHours: firebaseData.totalHours,
+                    timestamp: new Date().toISOString(),
+                    action: 'save'
+                };
+                
+                // Queue data in service worker
+                if (registration.active) {
+                    registration.active.postMessage({
+                        type: 'QUEUE_DATA',
+                        payload: syncData
+                    });
+                }
+                
+                // Register for background sync
+                if (registration.sync) {
+                    await registration.sync.register('firestore-sync');
+                    console.log('✅ Background sync registered');
+                }
+                
+                // Also try periodic sync if available
+                if ('periodicSync' in registration) {
+                    try {
+                        await registration.periodicSync.register('firestore-periodic-sync', {
+                            minInterval: 60 * 60 * 1000 // 1 hour
+                        });
+                        console.log('✅ Periodic sync registered');
+                    } catch (periodicError) {
+                        console.log('Periodic sync not available:', periodicError);
+                    }
+                }
+                
+            } catch (swError) {
+                console.log('Service Worker sync trigger failed:', swError);
+                // Fallback to regular sync check
+                setTimeout(() => {
+                    if (typeof checkForUpdates === 'function') {
+                        checkForUpdates();
+                    }
+                }, 5000);
+            }
+        }
+        
+        // 11. Update last sync display
+        updateLastSyncDisplay();
+        
+        // 12. Show success
         const entryCount = currentData.length;
         showNotification(`Saved ${entryCount} ${entryCount === 1 ? 'entry' : 'entries'} to cloud`, 'success');
+        
+        // 13. Broadcast to other tabs/windows (for same device)
+        if (typeof BroadcastChannel !== 'undefined') {
+            const channel = new BroadcastChannel('broiler-sync');
+            channel.postMessage({
+                type: 'DATA_SAVED',
+                userId: userId,
+                monthYear: monthYear,
+                timestamp: new Date().toISOString()
+            });
+            channel.close();
+        }
         
         return true;
         
@@ -1468,6 +1771,91 @@ async function saveData() {
         console.error('❌ Save error:', error);
         showNotification('Error saving form: ' + error.message, 'error');
         return false;
+    }
+}
+
+// ==================== CHECK FOR UPDATES ====================
+async function checkForUpdates() {
+    console.log('🔄 Checking for updates from other devices...');
+    
+    try {
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) return;
+        
+        const user = JSON.parse(userData);
+        const userId = user.uid;
+        
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        const monthYear = `${monthSelect.value}-${yearInput.value}`;
+        
+        // Get last sync time
+        const lastSync = localStorage.getItem('lastCloudSync') || '1970-01-01';
+        
+        if (!db) return;
+        
+        const docRef = db.collection('broilerClaims').doc(userId).collection('months').doc(monthYear);
+        const docSnap = await docRef.get();
+        
+        if (docSnap.exists) {
+            const firebaseData = docSnap.data();
+            const firebaseTime = firebaseData.lastUpdatedISO || '';
+            
+            // If Firebase data is newer, ask user to reload
+            if (firebaseTime > lastSync) {
+                console.log('✨ Newer data found from another device!');
+                
+                // Compare entry counts
+                const localCount = window.currentFormData?.length || 0;
+                const cloudCount = firebaseData.entries?.length || 0;
+                
+                if (cloudCount !== localCount) {
+                    if (confirm(`New data available from another device!\n\nLocal: ${localCount} entries\nCloud: ${cloudCount} entries\n\nReload to get the latest data?`)) {
+                        window.location.reload();
+                    }
+                } else {
+                    // Same count but newer timestamp - might be edits
+                    showNotification('Data updated from another device', 'info');
+                    // Optionally reload quietly
+                    // window.location.reload();
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error checking for updates:', error);
+    }
+}
+
+// ==================== SETUP BROADCAST CHANNEL ====================
+function setupBroadcastChannel() {
+    if (typeof BroadcastChannel === 'undefined') return;
+    
+    try {
+        const channel = new BroadcastChannel('broiler-sync');
+        
+        channel.addEventListener('message', (event) => {
+            const { type, userId, monthYear, timestamp } = event.data;
+            
+            if (type === 'DATA_SAVED') {
+                console.log('📡 Update detected from another tab:', { userId, monthYear });
+                
+                // Check if it's the same user and month
+                const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+                const currentMonthYear = `${document.getElementById('month-select')?.value}-${document.getElementById('year-input')?.value}`;
+                
+                if (currentUser.uid === userId && currentMonthYear === monthYear) {
+                    console.log('🔄 Same user/month - checking for updates...');
+                    setTimeout(() => {
+                        checkForUpdates();
+                    }, 2000);
+                }
+            }
+        });
+        
+        console.log('✅ Broadcast channel setup complete');
+        
+    } catch (error) {
+        console.log('Broadcast channel not supported:', error);
     }
 }
 
@@ -4111,6 +4499,244 @@ function createSampleData(month, year) {
     allData[monthYear] = sampleData;
     
     return allData;
+}
+
+// ==================== SERVICE WORKER SYNC MANAGER ====================
+let syncWorker = null;
+
+// Initialize Service Worker sync
+async function initServiceWorkerSync() {
+    console.log('🔄 Initializing Service Worker sync...');
+    
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        try {
+            // Register service worker
+            const registration = await navigator.serviceWorker.register('sw.js');
+            console.log('Service Worker registered:', registration);
+            
+            // Wait for it to be ready
+            await navigator.serviceWorker.ready;
+            
+            // Set up message listener
+            navigator.serviceWorker.addEventListener('message', handleSWMessage);
+            
+            // Register for periodic sync if available
+            if ('periodicSync' in registration) {
+                const status = await navigator.permissions.query({
+                    name: 'periodic-background-sync',
+                });
+                
+                if (status.state === 'granted') {
+                    await registration.periodicSync.register('firestore-periodic-sync', {
+                        minInterval: 60 * 60 * 1000, // 1 hour
+                    });
+                    console.log('Periodic sync registered');
+                }
+            }
+            
+            syncWorker = registration;
+            
+            // Initial sync
+            triggerBackgroundSync();
+            
+            // Set up online/offline listeners
+            window.addEventListener('online', () => {
+                console.log('📶 Back online - triggering sync');
+                triggerBackgroundSync();
+            });
+            
+            return true;
+            
+        } catch (error) {
+            console.error('Service Worker sync initialization failed:', error);
+            return false;
+        }
+    } else {
+        console.log('Background sync not supported in this browser');
+        return false;
+    }
+}
+
+// Handle messages from Service Worker
+function handleSWMessage(event) {
+    const { type, timestamp, success, error } = event.data;
+    
+    console.log('📨 Message from Service Worker:', type, event.data);
+    
+    switch (type) {
+        case 'SYNC_STARTED':
+            showNotification('Background sync started...', 'info');
+            updateSyncStatus('🔄 Syncing...', '#2196F3');
+            break;
+            
+        case 'SYNC_COMPLETED':
+            if (success) {
+                showNotification('Background sync complete!', 'success');
+                updateSyncStatus('✅ Synced', '#4CAF50');
+                // Reload data to show updates
+                loadUserData();
+            } else {
+                showNotification('Background sync failed', 'error');
+                updateSyncStatus('❌ Sync failed', '#f44336');
+            }
+            localStorage.setItem('lastCloudSync', timestamp);
+            updateLastSyncDisplay();
+            break;
+            
+        case 'SYNC_FAILED':
+            showNotification(`Sync error: ${error}`, 'error');
+            updateSyncStatus('❌ Sync error', '#f44336');
+            break;
+    }
+}
+
+// Trigger background sync
+async function triggerBackgroundSync() {
+    if (!syncWorker || !syncWorker.sync) {
+        console.log('Background sync not available');
+        return false;
+    }
+    
+    try {
+        // Get current data to sync
+        const userData = localStorage.getItem('currentUser');
+        if (!userData) return false;
+        
+        const user = JSON.parse(userData);
+        const userId = user.uid;
+        
+        const monthSelect = document.getElementById('month-select');
+        const yearInput = document.getElementById('year-input');
+        const monthYear = `${monthSelect.value}-${yearInput.value}`;
+        
+        // Queue data for sync
+        const syncData = {
+            userId: userId,
+            userEmail: user.email,
+            monthYear: monthYear,
+            entries: window.currentFormData || [],
+            employeeName: document.getElementById('employee-name')?.value,
+            totalHours: document.getElementById('total-hours')?.textContent
+        };
+        
+        // Send to service worker
+        const registration = await navigator.serviceWorker.ready;
+        registration.active.postMessage({
+            type: 'QUEUE_DATA',
+            payload: syncData
+        });
+        
+        // Register sync
+        await registration.sync.register('firestore-sync');
+        console.log('Background sync triggered');
+        return true;
+        
+    } catch (error) {
+        console.error('Failed to trigger background sync:', error);
+        return false;
+    }
+}
+
+// Update sync status in UI
+function updateSyncStatus(message, color) {
+    const statusElement = document.getElementById('sync-status');
+    if (statusElement) {
+        statusElement.innerHTML = `<span style="color: ${color}">${message}</span>`;
+    }
+}
+
+// Check sync support
+function checkSyncSupport() {
+    const support = {
+        serviceWorker: 'serviceWorker' in navigator,
+        syncManager: 'SyncManager' in window,
+        periodicSync: 'periodicSync' in (navigator.serviceWorker?.ready || {}),
+        indexedDB: 'indexedDB' in window
+    };
+    
+    console.log('📱 Sync Support:', support);
+    
+    if (!support.serviceWorker) {
+        showNotification('Service Worker not supported - using standard sync', 'warning');
+    }
+    if (!support.syncManager) {
+        showNotification('Background sync not supported - sync will happen when app is open', 'info');
+    }
+    
+    return support;
+}
+
+// Initialize sync on app start
+async function initializeSync() {
+    console.log('🔄 Initializing sync system...');
+    
+    // Check support
+    checkSyncSupport();
+    
+    // Initialize Service Worker sync
+    const swSupported = await initServiceWorkerSync();
+    
+    if (!swSupported) {
+        // Fallback to regular sync
+        console.log('Using fallback sync method');
+        startRegularSync();
+    }
+    
+    // Set up periodic check
+    setInterval(() => {
+        if (navigator.onLine) {
+            checkForUpdates();
+        }
+    }, 5 * 60 * 1000); // Every 5 minutes
+}
+
+// Fallback regular sync
+function startRegularSync() {
+    console.log('Starting regular sync interval');
+    setInterval(() => {
+        if (navigator.onLine && !document.hidden) {
+            syncFromCloud();
+        }
+    }, 5 * 60 * 1000);
+}
+
+// Check for updates from Firebase
+async function checkForUpdates() {
+    console.log('Checking for updates...');
+    
+    const userData = localStorage.getItem('currentUser');
+    if (!userData) return;
+    
+    const user = JSON.parse(userData);
+    const userId = user.uid;
+    
+    const monthSelect = document.getElementById('month-select');
+    const yearInput = document.getElementById('year-input');
+    const monthYear = `${monthSelect.value}-${yearInput.value}`;
+    
+    // Get last sync time
+    const lastSync = localStorage.getItem('lastCloudSync');
+    
+    try {
+        const docRef = db.collection('broilerClaims').doc(userId).collection('months').doc(monthYear);
+        const docSnap = await docRef.get();
+        
+        if (docSnap.exists) {
+            const firebaseData = docSnap.data();
+            const firebaseTime = firebaseData.lastUpdatedISO || '';
+            
+            // If Firebase data is newer, update
+            if (firebaseTime > lastSync) {
+                console.log('Newer data found in Firebase, updating...');
+                window.currentFormData = firebaseData.entries;
+                renderTable();
+                calculateTotal();
+                showNotification('Auto-updated with latest data', 'info');
+            }
+        }
+    } catch (error) {
+        console.error('Error checking for updates:', error);
+    }
 }
 
 // ==================== DEBUG FUNCTIONS ====================
