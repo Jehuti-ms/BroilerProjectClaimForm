@@ -750,71 +750,19 @@ function updateClaimName() {
     console.log('Claim name updated to:', name);
 }
 
-// ==================== FIXED PDF FUNCTION ====================
-// ==================== PDF FUNCTION - FORCE CENTERED TABLE ====================
+// ==================== PDF FUNCTION - USING PRINT TEMPLATE ====================
 function generatePDF() {
-    console.log('Generating A4 PDF with FORCE CENTERED table...');
-    
-    // Check if jsPDF is loaded
-    if (!window.jspdf) {
-        alert('PDF library not loaded. Please ensure you have internet connection.');
-        if (typeof loadPDFLibrary === 'function') {
-            loadPDFLibrary().then(() => generatePDF());
-        }
-        return;
-    }
+    console.log('Generating PDF using print template...');
     
     try {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
-        
-        // Page dimensions
-        const pageWidth = 210; // A4 width in mm
-        const pageHeight = 297; // A4 height in mm
-        const margin = 20; // Left/right margin
-        
-        // Get data
-        const monthSelect = document.getElementById('month-select');
-        const yearInput = document.getElementById('year-input');
-        
-        // Get employee name
-        const employeeName = document.getElementById('employee-name')?.value || 
-                            localStorage.getItem('claimEmployeeName') || 
-                            'Employee Name';
-        
-        const totalHours = document.getElementById('total-hours')?.textContent || '0:00';
-        
-        const month = parseInt(monthSelect?.value || 0);
-        const year = parseInt(yearInput?.value || 2026);
-        const monthName = monthNames[month] || 'Month';
-        
-        // ========== CENTERED HEADER ==========
-        doc.setFont('helvetica', 'bold');
-        
-        // School name - centered
-        doc.setFontSize(18);
-        doc.text('Grantley Adams Memorial School', pageWidth / 2, 20, { align: 'center' });
-        
-        // Project name - centered
-        doc.setFontSize(14);
-        doc.text('Broiler Production Project', pageWidth / 2, 30, { align: 'center' });
-        
-        // Claim form with employee name - centered
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Claim Form for: ${employeeName}`, pageWidth / 2, 40, { align: 'center' });
-        
-        // Month/Year - centered
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`${monthName} ${year}`, pageWidth / 2, 50, { align: 'center' });
-        
-        // Line separator
-        doc.setLineWidth(0.5);
-        doc.line(margin, 55, pageWidth - margin, 55);
+        // Get the print HTML that we know works
+        const month = document.getElementById('month-select').value;
+        const year = document.getElementById('year-input').value;
+        const employeeName = document.getElementById('employee-name').value;
+        const totalHours = document.getElementById('total-hours').textContent;
         
         // Get table data
-        const tableData = [];
+        let tableRows = '';
         const rows = document.querySelectorAll('#time-table tbody tr');
         
         rows.forEach(row => {
@@ -825,186 +773,227 @@ function generatePDF() {
             const hours = row.cells[4]?.textContent;
             
             if (date && date !== '' && date !== 'undefined') {
-                tableData.push([date, amPm || '', timeIn || '', timeOut || '', hours || '0:00']);
+                tableRows += `
+                    <tr>
+                        <td>${date}</td>
+                        <td>${amPm || ''}</td>
+                        <td>${timeIn || ''}</td>
+                        <td>${timeOut || ''}</td>
+                        <td class="hours">${hours || '0:00'}</td>
+                    </tr>
+                `;
             }
         });
         
-        // ========== FORCE CENTERED TABLE ==========
-        if (tableData.length > 0) {
-            // APPROACH 1: Calculate exact center position
-            // Column widths (optimized for A4)
-            const colWidths = [35, 25, 30, 30, 25]; // Date, AM/PM, Time IN, Time OUT, Hours
-            const totalTableWidth = colWidths.reduce((a, b) => a + b, 0);
-            
-            // Calculate starting X to PERFECTLY center the table
-            const startX = (pageWidth - totalTableWidth) / 2;
-            
-            console.log(`Table width: ${totalTableWidth}mm, Start X: ${startX}mm`);
-            
-            // Draw table manually if autoTable is causing issues
-            let yPos = 70;
-            
-            // Draw table header
-            doc.setFillColor(70, 70, 70);
-            doc.rect(startX, yPos - 5, totalTableWidth, 8, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(10);
-            
-            let xPos = startX;
-            doc.text('Date', xPos + 5, yPos);
-            xPos += colWidths[0];
-            doc.text('AM/PM', xPos + 5, yPos);
-            xPos += colWidths[1];
-            doc.text('Time IN', xPos + 5, yPos);
-            xPos += colWidths[2];
-            doc.text('Time OUT', xPos + 5, yPos);
-            xPos += colWidths[3];
-            doc.text('Hours', xPos + 5, yPos);
-            
-            // Draw vertical lines for header
-            doc.setDrawColor(255, 255, 255);
-            doc.setLineWidth(0.1);
-            xPos = startX;
-            for (let i = 0; i <= colWidths.length; i++) {
-                doc.line(xPos, yPos - 5, xPos, yPos + 3);
-                if (i < colWidths.length) xPos += colWidths[i];
-            }
-            
-            yPos += 8;
-            
-            // Draw table rows
-            doc.setTextColor(0, 0, 0);
-            doc.setFont('helvetica', 'normal');
-            
-            tableData.forEach((row, index) => {
-                if (yPos > 250) {
-                    doc.addPage();
-                    yPos = 30;
+        // Create the HTML content (copied from your working print function)
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Broiler Claim Form - ${employeeName} - ${monthNames[month]} ${year}</title>
+                <style>
+                    /* Print styles */
+                    @media print {
+                        @page {
+                            size: A4;
+                            margin: 2cm;
+                        }
+                    }
                     
-                    // Redraw header on new page
-                    doc.setFillColor(70, 70, 70);
-                    doc.rect(startX, yPos - 5, totalTableWidth, 8, 'F');
-                    doc.setTextColor(255, 255, 255);
-                    doc.setFont('helvetica', 'bold');
+                    body {
+                        font-family: Arial, sans-serif;
+                        line-height: 1.4;
+                        color: #333;
+                        max-width: 800px;
+                        margin: 0 auto;
+                        padding: 20px;
+                    }
                     
-                    xPos = startX;
-                    doc.text('Date', xPos + 5, yPos);
-                    xPos += colWidths[0];
-                    doc.text('AM/PM', xPos + 5, yPos);
-                    xPos += colWidths[1];
-                    doc.text('Time IN', xPos + 5, yPos);
-                    xPos += colWidths[2];
-                    doc.text('Time OUT', xPos + 5, yPos);
-                    xPos += colWidths[3];
-                    doc.text('Hours', xPos + 5, yPos);
+                    .header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        padding-bottom: 15px;
+                        border-bottom: 2px solid #333;
+                    }
                     
-                    doc.setTextColor(0, 0, 0);
-                    doc.setFont('helvetica', 'normal');
-                    yPos += 8;
-                }
+                    .header h1 {
+                        margin: 5px 0;
+                        font-size: 24px;
+                        color: #000;
+                        font-weight: bold;
+                    }
+                    
+                    .header h2 {
+                        margin: 5px 0;
+                        font-size: 20px;
+                        color: #333;
+                    }
+                    
+                    .header .claim-for {
+                        font-size: 18px;
+                        font-weight: bold;
+                        margin: 10px 0;
+                        color: #2c3e50;
+                    }
+                    
+                    .header .month-year {
+                        font-size: 16px;
+                        color: #666;
+                        margin-top: 5px;
+                    }
+                    
+                    .info-section {
+                        margin: 20px 0;
+                        padding: 15px;
+                        background-color: #f8f9fa;
+                        border: 1px solid #dee2e6;
+                        border-radius: 5px;
+                    }
+                    
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 20px auto;
+                        font-size: 14px;
+                    }
+                    
+                    th {
+                        background-color: #343a40;
+                        color: white;
+                        font-weight: bold;
+                        padding: 12px;
+                        text-align: center;
+                        border: 1px solid #454d55;
+                    }
+                    
+                    td {
+                        padding: 10px;
+                        text-align: center;
+                        border: 1px solid #dee2e6;
+                    }
+                    
+                    td.hours {
+                        font-weight: bold;
+                        color: #28a745;
+                    }
+                    
+                    .total-section {
+                        text-align: center;
+                        margin: 25px 0;
+                        padding: 15px;
+                        font-size: 18px;
+                        font-weight: bold;
+                        border-top: 2px solid #333;
+                        border-bottom: 2px solid #333;
+                        background-color: #f8f9fa;
+                    }
+                    
+                    .signature-section {
+                        display: flex;
+                        justify-content: center;
+                        gap: 30px;
+                        margin: 50px 0 30px 0;
+                    }
+                    
+                    .signature-box {
+                        width: 150px;
+                        text-align: center;
+                    }
+                    
+                    .signature-line {
+                        border-top: 2px solid #333;
+                        margin-top: 40px;
+                        padding-top: 5px;
+                    }
+                    
+                    .footer {
+                        text-align: center;
+                        margin-top: 40px;
+                        padding-top: 15px;
+                        font-size: 11px;
+                        color: #999;
+                        border-top: 1px solid #dee2e6;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>Grantley Adams Memorial School</h1>
+                    <h2>Broiler Production Project</h2>
+                    <div class="claim-for">Claim Form for: ${employeeName}</div>
+                    <div class="month-year">${monthNames[month]} ${year}</div>
+                </div>
                 
-                // Draw row background (alternating colors)
-                if (index % 2 === 0) {
-                    doc.setFillColor(245, 245, 245);
-                    doc.rect(startX, yPos - 4, totalTableWidth, 7, 'F');
-                }
+                <div class="info-section">
+                    <div><strong>Employee:</strong> ${employeeName}</div>
+                    <div><strong>Period:</strong> ${monthNames[month]} ${year}</div>
+                    <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
+                </div>
                 
-                // Draw row data
-                doc.setTextColor(0, 0, 0);
-                xPos = startX;
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>AM/PM</th>
+                            <th>Time IN</th>
+                            <th>Time OUT</th>
+                            <th>Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows || '<tr><td colspan="5" style="text-align: center;">No entries</td></tr>'}
+                    </tbody>
+                </table>
                 
-                doc.text(row[0], xPos + 5, yPos);
-                xPos += colWidths[0];
-                doc.text(row[1], xPos + 5, yPos);
-                xPos += colWidths[1];
-                doc.text(row[2], xPos + 5, yPos);
-                xPos += colWidths[2];
-                doc.text(row[3], xPos + 5, yPos);
-                xPos += colWidths[3];
-                doc.text(row[4], xPos + 5, yPos);
+                <div class="total-section">
+                    Total Hours: ${totalHours}
+                </div>
                 
-                // Draw bottom border
-                doc.setDrawColor(200, 200, 200);
-                doc.line(startX, yPos + 3, startX + totalTableWidth, yPos + 3);
+                <div class="signature-section">
+                    <div class="signature-box">
+                        <div>Claimant:</div>
+                        <div class="signature-line">${employeeName}</div>
+                    </div>
+                    <div class="signature-box">
+                        <div>HOD:</div>
+                        <div class="signature-line"></div>
+                    </div>
+                    <div class="signature-box">
+                        <div>Principal:</div>
+                        <div class="signature-line"></div>
+                    </div>
+                </div>
                 
-                yPos += 7;
-            });
-            
-            yPos += 10;
-            
-            // ========== CENTERED TOTAL HOURS ==========
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(14);
-            doc.setTextColor(40, 167, 69);
-            doc.text(`Total Hours: ${totalHours}`, pageWidth / 2, yPos, { align: 'center' });
-            
-            yPos += 15;
-            
-            // ========== CENTERED SIGNATURE SECTION ==========
-            doc.setTextColor(0, 0, 0);
-            doc.setFontSize(10);
-            
-            // Calculate positions for centered signature boxes
-            const boxWidth = 45;
-            const spacing = 10;
-            const totalSigWidth = (boxWidth * 3) + (spacing * 2);
-            const sigStartX = (pageWidth - totalSigWidth) / 2;
-            
-            // Draw signature lines
-            doc.setFont('helvetica', 'bold');
-            
-            // Claimant
-            doc.text('Claimant:', sigStartX, yPos);
-            doc.setFont('helvetica', 'normal');
-            doc.line(sigStartX, yPos + 15, sigStartX + boxWidth, yPos + 15);
-            
-            // HOD
-            doc.setFont('helvetica', 'bold');
-            doc.text('HOD:', sigStartX + boxWidth + spacing, yPos);
-            doc.setFont('helvetica', 'normal');
-            doc.line(sigStartX + boxWidth + spacing, yPos + 15, 
-                    sigStartX + (boxWidth * 2) + spacing, yPos + 15);
-            
-            // Principal
-            doc.setFont('helvetica', 'bold');
-            doc.text('Principal:', sigStartX + (boxWidth * 2) + (spacing * 2), yPos);
-            doc.setFont('helvetica', 'normal');
-            doc.line(sigStartX + (boxWidth * 2) + (spacing * 2), yPos + 15, 
-                    sigStartX + (boxWidth * 3) + (spacing * 2), yPos + 15);
-            
-            // Add employee name under claimant
-            doc.setFont('helvetica', 'italic');
-            doc.setFontSize(9);
-            doc.setTextColor(100, 100, 100);
-            doc.text(employeeName, sigStartX + (boxWidth / 2), yPos + 25, { align: 'center' });
-            
-        } else {
-            // No entries message - centered
-            doc.setFont('helvetica', 'italic');
-            doc.setFontSize(14);
-            doc.setTextColor(150, 150, 150);
-            doc.text('No entries found for this period.', pageWidth / 2, 120, { align: 'center' });
-            doc.text('Please add time entries using the form.', pageWidth / 2, 130, { align: 'center' });
-        }
+                <div class="footer">
+                    Generated on ${new Date().toLocaleDateString()}
+                </div>
+            </body>
+            </html>
+        `;
         
-        // ========== CENTERED FOOTER ==========
-        const currentDate = new Date().toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
+        // Create a hidden iframe to generate PDF from HTML
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
         
-        doc.setFont('helvetica', 'italic');
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`Generated on: ${currentDate}`, pageWidth / 2, 285, { align: 'center' });
+        iframe.contentDocument.open();
+        iframe.contentDocument.write(htmlContent);
+        iframe.contentDocument.close();
         
-        // Save the PDF
-        const filename = `Broiler_Claim_${monthName}_${year}_${employeeName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-        doc.save(filename);
+        // Wait for iframe to load then print/save as PDF
+        iframe.onload = function() {
+            setTimeout(() => {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                
+                // Remove iframe after printing
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 1000);
+            }, 500);
+        };
         
-        showNotification('FORCE CENTERED PDF generated successfully!');
+        showNotification('PDF preview opened - choose "Save as PDF" in print dialog', 'info');
         
     } catch (error) {
         console.error('PDF generation error:', error);
